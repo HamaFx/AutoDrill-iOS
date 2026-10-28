@@ -117,17 +117,30 @@ function addDrillButton(spriteName, onClick){
 }
 
 /** Drill buttons that need an output direction: remember the action, show the direction table. */
+var directionFillDone = false;
+
 function requireDirection(action){
     directionAction = action;
+    directionFillDone = false;
     api.elementSetVisible(directionTable, true);
 }
 
-/** Runs the pending fill for a chosen direction, with feedback so the tap is unmistakable. */
+/**
+ * Runs the pending fill for a chosen direction. The arrow table stays open: picking another
+ * arrow removes the layout that was just planned (while it is still unbuilt) and plans the new
+ * direction, so the choice can be changed without extra taps or leftovers.
+ */
 function chooseDirection(direction){
-    api.elementSetVisible(directionTable, false);
     if(directionAction == null) return;
 
-    api.toast("[AutoDrill] output facing " + directionName(direction));
+    if(directionFillDone){
+        var removed = util.undoLastCommitted();
+        if(removed > 0) api.toast("[AutoDrill] changed to " + directionName(direction) + " (removed " + removed + " old plans)");
+    }else{
+        api.toast("[AutoDrill] output facing " + directionName(direction) + " - tap another arrow to change it");
+    }
+
+    directionFillDone = true;
     directionAction(direction);
 }
 
@@ -162,7 +175,9 @@ function buildDirectionTable(){
         chooseDirection(direction.LEFT);
     });
     api.directionAddButton(row, "cancel", function(){
+        // done: keep whatever has been planned and close the picker
         api.elementSetVisible(directionTable, false);
+        if(directionFillDone) api.toast("[AutoDrill] direction confirmed");
     });
     api.directionAddButton(row, "right", function(){
         chooseDirection(direction.RIGHT);
