@@ -30,6 +30,16 @@ can read, and the listing is generated from the repository, not from a zip).
 
 ## 3. Publish
 
+Fastest path (no GitHub Actions needed):
+
+```bash
+tools/publish.sh                # packs and publishes the version in mod.hjson
+```
+
+This is exactly what `.github/workflows/release.yml` does on a tag push; use the script when
+Actions is unavailable (for example when the account's Actions minutes are locked).
+
+
 - [ ] `mod.hjson` → `repo: "<owner>/<repo>"` and `version` bumped
 - [ ] Repository has topic **`mindustry-mod`** (required for the auto-generated listing)
 - [ ] Repository language must **not** be Java/Kotlin/Groovy/Scala, and the repo must not
