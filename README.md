@@ -44,9 +44,11 @@ Two differences from the Java version, both caused by iOS mod limits:
 
 - The settings page has no decorative divider/description rows (iOS cannot subclass the
   game's setting classes). The descriptions are available as tooltips instead.
-- The layout search for laser/airblast/impact/eruption drills stops after **2 seconds** so
-  the game never freezes; a toast tells you when that happened. Lower *Optimization
-  Quality* for instant results, raise it for better layouts on small patches.
+- The layout search for laser/airblast/impact/eruption drills is capped at **2 seconds** and
+  at *Optimization Quality × 1000* explored layouts, so the game never freezes; a toast tells
+  you when the cap was hit. Each step now explores a *distinct* layout, so raising the quality
+  goes further than it used to, and the drill it replays mines ore no other selected drill
+  mines (no double counting).
 
 ## Notes
 
@@ -60,6 +62,10 @@ Two differences from the Java version, both caused by iOS mod limits:
 
 - `tools/ios-mode-check.sh` — lint + iOS-mode loader test (runs the mod through Rhino
   exactly as the iOS build does).
+- `tools/engine-probe.sh` — runs the placement engine against a fake world in seconds, with
+  no game needed. First stop when the engine misbehaves.
+- `tools/run-tests.sh <normal|ios>` — the in-engine suite in both script modes;
+  `tools/guard-check.sh` — the "another AutoDrill is installed" check.
 - `tools/pack.sh` — builds the release zip.
 - `tests/ingame/` — a test mod and a screenshot driver that run inside the real game.
 - `tests/harness/` — Rhino harness used by the iOS-mode check.

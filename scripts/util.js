@@ -17,7 +17,10 @@ var DEBUG = false;
 // declares those as consts in the shared lexical scope, and Rhino rejects the
 // redeclaration inside a module.
 function debugLog(msg){
-    if(DEBUG) api.log(msg);
+    if(DEBUG){
+        api.log(msg);
+        api.trace("[util] " + msg);
+    }
 }
 
 // ---------------------------------------------------------------- plan helpers
@@ -246,10 +249,14 @@ exports.expandArea = expandArea;
  * The frontier extends one tile past the patch edge.
  */
 function getConnectedTiles(tile, maxTiles, teamOverride){
+    api.trace("[util] flood fill start tile=" + api.tx(tile) + "," + api.ty(tile) + " max=" + maxTiles);
+
     var queue = [tile];
     var queueIndex = 0;
     var tiles = [];
-    var visited = {};
+    // 'seen' is set when a tile is enqueued: the buildability probe cannot change during a
+    // fill, so probing a tile twice is pure waste (it used to happen a lot).
+    var seen = {};
 
     var sourceItem = api.drop(tile);
     var sourceId = api.itemId(sourceItem);
@@ -258,11 +265,19 @@ function getConnectedTiles(tile, maxTiles, teamOverride){
     var copper = api.block("copperWall");
     var wall = api.environmentBuildable(copper) ? copper : api.block("berylliumWall");
 
-    while(queueIndex < queue.length && tiles.length < maxTiles){
-        var current = queue[queueIndex++];
-        var currentPos = api.pos(current);
+    seen[api.pos(tile)] = true;
 
-        if(!api.validPlace(wall, team, api.tx(current), api.ty(current), 0) || visited[currentPos] === true){
+    var iterations = 0;
+
+    while(queueIndex < queue.length && tiles.length < maxTiles){
+        iterations++;
+        if(DEBUG && (iterations % 500) === 0){
+            debugLog("flood fill: iterations=" + iterations + " queue=" + queue.length + " tiles=" + tiles.length);
+        }
+
+        var current = queue[queueIndex++];
+
+        if(!api.validPlace(wall, team, api.tx(current), api.ty(current), 0)){
             continue;
         }
 
@@ -272,15 +287,15 @@ function getConnectedTiles(tile, maxTiles, teamOverride){
                     if(x === 0 && y === 0) continue;
                     var neighbour = api.nearby(current, x, y);
                     if(neighbour == null) continue;
-                    if(visited[api.pos(neighbour)] !== true){
+                    var neighbourPos = api.pos(neighbour);
+                    if(seen[neighbourPos] !== true){
+                        seen[neighbourPos] = true;
                         queue.push(neighbour);
                     }
                 }
             }
             tiles.push(current);
         }
-
-        visited[currentPos] = true;
     }
 
     sortStable(tiles, function(t){

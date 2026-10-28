@@ -168,6 +168,34 @@ build tag in release titles (already wired in the release workflow).
 
 ---
 
+## Implementation status — batch 1 (v1.1.0, 2026-10-28)
+
+Items 1–4 of the recommended order are implemented and verified by the existing suite
+(66/66 in both normal and iOS script modes):
+
+| Item | Change | Measured (iOS mode = interpreted, worst case) |
+|---|---|---|
+| A8 + B5 | flood fill probes each tile exactly once; ore counting reuses one scratch `Seq` | bridge fill, 41×41 patch: 186 ms → **20 ms** |
+| B2 + B4 | push/pop backtracking with copy-on-improvement; occupancy and coverage bitsets replace rect scans | |
+| A1 | marginal-gain (union) scoring: a tile mined by two drills is counted once | new check "every drill mines ore no other drill mines" passes (worst 6 ≥ min 5) |
+| A2 | canonical order + suffix upper bound; one global placement budget replaces the per-level halving decay | optimiser, 41×41 patch: 2129 ms → **97 ms** (39 plans vs 40 before) |
+
+`Optimization Quality` now means *explored placements* (quality × 1000). Canonical ordering
+removed the duplicate permutations, so the same number covers far more distinct layouts; large
+patches still stop at the 2 s wall-clock cap or the budget, whichever comes first.
+
+### Two Rhino interpreter landmines found while implementing this (iOS-specific, both reproduced)
+
+1. **Uninitialised locals in functions containing nested functions.** `var x;` followed by an
+   assignment throws *"Assignment to undefined x in strict mode"*. Rule: always initialise
+   (`var x = null;`) — enforced by a static check in `tools/ios-mode-check.sh`.
+2. **Helper calls in hot loops can never return.** Calling a function that builds and returns
+   an object from inside the candidate loop made the loop repeat its last iteration and
+   allocate until OutOfMemory — on desktop it is fine, on the interpreted iOS engine it dies.
+   The candidate scan is therefore inlined (see the comment in `scripts/optimization.js`).
+   `tools/engine-probe.sh` reproduces engine failures in seconds with no game running; it was
+   what proved the merged pass fixes it.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

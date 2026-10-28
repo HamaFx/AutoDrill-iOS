@@ -21,7 +21,9 @@ fi
 mkdir -p "$(dirname "$LOG")" "$SHOTS"
 
 # a killed game makes Mindustry disable all mods on the next start - always start clean
-rm -f "$DATA/settings.bin" "$DATA/settings_backup.bin"
+# Mindustry writes launchid.dat on start and deletes it on a clean exit: if it is
+# left behind (killed run), the next start disables ALL mods.
+rm -f "$DATA/settings.bin" "$DATA/settings_backup.bin" "$DATA/launchid.dat"
 mkdir -p "$MODS"
 rm -rf "$MODS"/*
 
@@ -40,6 +42,10 @@ GAME_PID=$!
 for _ in $(seq 1 60); do
     sleep 2
     if grep -q "AUTODRILL-TEST-RESULT" "$LOG" 2>/dev/null; then
+        break
+    fi
+    if grep -q "OutOfMemoryError" "$LOG" 2>/dev/null; then
+        echo "(run aborted early: OutOfMemoryError)"
         break
     fi
 done

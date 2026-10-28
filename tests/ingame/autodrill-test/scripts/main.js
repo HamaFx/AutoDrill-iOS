@@ -17,6 +17,7 @@ var ui = require("auto-drill-ios/ui");
 var Vars = Packages.mindustry.Vars;
 var Blocks = Packages.mindustry.content.Blocks;
 var Team = Packages.mindustry.game.Team;
+var Core = Packages.arc.Core;
 
 var passed = 0;
 var failed = 0;
@@ -37,6 +38,9 @@ function check(name, condition, detail){
 }
 
 function runAll(){
+    report("jvm max heap MB=" + (java.lang.Runtime.getRuntime().maxMemory() / 1048576)
+        + " free MB=" + (java.lang.Runtime.getRuntime().freeMemory() / 1048576));
+
     try{
         buildMap();
     }catch(e){
@@ -62,6 +66,12 @@ function finish(){
     for(var i = 0; i < failures.length; i++){
         report("  failure: " + failures[i]);
     }
+
+    // shut down cleanly: this also clears the game's launch marker so the next test run
+    // starts with mods enabled instead of in crash-recovery mode
+    Core.app.post(function(){
+        Core.app.exit();
+    });
 }
 
 // ------------------------------------------------------------------ test world
@@ -227,15 +237,21 @@ function testBridge(){
     }
     check("bridge: drills sit on pattern tiles", wrongDrill == null, "wrong=" + wrongDrill);
 
+    report("bridge: pattern check done");
+
     // pneumatic
     var pneu = bridge.fill(ore, Blocks.pneumaticDrill, dir.UP, team);
     check("bridge: pneumatic produces plans", pneu.length > 0, "plans=" + pneu.length);
     check("bridge: pneumatic has drills", tileCount(pneu, Blocks.pneumaticDrill) > 0);
 
+    report("bridge: pneumatic done");
+
     // edge case: patch corner (bounds handling)
     var corner = api.tile(COPPER.x0, COPPER.y0);
     var cornerPlans = bridge.fill(corner, Blocks.mechanicalDrill, dir.LEFT, team);
     check("bridge: corner tap stays in bounds", allInBounds(cornerPlans));
+
+    report("bridge: corner done");
 
     // edge case: no ore
     var empty = api.tile(2, 2);
@@ -246,8 +262,14 @@ function testBridge(){
 function testOptimization(){
     var team = Team.sharded;
     var ore = api.tile(25, 25);
+    var minOres = api.settingInt("laser-drill-min-ores", 5);
 
+    report("optimization: starting");
+    util.setDebug(true);
+
+    optimization.setDebug(true);
     var laser = optimization.fill(ore, Blocks.laserDrill, true, team);
+    optimization.setDebug(false);
     check("optimization: laser produces plans", laser.length > 0, "plans=" + laser.length);
     check("optimization: laser blocks", allBlocksAllowed(laser, [Blocks.laserDrill, Blocks.waterExtractor, Blocks.powerNode]) === true,
         String(allBlocksAllowed(laser, [Blocks.laserDrill, Blocks.waterExtractor, Blocks.powerNode])));
@@ -269,8 +291,54 @@ function testOptimization(){
     check("optimization: impact produces plans", tileCount(impact, Blocks.impactDrill) > 0, "plans=" + impact.length);
     check("optimization: impact has no support blocks", tileCount(impact, Blocks.waterExtractor) === 0);
 
+    // deterministic: the shared-array search must not leak state between runs
+    var again = optimization.fill(ore, Blocks.laserDrill, true, team);
+    var identical = again.length === laser.length;
+    if(identical){
+        for(i = 0; i < again.length; i++){
+            if(again[i].x !== laser[i].x || again[i].y !== laser[i].y
+                || api.blockId(again[i].block) !== api.blockId(laser[i].block)){
+                identical = false;
+                break;
+            }
+        }
+    }
+    check("optimization: repeat fill gives the same layout", identical,
+        "first=" + laser.length + " second=" + again.length);
+
+    // marginal gain: with double counting gone, every placed drill must own ore cells that
+    // no other placed drill mines (this failed before the union-scoring change)
+    var coverage = {};
+    var perDrill = [];
+    for(i = 0; i < laser.length; i++){
+        if(api.blockId(laser[i].block) !== api.blockId(Blocks.laserDrill)) continue;
+
+        var linked = api.linkedTiles(Blocks.laserDrill, api.tile(laser[i].x, laser[i].y));
+        var owned = [];
+        for(var m = 0; m < linked.length; m++){
+            if(api.canMine(Blocks.laserDrill, linked[m])
+                && api.itemId(api.drop(linked[m])) === api.itemId(Packages.mindustry.content.Items.copper)){
+                var key = api.pos(linked[m]);
+                owned.push(key);
+                coverage[key] = (coverage[key] === undefined ? 0 : coverage[key]) + 1;
+            }
+        }
+        perDrill.push(owned);
+    }
+
+    var worstUnique = 999;
+    for(i = 0; i < perDrill.length; i++){
+        var unique = 0;
+        for(var n = 0; n < perDrill[i].length; n++){
+            if(coverage[perDrill[i][n]] === 1) unique++;
+        }
+        worstUnique = Math.min(worstUnique, unique);
+    }
+    check("optimization: every drill mines ore no other drill mines", worstUnique >= minOres,
+        "worst unique=" + worstUnique + " min=" + minOres);
+    report("optimization: marginal ore per drill (worst) = " + worstUnique);
+
     // min-ores setting is respected
-    var minOres = api.settingInt("laser-drill-min-ores", 5);
     var worst = 99;
     for(var i = 0; i < laser.length; i++){
         if(api.blockId(laser[i].block) === api.blockId(Blocks.laserDrill)){

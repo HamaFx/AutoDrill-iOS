@@ -70,6 +70,16 @@ function buildReal(){
         Log.warn("[auto-drill-ios] " + msg);
     };
 
+    /** Appends a line to <data dir>/autodrill-trace.txt. Debug helper: it survives a
+     *  hard crash (unlike the log), which makes it usable for bisecting failures. */
+    api.trace = function(text){
+        try{
+            Core.settings.getDataDirectory().child("autodrill-trace.txt").writeString(text + "\n", true);
+        }catch(e){
+            // tracing must never break the mod
+        }
+    };
+
     api.now = function(){
         return Time.millis();
     };
@@ -240,11 +250,18 @@ function buildReal(){
         return out;
     };
 
+    // One scratch Seq is reused: allocating a Seq per call was a measurable part of the
+    // ore-counting cost (the game is single threaded, so sharing is safe).
+    var linkedScratch = null;
+
     api.linkedTiles = function(block, tile){
-        var seq = tile.getLinkedTilesAs(block, new Seq());
+        if(linkedScratch == null) linkedScratch = new Seq();
+        linkedScratch.clear();
+        tile.getLinkedTilesAs(block, linkedScratch);
+
         var out = [];
-        for(var i = 0; i < seq.size; i++){
-            out.push(seq.get(i));
+        for(var i = 0; i < linkedScratch.size; i++){
+            out.push(linkedScratch.get(i));
         }
         return out;
     };

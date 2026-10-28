@@ -10,7 +10,9 @@ JAR="/tmp/opencode/libs/Mindustry-iossim.jar"
 LOG="/tmp/opencode/mr/guard.log"
 
 mkdir -p "$(dirname "$LOG")"
-rm -f "$DATA/settings.bin" "$DATA/settings_backup.bin"
+# Mindustry writes launchid.dat on start and deletes it on a clean exit: if it is
+# left behind (killed run), the next start disables ALL mods.
+rm -f "$DATA/settings.bin" "$DATA/settings_backup.bin" "$DATA/launchid.dat"
 mkdir -p "$MODS"
 rm -rf "$MODS"/*
 

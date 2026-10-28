@@ -41,5 +41,9 @@ Packages.arc.Events.on(Packages.mindustry.game.EventType.ClientLoadEvent, new Co
 
         report("RESULT passed=" + passed + " failed=" + failed
             + " | AUTODRILL-GUARD-RESULT passed=" + passed + " failed=" + failed);
+
+        Core.app.post(function(){
+            Core.app.exit();
+        });
     });
 }}));
