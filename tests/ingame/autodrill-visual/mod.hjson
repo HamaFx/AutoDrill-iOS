@@ -1,0 +1,7 @@
+displayName: "AutoDrill Visual Check"
+name: "autodrill-visual"
+author: "dev"
+description: "Visual verification driver for the auto-drill-ios port. Not for players."
+version: "1.0"
+minGameVersion: 160
+hidden: true

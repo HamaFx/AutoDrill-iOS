@@ -1,0 +1,7 @@
+displayName: "AutoDrill (desktop stand-in)"
+name: "auto-drill"
+author: "dev"
+description: "Dummy stand-in for the Java AutoDrill mod, used to verify the iOS edition stands down."
+version: "1.0"
+minGameVersion: 160
+hidden: true

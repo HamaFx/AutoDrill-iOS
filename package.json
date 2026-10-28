@@ -1,0 +1,11 @@
+{
+  "name": "auto-drill-ios-tools",
+  "private": true,
+  "description": "Dev-time linting for the AutoDrill (iOS) script mod - not shipped",
+  "scripts": {
+    "lint": "eslint scripts tests/ingame"
+  },
+  "devDependencies": {
+    "eslint": "9"
+  }
+}

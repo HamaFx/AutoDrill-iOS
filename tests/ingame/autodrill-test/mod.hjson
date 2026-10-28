@@ -1,0 +1,7 @@
+displayName: "AutoDrill Test Harness"
+name: "autodrill-test"
+author: "dev"
+description: "In-engine test harness for the auto-drill-ios port. Not for players."
+version: "1.0"
+minGameVersion: 160
+hidden: true

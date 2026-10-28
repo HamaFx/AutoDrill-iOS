@@ -1,0 +1,7 @@
+displayName: "AutoDrill Guard Check"
+name: "autodrill-guard"
+author: "dev"
+description: "Verifies the iOS edition stands down when another AutoDrill is installed. Not for players."
+version: "1.0"
+minGameVersion: 160
+hidden: true

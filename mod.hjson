@@ -1,0 +1,9 @@
+displayName: "AutoDrill (iOS)"
+name: "auto-drill-ios"
+author: "Pointifix, iOS/JS port"
+description: "Adds tools for automatically filling resource patches with drills (JavaScript edition for iOS-compatible script modding)"
+version: "1.0.0"
+minGameVersion: 160
+iosCompatible: true
+hidden: true
+repo: ""
