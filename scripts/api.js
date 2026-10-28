@@ -203,6 +203,21 @@ function buildReal(){
         return item == null ? -1 : item.id;
     };
 
+    /** Arc Point2.pack(x, y) - how Mindustry stores an item bridge's link target. */
+    api.pointPacked = function(x, y){
+        return Point2.pack(x, y);
+    };
+
+    /** The packed link target of a built item bridge, or -1 when unset. */
+    api.bridgeLinkPacked = function(building){
+        return building == null ? -1 : building.link;
+    };
+
+    /** Water attribute of a tile's floor - decides how good a water extractor would be. */
+    api.waterAt = function(tile){
+        return tile.floor().attributes.get(Packages.mindustry.world.meta.Attribute.water);
+    };
+
     api.itemHardness = function(item){
         return item == null ? -1 : item.hardness;
     };
@@ -217,6 +232,10 @@ function buildReal(){
 
     api.getDrop = function(drill, tile){
         return drill.getDrop(tile);
+    };
+
+    api.bridgeRange = function(block){
+        return block.range;
     };
 
     api.beamRange = function(drill){
@@ -271,6 +290,14 @@ function buildReal(){
             return new BuildPlan(x, y, rot, block);
         }
         return new BuildPlan(x, y, rot, block, new Point2(configX, configY));
+    };
+
+    /** Removes one previously added build plan from the player's queue (undo). */
+    api.removePlan = function(plan){
+        if(V.player == null || V.player.dead()) return false;
+        var unit = V.player.unit();
+        if(unit == null) return false;
+        return unit.plans.remove(plan, true);
     };
 
     api.addPlan = function(plan){
@@ -342,6 +369,29 @@ function buildReal(){
     };
 
     // ------------------------------------------------------------ events / input
+
+    /** Runs `fn` on the next frame - used to spread long work over frames. */
+    api.postStep = function(fn){
+        Core.app.post(new java.lang.Runnable({run: fn}));
+    };
+
+    // ---- progress bar (the same widget the mod importer uses) ----
+    api.showProgress = function(title){
+        V.ui.loadfrag.show(title);
+        V.ui.loadfrag.setProgress(0);
+    };
+
+    api.setProgress = function(fn){
+        V.ui.loadfrag.setProgress(new Packages.arc.func.Floatp({get: fn}));
+    };
+
+    api.setProgressCancel = function(fn){
+        V.ui.loadfrag.setButton(new java.lang.Runnable({run: fn}));
+    };
+
+    api.hideProgress = function(){
+        V.ui.loadfrag.hide();
+    };
 
     api.onClientLoad = function(fn){
         Events.on(EventType.ClientLoadEvent, new Cons({get: function(e){
@@ -543,6 +593,22 @@ function buildReal(){
         return handle;
     };
 
+    /** A plain (non-toggle) HUD button, e.g. undo. */
+    api.hudButton = function(iconName, visibleFn, onClick){
+        var handle = {element: null};
+        V.ui.hudGroup.fill(new Cons({get: function(t){
+            t.margin(5);
+            t.marginRight(191);
+            t.top().right();
+            var cell = t.button(Icon[iconName], Styles.defaulti, new java.lang.Runnable({run: onClick}));
+            var button = cell.get();
+            button.resizeImage(30);
+            button.visibility = new Boolp({get: visibleFn});
+            handle.element = button;
+        }}));
+        return handle;
+    };
+
     // ------------------------------------------------------------ tutorial dialog
 
     api.showTutorial = function(){
@@ -595,6 +661,20 @@ function buildReal(){
                     st.textPref(key, def, onChange == null ? null : new Cons({get: function(value){
                         onChange(value);
                     }}));
+                },
+                // Extra rows are appended after the preference list. The settings table
+                // rebuilds when a preference is registered, so these must come last.
+                label: function(text){
+                    st.labelWrap(text).growX().fillX().left().padTop(12).padLeft(8).get().setWrap(true);
+                    st.row();
+                },
+                divider: function(){
+                    st.image().growX().pad(8, 0, 8, 0).color(Pal.gray);
+                    st.row();
+                },
+                button: function(text, onClick){
+                    st.button(text, new java.lang.Runnable({run: onClick})).size(220, 46).padTop(6);
+                    st.row();
                 }
             });
         }}));

@@ -9,14 +9,14 @@ MODE="${1:?usage: run-tests.sh <normal|ios>}"
 DATA="$HOME/.local/share/Mindustry"
 MODS="$DATA/mods"
 DISP=":91"
-JAR="/tmp/opencode/libs/Mindustry.jar"
+JAR="${MINDUSTRY_JAR:-/tmp/opencode/libs/Mindustry.jar}"
 LOG="/tmp/opencode/mr/suite-$MODE.log"
 SHOTS="dist/screenshots"
 
-if [ "$MODE" = "ios" ]; then
+if [ "$MODE" = "ios" ] && [ -z "${MINDUSTRY_JAR:-}" ]; then
     JAR="/tmp/opencode/libs/Mindustry-iossim.jar"
 fi
-[ -f "$JAR" ] || { echo "missing $JAR (see docs/plans for how it is built)"; exit 1; }
+[ -f "$JAR" ] || { echo "missing $JAR - build it with tools/make-ios-sim-jar.sh"; exit 1; }
 
 mkdir -p "$(dirname "$LOG")" "$SHOTS"
 

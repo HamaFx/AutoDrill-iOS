@@ -222,8 +222,10 @@ function expandArea(tiles, radius){
 
     var expanded = [];
     for(i = 0; i < tiles.length; i++){
-        for(var dx = -radius; dx < radius; dx++){
-            for(var dy = -radius; dy < radius; dy++){
+        // symmetric: the original used a half-open range, which only added the extra ring
+        // on the -x/-y side (the drills could therefore overhang one row further there)
+        for(var dx = -radius; dx <= radius; dx++){
+            for(var dy = -radius; dy <= radius; dy++){
                 if(dx === 0 && dy === 0) continue;
                 var t = api.nearby(tiles[i], dx, dy);
                 if(t == null) continue;
@@ -307,20 +309,99 @@ function getConnectedTiles(tile, maxTiles, teamOverride){
 
 exports.getConnectedTiles = getConnectedTiles;
 
+/**
+ * Shortest path of tiles a block can be placed on, from `from` to any tile in `goals`.
+ * Returns the path *excluding* the goal tile, or null when none is reachable.
+ * Bounded by `budget` explored tiles; used for Erekir duct routing.
+ */
+function findDuctPath(from, goals, block, team, budget){
+    var goalSet = {};
+    var i = 0;
+    for(i = 0; i < goals.length; i++){
+        goalSet[api.pos(goals[i])] = true;
+    }
+
+    var startKey = api.pos(from);
+    var cameFrom = {};        // packed pos -> parent packed pos (-1 for the start)
+    var tileAt = {};          // packed pos -> tile (so the path can be rebuilt without scanning)
+    var visited = {};
+    var queue = [from];
+    var queueIndex = 0;
+    var explored = 0;
+
+    visited[startKey] = true;
+    cameFrom[startKey] = -1;
+    tileAt[startKey] = from;
+
+    while(queueIndex < queue.length && explored < budget){
+        var current = queue[queueIndex++];
+        explored++;
+
+        if(goalSet[api.pos(current)] === true){
+            var path = [];
+            var key = api.pos(current);
+            while(cameFrom[key] !== -1){
+                path.push(tileAt[key]);
+                key = cameFrom[key];
+            }
+            path.reverse();
+            return path;
+        }
+
+        // cardinal steps only: ducts are one-way and leaving the run is what the layout wants
+        for(i = 0; i < 4; i++){
+            var neighbour = api.nearby(current, i === 0 ? 1 : (i === 1 ? -1 : 0), i === 2 ? 1 : (i === 3 ? -1 : 0));
+            if(neighbour == null) continue;
+
+            var nkey = api.pos(neighbour);
+            if(visited[nkey] === true) continue;
+            if(goalSet[nkey] !== true && !canPlaceBlock(block, team, api.tx(neighbour), api.ty(neighbour), 0)) continue;
+
+            visited[nkey] = true;
+            cameFrom[nkey] = api.pos(current);
+            tileAt[nkey] = neighbour;
+            queue.push(neighbour);
+        }
+    }
+    return null;
+}
+
+exports.findDuctPath = findDuctPath;
+
 // ---------------------------------------------------------------- commit
+
+var lastCommitted = [];
 
 /** Java: Util.commitPlans - submits plans to the player's build queue. */
 function commitPlans(plans){
-    var committed = 0;
+    var committed = [];
     for(var i = 0; i < plans.length; i++){
         var p = plans[i];
-        if(api.addPlan(api.newPlan(p.x, p.y, p.rot, p.block, p.configX, p.configY))){
-            committed++;
+        var javaPlan = api.newPlan(p.x, p.y, p.rot, p.block, p.configX, p.configY);
+        if(api.addPlan(javaPlan)){
+            committed.push(javaPlan);
         }
     }
-    debugLog("Committed " + committed + "/" + plans.length + " build plans.");
-    return committed;
+    lastCommitted = committed;
+    debugLog("Committed " + committed.length + "/" + plans.length + " build plans.");
+    return committed.length;
 }
+
+exports.lastCommitted = function(){
+    return lastCommitted;
+};
+
+/** Removes the plans of the most recent fill from the player's queue. */
+function undoLastCommitted(){
+    var removed = 0;
+    for(var i = 0; i < lastCommitted.length; i++){
+        if(api.removePlan(lastCommitted[i])) removed++;
+    }
+    lastCommitted = [];
+    return removed;
+}
+
+exports.undoLastCommitted = undoLastCommitted;
 
 exports.commitPlans = commitPlans;
 

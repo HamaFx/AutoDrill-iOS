@@ -196,6 +196,25 @@ patches still stop at the 2 s wall-clock cap or the budget, whichever comes firs
    `tools/engine-probe.sh` reproduces engine failures in seconds with no game running; it was
    what proved the merged pass fixes it.
 
+## Implementation status — batch 2 (v1.2.0, 2026-10-28)
+
+Items 5–10 of the recommended order are implemented as well (suite still 66/66 in both modes):
+
+| Item | Change |
+|---|---|
+| B1 | The optimiser's search is now resumable and runs in slices across frames with a progress bar and a **cancel button** — no freeze even at high quality |
+| A4 | Optional **output routing** for optimised drills: a straight conveyor (duct on Erekir) run in the chosen direction, set by the new *Output Routing Length* slider (0 = off, the original behaviour) |
+| A7 | Existing bridges are now checked against their **real link** (`ItemBridgeBuild.link`, packed with `Point2.pack`) instead of "any bridge nearby" |
+| A6 | Erekir duct routing uses a **bounded BFS** over buildable tiles; beam nodes are *searched* for instead of computed by a formula that collided with the outlet duct (and were silently dropped) |
+| A5 | The water extractor picks the valid spot with the **highest water attribute** rather than the first one |
+| A3 | `expandArea` is symmetric again (it previously added the extra ring on one side only) |
+| C2–C4 | Toasts for: nothing placeable (out of build range), the quality budget being hit, and a partial fill ("mined X of Y ore tiles") |
+| D1 | **Undo**: a HUD button removes the last fill's plans while they are still unbuilt |
+| D2 | In-settings help paragraph + "show the tutorial again" button (rows appended after the preferences, the iOS-safe way) |
+| E1 | `tools/make-ios-sim-jar.sh` rebuilds the iOS-simulation jar from the official sources — the strongest test rig is now reproducible in one command |
+| E3 | `main` is treated as the release branch (what players install); work goes through `dev` |
+| A8b | Upstream quirk fixed: a tap on a non-ore tile used to plan a pointless bridge matrix; with no drill candidates nothing is planned now |
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

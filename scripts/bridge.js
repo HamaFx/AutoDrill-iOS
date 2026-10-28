@@ -144,6 +144,10 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
     }
     drillTiles = filtered;
 
+    // No drill means no job: the chain only exists to carry their output. Upstream planned a
+    // bridge matrix anyway when a non-ore tile was tapped, filling the map with useless plans.
+    if(drillTiles.length === 0) return [];
+
     if(bridgeTiles.length === 0) return [];
 
     // --- Outlet: the bridge tile furthest in the chosen direction, plus one tile further out.
@@ -291,15 +295,31 @@ function findExistingBridgePartner(bridgeTile){
     return null;
 }
 
-/** Java: BridgeDrill.hasExistingBridgePointingAt */
+/**
+ * Java: BridgeDrill.hasExistingBridgePointingAt - but exact.
+ *
+ * The original could only ask "is there a bridge nearby", because it assumed an item
+ * bridge's config cannot be read. It can: an ItemBridgeBuild stores its target as
+ * Point2.pack(x, y), so we check the real link. Search radius is the bridge's own reach.
+ */
 function hasExistingBridgePointingAt(x, y){
-    var offsets = [[3, 0], [-3, 0], [0, 3], [0, -3]];
-    for(var i = 0; i < offsets.length; i++){
-        var candidate = api.tile(x + offsets[i][0], y + offsets[i][1]);
-        if(candidate != null && api.buildOf(candidate) != null
-            && api.blockId(api.blockOf(candidate)) === api.blockId(api.block("itemBridge"))){
+    var range = api.bridgeRange(api.block("itemBridge"));
+    var packed = api.pointPacked(x, y);
+    var i = 0;
+
+    for(i = 1; i <= range; i++){
+        if(bridgeAtPointsTo(x + i, y, packed) || bridgeAtPointsTo(x - i, y, packed)
+            || bridgeAtPointsTo(x, y + i, packed) || bridgeAtPointsTo(x, y - i, packed)){
             return true;
         }
     }
     return false;
+}
+
+function bridgeAtPointsTo(x, y, packed){
+    var tile = api.tile(x, y);
+    if(tile == null) return false;
+    var building = api.buildOf(tile);
+    if(building == null || api.blockId(api.blockOf(tile)) !== api.blockId(api.block("itemBridge"))) return false;
+    return api.bridgeLinkPacked(building) === packed;
 }

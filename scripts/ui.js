@@ -6,6 +6,7 @@
 
 var api = require("api");
 var direction = require("direction");
+var util = require("util");
 var bridge = require("bridge");
 var optimization = require("optimization");
 var wall = require("wall");
@@ -15,6 +16,7 @@ var KEY_SHOW_BUTTON = "auto-drill-ios-display-toggle-button";
 var KEY_WELCOME = "auto-drill-ios-welcome";
 var KEY_QUALITY = "auto-drill-ios-optimization-quality";
 var KEY_SUPPORT = "auto-drill-ios-place-water-extractor-and-power-nodes";
+var KEY_ROUTE = "auto-drill-ios-output-routing-length";
 
 var enabled = false;
 var selectedTile = null;
@@ -56,6 +58,7 @@ exports.init = function(){
     buildSelectTable();
     buildSettings();
     buildHudButton();
+    buildUndoButton();
     registerInput();
     registerTap();
     return true;
@@ -187,12 +190,12 @@ function updateSelectTable(){
 
     if(api.environmentBuildable(laser) && api.canMine(laser, selectedTile)){
         addDrillButton("block-laser-drill-full",
-            function(){ optimization.fill(selectedTile, laser); });
+            function(){ startOptimization(laser, true); });
     }
 
     if(api.environmentBuildable(blast) && api.canMine(blast, selectedTile)){
         addDrillButton("block-blast-drill-full",
-            function(){ optimization.fill(selectedTile, blast); });
+            function(){ startOptimization(blast, true); });
     }
 
     var wallDrop = api.wallDrop(selectedTile);
@@ -204,12 +207,28 @@ function updateSelectTable(){
 
     if(api.environmentBuildable(impact) && api.canMine(impact, selectedTile)){
         addDrillButton("block-impact-drill-full",
-            function(){ optimization.fill(selectedTile, impact, false); });
+            function(){ startOptimization(impact, false); });
     }
 
     if(api.environmentBuildable(eruption) && api.canMine(eruption, selectedTile)){
         addDrillButton("block-eruption-drill-full",
-            function(){ optimization.fill(selectedTile, eruption, false); });
+            function(){ startOptimization(eruption, false); });
+    }
+}
+
+/**
+ * Optimised fills run in slices across frames (progress bar + cancel), and when output
+ * routing is enabled they ask for a direction first, like the bridge fillers do.
+ */
+function startOptimization(drill, withSupport){
+    var routeLength = api.settingInt(KEY_ROUTE, 0);
+
+    if(routeLength > 0){
+        requireDirection(function(d){
+            optimization.fillAsync(selectedTile, drill, withSupport, null, d, routeLength, function(){});
+        });
+    }else{
+        optimization.fillAsync(selectedTile, drill, withSupport, null, null, 0, function(){});
     }
 }
 
@@ -222,6 +241,18 @@ function buildHudButton(){
             enabled = !enabled;
             api.elementSetVisible(selectTable, false);
             api.elementSetVisible(directionTable, false);
+        });
+}
+
+/** Undo button: appears while the last fill's plans are still in the build queue. */
+function buildUndoButton(){
+    api.hudButton("undo",
+        function(){ return util.lastCommitted().length > 0; },
+        function(){
+            var removed = util.undoLastCommitted();
+            if(removed > 0){
+                api.toast("[AutoDrill] removed " + removed + " planned buildings");
+            }
         });
 }
 
@@ -310,5 +341,15 @@ function buildSettings(){
 
         st.slider(KEY_QUALITY, 2, 1, 10, 1);
         st.check(KEY_SUPPORT, true);
+
+        st.slider(KEY_ROUTE, 0, 0, 12, 1);
+
+        // Extra rows are allowed here (the table cannot be subclassed on iOS, but it is a
+        // Table, so plain rows work as long as they come after the preferences).
+        st.divider();
+        st.label(api.bundle("auto-drill-ios-help-text"));
+        st.button(api.bundle("auto-drill-ios-show-tutorial"), function(){
+            api.showTutorial();
+        });
     });
 }

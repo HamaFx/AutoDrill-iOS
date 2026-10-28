@@ -146,6 +146,18 @@ function makeApi(){
         return out;
     };
 
+    // ---- pieces the optimiser/reporting paths touch ----
+    api.waterAt = function(tile){ return ((tile.x * 7 + tile.y * 13) % 5) / 10; };
+    api.bridgeRange = function(){ return 4; };
+    api.pointPacked = function(x, y){ return ((x & 0xffff) << 16) | (y & 0xffff); };
+    api.bridgeLinkPacked = function(){ return -1; };
+    api.removePlan = function(){ return true; };
+    api.postStep = function(fn){ fn(); };
+    api.showProgress = function(text){ fakeLog.push("progress: " + text); };
+    api.setProgress = function(){};
+    api.setProgressCancel = function(){};
+    api.hideProgress = function(){};
+
     api.newPlan = function(x, y, rot, blk, configX, configY){
         return {x: x, y: y, rot: rot, block: blk, configX: configX, configY: configY};
     };

@@ -256,6 +256,11 @@ function testBridge(){
     // edge case: no ore
     var empty = api.tile(2, 2);
     var emptyPlans = bridge.fill(empty, Blocks.mechanicalDrill, dir.RIGHT, team);
+    var sample = [];
+    for(i = 0; i < emptyPlans.length && i < 6; i++){
+        sample.push(api.blockName(emptyPlans[i].block) + "@" + emptyPlans[i].x + "," + emptyPlans[i].y);
+    }
+    report("bridge: empty fill sampled " + sample.join(" ") + " dropIdOfTile2,2=" + api.itemId(api.drop(empty)));
     check("bridge: no-ore tile produces nothing", emptyPlans.length === 0, "plans=" + emptyPlans.length);
 }
 

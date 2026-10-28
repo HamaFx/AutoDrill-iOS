@@ -112,49 +112,27 @@ function fill(tile, drill, direction, teamOverride){
 
     var connectingTiles = [outerMostDuctTile];
 
+    // Every duct candidate is connected to the trunk along the shortest path of tiles a duct
+    // can actually be placed on. The original walked in primary/secondary steps, which could
+    // wander far away from the bores (and could loop forever without a guard).
+    var ductsBlock = api.block("duct");
+    var routeBudget = 4000;
+
     for(i = 0; i < ductTiles.length; i++){
         var ductTile2 = ductTiles[i];
         if(util.containsTile(connectingTiles, ductTile2)) continue;
+        if(routeBudget <= 0) break;
 
-        var closestDuctTile = util.argMin(connectingTiles, function(t){
-            return api.dst2ToTile(t, ductTile2);
-        });
-        if(closestDuctTile == null) continue;
+        var path = util.findDuctPath(ductTile2, connectingTiles, ductsBlock, team, routeBudget);
+        if(path == null){
+            dbg("no duct route from " + api.tx(ductTile2) + "," + api.ty(ductTile2));
+            continue;
+        }
+        dbg("duct route from " + api.tx(ductTile2) + "," + api.ty(ductTile2) + " length=" + path.length);
 
-        var currentX = api.tx(ductTile2);
-        var currentY = api.ty(ductTile2);
-        var goalX = api.tx(closestDuctTile);
-        var goalY = api.ty(closestDuctTile);
-        var paGoal = dir.primary(direction, goalX, goalY);
-        var saGoal = dir.secondary(direction, goalX, goalY);
-
-        var guard = 0;
-        while((currentX !== goalX || currentY !== goalY) && guard++ < 1000){
-            var paCur = dir.primary(direction, currentX, currentY);
-            var saCur = dir.secondary(direction, currentX, currentY);
-
-            var currentTile = api.tile(currentX, currentY);
-            if(currentTile != null && !util.containsTile(connectingTiles, currentTile)){
-                connectingTiles.push(currentTile);
-            }
-
-            if((paCur < paGoal && saCur === saGoal) || paCur > paGoal){
-                if(Math.abs(paCur) < Math.abs(paGoal)){
-                    currentX += Math.abs(direction.x);
-                    currentY += Math.abs(direction.y);
-                }else{
-                    currentX -= Math.abs(direction.x);
-                    currentY -= Math.abs(direction.y);
-                }
-            }else{
-                if(Math.abs(saCur) < Math.abs(saGoal)){
-                    currentX += Math.abs(direction.y);
-                    currentY += Math.abs(direction.x);
-                }else{
-                    currentX -= Math.abs(direction.y);
-                    currentY -= Math.abs(direction.x);
-                }
-            }
+        routeBudget -= path.length;
+        for(j = 0; j < path.length; j++){
+            if(!util.containsTile(connectingTiles, path[j])) connectingTiles.push(path[j]);
         }
     }
 
@@ -230,35 +208,31 @@ function fill(tile, drill, direction, teamOverride){
     }
 
     // --- Phase 5: beam nodes ------------------------------------------------------------
-    var outerMost = util.argMax(boreTiles, function(t){
-        return -dir.primary(direction, api.tx(t), api.ty(t));
-    });
-    if(outerMost == null) return [];
-
+    // Nodes used to be placed by a fixed formula that overlapped the outlet duct in simple
+    // geometries, in which case they were silently dropped. They are now searched for: step
+    // away from the bore in the output direction until a node fits, then chain back toward
+    // the bore (a beam node reaches 10 tiles, so links are made every 5 tiles).
     var beamNode = api.block("beamNode");
     var tilesize = api.tilesize();
 
-    dbg("phase5: bores=" + boreTiles.length + " outerMost=" + api.tx(outerMost) + "," + api.ty(outerMost)
-        + " offsetOpposite=" + offsetOpposite.x + "," + offsetOpposite.y + " opposite=" + opposite.x + "," + opposite.y);
-
     for(i = 0; i < boreTiles.length; i++){
         var boreTile2 = boreTiles[i];
-        var nodeX = Math.abs(direction.x) * api.tx(outerMost) + Math.abs(direction.y) * api.tx(boreTile2)
-            - offsetOpposite.x + opposite.x * 2;
-        var nodeY = Math.abs(direction.y) * api.ty(outerMost) + Math.abs(direction.x) * api.ty(boreTile2)
-            - offsetOpposite.y + opposite.y * 2;
+        var beamNodeTile = null;
 
-        var beamNodeTile = api.tile(nodeX, nodeY);
-        var nodeInWorld = util.isWithinWorld(beamNode, nodeX, nodeY);
-        var nodeValid = nodeInWorld && api.validPlace(beamNode, team, nodeX, nodeY, 0);
-        var nodeOverlaps = util.footprintOverlapsPlanned(beamNode, nodeX, nodeY, allPlans);
-        dbg("node " + nodeX + "," + nodeY + " tile=" + (beamNodeTile != null) + " inWorld=" + nodeInWorld
-            + " valid=" + nodeValid + " overlaps=" + nodeOverlaps);
-        if(beamNodeTile == null) continue;
+        for(j = 2; j <= 14; j++){
+            var probe = api.nearby(boreTile2, opposite.x * j, opposite.y * j);
+            if(probe == null) break;
 
-        var beamPlan = util.newPlan(api.tx(beamNodeTile), api.ty(beamNodeTile), 0, beamNode);
-        if(util.canPlaceWithoutPlanCollision(beamPlan, team, allPlans)){
-            allPlans.push(beamPlan);
+            var probePlan = util.newPlan(api.tx(probe), api.ty(probe), 0, beamNode);
+            if(util.canPlaceWithoutPlanCollision(probePlan, team, allPlans)){
+                allPlans.push(probePlan);
+                beamNodeTile = probe;
+                break;
+            }
+        }
+        if(beamNodeTile == null){
+            dbg("no beam node spot beyond bore " + api.tx(boreTile2) + "," + api.ty(boreTile2));
+            continue;
         }
 
         var chainGuard = 0;

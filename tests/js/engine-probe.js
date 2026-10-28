@@ -23,3 +23,22 @@ var elapsed = Date.now() - start;
 
 memory("after fill");
 java.lang.System.out.println("PROBE result plans=" + plans.length + " ms=" + elapsed);
+
+// the chunked (UI) path must produce exactly the same layout as the synchronous one
+var asyncPlans = null;
+optimization.fillAsync({x: 30, y: 30}, info.laserDrill, true, "sharded", null, 0, function(result){
+    asyncPlans = result;
+});
+
+var same = asyncPlans != null && asyncPlans.length === plans.length;
+if(same){
+    for(var i = 0; i < plans.length; i++){
+        if(asyncPlans[i].x !== plans[i].x || asyncPlans[i].y !== plans[i].y
+            || api.blockId(asyncPlans[i].block) !== api.blockId(plans[i].block)){
+            same = false;
+            break;
+        }
+    }
+}
+java.lang.System.out.println("PROBE chunked-vs-sync " + (same ? "MATCH" : "MISMATCH")
+    + " sync=" + plans.length + " chunked=" + (asyncPlans == null ? "null" : asyncPlans.length));
