@@ -267,7 +267,9 @@ function testBridge(){
 function testOptimization(){
     var team = Team.sharded;
     var ore = api.tile(25, 25);
-    var minOres = api.settingInt("laser-drill-min-ores", 5);
+        // the engine owns the default (optimization.settingDefaults), so read it there instead of
+    // repeating the number - the two drifted apart once already
+    var minOres = api.settingInt("laser-drill-min-ores", optimization.settingDefaults.laser.ores);
 
     report("optimization: starting");
     util.setDebug(true);
@@ -479,7 +481,8 @@ function testPerformance(){
     var bridgeMs = api.now() - start;
 
     start = api.now();
-    var laserPlans = optimization.fill(center, Blocks.laserDrill, true, team);
+    var laserFill = optimization.fillDetailed(center, Blocks.laserDrill, true, team);
+    var laserPlans = laserFill.plans;
     var laserMs = api.now() - start;
 
     report("performance: patch " + (BIG.x1 - BIG.x0 + 1) + "x" + (BIG.y1 - BIG.y0 + 1)
@@ -487,9 +490,24 @@ function testPerformance(){
         + " laser=" + laserMs + "ms/" + laserPlans.length + " plans");
 
     check("performance: bridge under 20s", bridgeMs < 20000, "ms=" + bridgeMs);
-    check("performance: optimization under 30s (incl. its 2s search budget)", laserMs < 30000, "ms=" + laserMs);
+    check("performance: optimization under 30s (incl. its search budget)", laserMs < 30000, "ms=" + laserMs);
     check("performance: bridge produced plans", bridgePlans.length > 0);
     check("performance: laser produced plans", laserPlans.length > 0);
+
+    // The guarantee the fill makes on a patch this size: it sees the whole thing and mines
+    // nearly all of it (the rim of a square is the worst case for 3x3 drills).
+    var patchTiles = (BIG.x1 - BIG.x0 + 1) * (BIG.y1 - BIG.y0 + 1);
+    var coveredFrac = laserFill.stats.target === 0 ? 0 : laserFill.stats.covered / laserFill.stats.target;
+    report("performance: big patch seen=" + laserFill.stats.target + "/" + patchTiles
+        + " covered=" + laserFill.stats.covered + " (" + Math.round(coveredFrac * 1000) / 10 + "%)"
+        + " drills=" + laserFill.stats.drills + " outOfReach=" + laserFill.stats.unreachable
+        + " stopped=" + laserFill.stats.stopped);
+    check("optimization: big patch is seen whole", laserFill.stats.target >= patchTiles,
+        "seen=" + laserFill.stats.target + "/" + patchTiles);
+    check("optimization: big patch coverage >= 90%", coveredFrac >= 0.90,
+        "covered=" + Math.round(coveredFrac * 1000) / 10 + "%");
+    check("optimization: big patch leaves nothing out of reach", laserFill.stats.unreachable === 0,
+        "outOfReach=" + laserFill.stats.unreachable);
 
     for(x = BIG.x0; x <= BIG.x1; x++){
         for(y = BIG.y0; y <= BIG.y1; y++){

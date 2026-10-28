@@ -1,0 +1,68 @@
+// Coverage probe: how much of an ore patch actually ends up mined?
+//
+// The engine maximises the ore tiles under the placed drills, which is exactly what Mindustry
+// pays out (a drill's progress is scaled by the number of ore tiles of its dominant item). So
+// the questions this probe answers are: does the fill see the whole patch, how many drills does
+// it place, and how many ore tiles are left unmined.
+//
+// Driven by tools/coverage-probe.sh, which writes tests/js/scenario.js from environment vars.
+
+"use strict";
+
+var api = require("api");
+var optimization = require("optimization");
+
+var S = AUTODRILL_FAKE_SCENARIO;
+var rect = S.ore;
+var drill = api.block(S.drill == null ? "laserDrill" : S.drill);
+
+function patchTiles(){
+    var count = 0;
+    if(S.round === true){
+        var cx = (rect.oreX0 + rect.x1) / 2, cy = (rect.oreY0 + rect.y1) / 2;
+        var r = Math.min(rect.x1 - rect.oreX0, rect.y1 - rect.oreY0) / 2;
+        for(var i = rect.oreX0; i <= rect.x1; i++){
+            for(var j = rect.oreY0; j <= rect.y1; j++){
+                var d = (i - cx) * (i - cx) + (j - cy) * (j - cy);
+                if(d <= r * r * 0.8) count++;
+            }
+        }
+        return count;
+    }
+    return (rect.x1 - rect.oreX0 + 1) * (rect.y1 - rect.oreY0 + 1);
+}
+
+var start = {x: Math.floor((rect.oreX0 + rect.x1) / 2), y: Math.floor((rect.oreY0 + rect.y1) / 2)};
+var total = patchTiles();
+
+var t0 = Date.now();
+var job = optimization.prepare(start, drill, true, "sharded", null, 0);
+var prepareMs = Date.now() - t0;
+
+t0 = Date.now();
+while(!optimization.searchStep(job, Infinity)){
+    // run to completion
+}
+var searchMs = Date.now() - t0;
+
+var selection = job.result.selection == null ? [] : job.result.selection;
+var covered = 0;
+for(var key in job.covered){
+    if(job.covered[key] > 0) covered++;
+}
+
+var size = api.size(drill);
+var pct = total === 0 ? 0 : Math.round(covered * 1000 / total) / 10;
+
+java.lang.System.out.println("COVERAGE drill=" + api.blockName(drill)
+    + " patch=" + total
+    + " seen=" + job.patchTiles + "/" + job.maxTiles
+    + " candidates=" + job.entries.length
+    + " drills=" + selection.length
+    + " covered=" + covered + " (" + pct + "%)"
+    + " score=" + job.result.score
+    + " missing=" + (total - covered)
+    + " footprint=" + size + "x" + size
+    + " prepareMs=" + prepareMs + " searchMs=" + searchMs
+    + " placements=" + job.placements
+    + " stopped=" + (job.cancelled ? "cancel" : (job.aborted ? "time" : (job.exhausted ? "budget" : "no"))));

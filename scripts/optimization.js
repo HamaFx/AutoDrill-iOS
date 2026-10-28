@@ -1,13 +1,25 @@
 // AutoDrill (iOS) - optimization.js
 // Port of autodrill/filler/OptimizationDrill.java: laser/airblast/impact/eruption layouts.
 //
-// The search maximises the ore actually mined by the placed drills:
-//   * marginal gain - a tile mined by two drills counts once
-//   * canonical order - each set of drills is explored once, not once per permutation
-//   * an optimistic bound prunes branches that cannot beat the current best
-//   * a quality budget (placements) plus a wall-clock backstop
-//   * the search is resumable, so the UI can run it across frames with a progress bar and a
-//     cancel button; the plain `fill` runs it in one go for tests and tools
+// What is maximised: the ore actually mined. Mindustry pays a drill out in proportion to the
+// ore tiles of its dominant item under it (Drill.DrillBuild.updateTile scales progress by
+// `dominantItems`), so "ore tiles covered" is throughput - and covering one tile with two
+// drills is impossible anyway, because footprints may not overlap.
+//
+// Three layouts compete, the best score wins:
+//   1. lattice seed - candidates whose centre is congruent modulo the drill size never
+//      overlap each other, so each of the size*size translations is a perfect tiling. The
+//      best translation is usually a near-perfect cover of a round patch, and it costs one
+//      pass over the candidates.
+//   2. branch-and-bound search - canonical order, marginal-gain scoring, optimistic bound,
+//      quality budget, wall-clock backstop. Wins on irregular patches, where a free-form
+//      layout beats a lattice.
+//   3. gap filler - after either layout, keep adding any still-free candidate that mines an
+//      ore tile nothing mines yet. This is what guarantees "no ore tile is left behind that
+//      one more drill could reach", and it repairs a layout whose search ran out of budget.
+//
+// Both the patch scan and the search are resumable, so the UI can run them across frames
+// with a progress bar and a cancel button; `fill` runs them in one go for tests and tools.
 //
 // Placement rules (which ore a drill must cover, minimum ores, footprint validity) are
 // unchanged from the Java original. Counting reproduces the original winner-item rule
@@ -20,7 +32,7 @@ var util = require("util");
 
 var SEARCH_BUDGET_MS = 3000;
 var STEP_WORK = 12000;           // candidate visits per frame in the chunked path
-var MAX_PLACEMENTS_SAFETY = 4;   // × the quality budget: an absolute ceiling
+var SCAN_WORK = 3000;            // patch tiles per frame while scanning in the chunked path
 var DEBUG = false;
 
 exports.setDebug = function(value){
@@ -34,12 +46,18 @@ function debugLog(msg){
     }
 }
 
+// Patch-size defaults are safety limits, not "how much ore to bother with": ore patches are
+// routinely several hundred tiles, and a limit below that silently fills only the part nearest
+// the tap. The search itself is bounded by the quality budget and the wall clock instead.
 var SETTING_DEFAULTS = {
-    mechanical: {tiles: 200, ores: 1},
-    pneumatic: {tiles: 150, ores: 2},
-    laser: {tiles: 100, ores: 5},
-    airblast: {tiles: 100, ores: 9}
+    mechanical: {tiles: 2500, ores: 1},
+    pneumatic: {tiles: 2500, ores: 1},
+    laser: {tiles: 2500, ores: 2},
+    airblast: {tiles: 2500, ores: 2}
 };
+
+/** Shared with the bridge/wall fillers so the four defaults exist in exactly one place. */
+exports.settingDefaults = SETTING_DEFAULTS;
 
 var KEY_QUALITY = "auto-drill-ios-optimization-quality";
 var KEY_SUPPORT = "auto-drill-ios-place-water-extractor-and-power-nodes";
@@ -63,41 +81,105 @@ function isErekirDrill(drill){
     return id === api.blockId(api.block("impactDrill")) || id === api.blockId(api.block("eruptionDrill"));
 }
 
-// ---------------------------------------------------------------------------- prepare
+// ---------------------------------------------------------------------------- job
 
-/**
- * Everything that needs the world: patch discovery, per-tile facts and the candidate list.
- * Returns a job object that `searchStep` can run in slices and `finish` can complete.
- */
-function prepare(tile, drill, withSupport, teamOverride, direction, routeLength){
+var PHASE_TILES = 0, PHASE_FACTS = 1, PHASE_CANDIDATES = 2, PHASE_SETUP = 3, PHASE_READY = 4;
+
+/** Everything that needs the world, collected across as many calls as the caller wants. */
+function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
     var team = teamOverride != null ? teamOverride : api.team();
-
     var prefix = settingsPrefix(drill);
-    var maxTiles = api.settingInt(prefix + "-drill-max-tiles", SETTING_DEFAULTS[prefix].tiles);
-    var minOresPerDrill = api.settingInt(prefix + "-drill-min-ores", SETTING_DEFAULTS[prefix].ores);
-
-    var tiles = util.getConnectedTiles(tile, maxTiles, teamOverride);
     var size = api.size(drill);
-    var half = Math.floor((size - 1) / 2);
-    util.expandArea(tiles, Math.floor(size / 2));
 
-    var sourceDropId = api.itemId(api.drop(tile));
+    return {
+        // ---- inputs ----
+        startTile: tile,
+        drill: drill,
+        team: team,
+        withSupport: withSupport !== false,
+        direction: direction == null ? null : direction,
+        routeLength: routeLength == null ? 0 : routeLength,
 
-    var worldW = api.worldW();
-    var cellFacts = {};      // key(x,y) -> {canMine, dropId, mineable}
-    var lowPriority = {};    // dropId -> boolean
-    var targetCells = 0;     // ore cells this fill is about
-    var i = 0;
+        // ---- settings, read once ----
+        prefix: prefix,
+        size: size,
+        half: Math.floor((size - 1) / 2),
+        worldW: api.worldW(),
+        maxTiles: api.settingInt(prefix + "-drill-max-tiles", SETTING_DEFAULTS[prefix].tiles),
+        minOres: api.settingInt(prefix + "-drill-min-ores", SETTING_DEFAULTS[prefix].ores),
+        quality: api.settingInt(KEY_QUALITY, 2),
 
-    for(i = 0; i < tiles.length; i++){
+        // ---- patch scan (resumable) ----
+        phase: PHASE_TILES,
+        tiles: null,
+        tileIndex: 0,
+        truncated: false,       // flood fill hit Max Tiles: part of the patch is unseen
+        sourceDropId: -1,
+        targetCells: 0,         // ore tiles this drill can mine, inside the seen patch
+        cellFacts: {},          // key(x,y) -> {canMine, dropId, mineable}
+        lowPriority: {},        // dropId -> boolean
+        candidates: [],
+        coverable: 0,           // ore tiles at least one candidate could mine
+
+        // ---- search ----
+        entries: [],
+        suffix: [],
+        occ: {},                // footprint cell -> placed count
+        covered: {},            // mined cell -> placed count (search scratch only)
+        path: [],
+        frames: [],
+        result: {score: 0, selection: null},
+        done: false,
+        maxTries: 0,
+        placements: 0,
+        checks: 0,
+        exhausted: false,
+        aborted: false,
+        cancelled: false,
+        deadline: 0,
+
+        // ---- outcome, filled in by finish() ----
+        stats: {source: "none", covered: 0, target: 0, unreachable: 0, blocked: 0, drills: 0, plans: 0,
+            candidates: 0, truncated: false, stopped: "no"}
+    };
+}
+
+/** Phase 0: the flood fill (one tile past the limit, so truncation is detectable). */
+function scanTiles(job){
+    var tiles = util.getConnectedTiles(job.startTile, job.maxTiles + 1, job.team);
+
+    job.truncated = tiles.length > job.maxTiles;
+    if(job.truncated) tiles.length = job.maxTiles;
+    util.expandArea(tiles, Math.floor(job.size / 2));
+
+    job.tiles = tiles;
+    job.sourceDropId = api.itemId(api.drop(job.startTile));
+    job.tileIndex = 0;
+    job.phase = PHASE_FACTS;
+
+    debugLog("stage: patch tiles=" + tiles.length + " size=" + job.size
+        + " truncated=" + job.truncated + " sourceDrop=" + job.sourceDropId);
+}
+
+/** Phase 1: per-tile facts (what this drill can mine there). */
+function scanFacts(job, work){
+    var tiles = job.tiles;
+    var worldW = job.worldW;
+    var drill = job.drill;
+    var lowPriority = job.lowPriority;
+    var cellFacts = job.cellFacts;
+    var i = job.tileIndex;
+    var visited = 0;
+
+    for(; i < tiles.length && visited < work; i++, visited++){
         var t = tiles[i];
         var item = api.getDrop(drill, t);
         var itemId = api.itemId(item);
         if(lowPriority[itemId] === undefined) lowPriority[itemId] = api.itemLowPriority(item);
 
         var canMine = api.canMine(drill, t);
-        var mineable = canMine && itemId === sourceDropId;
-        if(mineable) targetCells++;
+        var mineable = canMine && itemId === job.sourceDropId;
+        if(mineable) job.targetCells++;
         cellFacts[api.tx(t) + api.ty(t) * worldW] = {
             canMine: canMine,
             dropId: itemId,
@@ -105,14 +187,36 @@ function prepare(tile, drill, withSupport, teamOverride, direction, routeLength)
         };
     }
 
-    debugLog("stage: patch tiles=" + tiles.length + " size=" + size + " sourceDrop=" + sourceDropId);
+    job.tileIndex = i;
+    if(i >= tiles.length){
+        job.tileIndex = 0;
+        job.phase = PHASE_CANDIDATES;
+    }
+}
 
-    // NOTE: this pass is deliberately inlined instead of calling a helper that returns an
-    // object. The interpreted Rhino engine iOS uses does not return from such a helper when
-    // it is called in this loop (reproduced: the loop never advances and the heap grows
-    // until OutOfMemory). Inlining also removes a pass over the patch.
-    var candidates = [];
-    for(i = 0; i < tiles.length; i++){
+/**
+ * Phase 2: the candidate pass - every patch tile whose footprint can be mined and whose
+ * winner item is the patch ore with at least Min Ores cells.
+ *
+ * NOTE: this pass is deliberately inlined instead of calling a helper that returns an
+ * object. The interpreted Rhino engine iOS uses does not return from such a helper when
+ * it is called in this loop (reproduced: the loop never advances and the heap grows
+ * until OutOfMemory). Inlining also removes a pass over the patch.
+ */
+function scanCandidates(job, work){
+    var tiles = job.tiles;
+    var worldW = job.worldW;
+    var size = job.size;
+    var half = job.half;
+    var cellFacts = job.cellFacts;
+    var lowPriority = job.lowPriority;
+    var candidates = job.candidates;
+    var minOres = job.minOres;
+    var sourceDropId = job.sourceDropId;
+    var i = job.tileIndex;
+    var visited = 0;
+
+    for(; i < tiles.length && visited < work; i++, visited++){
         var cand = tiles[i];
         var cx0 = api.tx(cand) - half, cy0 = api.ty(cand) - half;
 
@@ -155,59 +259,82 @@ function prepare(tile, drill, withSupport, teamOverride, direction, routeLength)
         });
 
         var winner = ids[ids.length - 1];
-        if(winner !== sourceDropId || counts[winner].count < minOresPerDrill) continue;
-        if(!util.canPlaceBlock(drill, team, api.tx(cand), api.ty(cand), 0)) continue;
+        if(winner !== sourceDropId || counts[winner].count < minOres) continue;
+        if(!util.canPlaceBlock(job.drill, job.team, api.tx(cand), api.ty(cand), 0)) continue;
 
         candidates.push({
             tile: cand,
             cellKeys: cellKeys,
             mineableKeys: mineableKeys,
-            winnerId: winner,
             winnerCount: counts[winner].count
         });
     }
 
-    // Highest yield first; ties keep flood-fill order (Java's sort is stable).
-    util.sortStable(candidates, function(e){
+    job.tileIndex = i;
+    if(i >= tiles.length){
+        job.tileIndex = 0;
+        job.phase = PHASE_SETUP;
+    }
+}
+
+/** Phase 3: order the candidates, build the pruning bound, size the budget. */
+function setupSearch(job){
+    var entries = job.candidates;
+    util.sortStable(entries, function(e){
         return -e.winnerCount;
     });
 
-    var suffix = new Array(candidates.length + 1);
-    suffix[candidates.length] = 0;
-    for(i = candidates.length - 1; i >= 0; i--){
-        suffix[i] = suffix[i + 1] + candidates[i].winnerCount;
+    var suffix = new Array(entries.length + 1);
+    suffix[entries.length] = 0;
+    for(var i = entries.length - 1; i >= 0; i--){
+        suffix[i] = suffix[i + 1] + entries[i].winnerCount;
     }
+    job.suffix = suffix;
+    job.entries = entries;
 
-    debugLog("stage: candidates=" + candidates.length);
+    // how much ore is reachable at all: the rest is out of reach at the current Min Ores
+    var reachable = {};
+    var coverable = 0;
+    for(i = 0; i < entries.length; i++){
+        var keys = entries[i].mineableKeys;
+        for(var k = 0; k < keys.length; k++){
+            if(reachable[keys[k]] !== true){
+                reachable[keys[k]] = true;
+                coverable++;
+            }
+        }
+    }
+    job.coverable = coverable;
 
-    var quality = api.settingInt(KEY_QUALITY, 2);
+    // The quality setting buys *exploration*. A complete greedy descent must always fit: with
+    // candidates.length as the ceiling for a layout, a few multiples of that is enough to walk
+    // down once per branch order and still have budget for alternatives.
+    job.maxTries = Math.max(job.quality * 1000, entries.length * 3);
+    job.deadline = api.now() + SEARCH_BUDGET_MS;
 
-    return {
-        drill: drill,
-        team: team,
-        withSupport: withSupport !== false,
-        direction: direction == null ? null : direction,
-        routeLength: routeLength == null ? 0 : routeLength,
+    job.phase = PHASE_READY;
 
-        entries: candidates,
-        suffix: suffix,
-        targetCells: targetCells,
+    debugLog("stage: candidates=" + entries.length + " coverable=" + coverable + "/" + job.targetCells
+        + " budget=" + job.maxTries + " truncated=" + job.truncated);
+}
 
-        occ: {},          // footprint cell -> number of placed drills covering it
-        covered: {},      // mined cell -> number of placed drills mining it
-        path: [],
-        frames: [],
-        result: {score: 0, selection: null},
-        done: false,
+/** Advances the patch scan. `work` bounds the api-heavy loops per call. */
+function prepareStep(job, work){
+    if(job.phase === PHASE_TILES) scanTiles(job);
+    if(job.phase === PHASE_FACTS) scanFacts(job, work);
+    if(job.phase === PHASE_CANDIDATES) scanCandidates(job, work);
+    if(job.phase === PHASE_SETUP) setupSearch(job);
+}
 
-        maxTries: quality * 1000,
-        placements: 0,
-        checks: 0,
-        exhausted: false,
-        aborted: false,
-        cancelled: false,
-        deadline: api.now() + SEARCH_BUDGET_MS
-    };
+function prepareDone(job){
+    return job.phase >= PHASE_READY;
+}
+
+/** Synchronous scan (tests, tools, and any caller that wants the job immediately). */
+function prepare(tile, drill, withSupport, teamOverride, direction, routeLength){
+    var job = newJob(tile, drill, withSupport, teamOverride, direction, routeLength);
+    while(!prepareDone(job)) prepareStep(job, Infinity);
+    return job;
 }
 
 // ---------------------------------------------------------------------------- search
@@ -285,7 +412,7 @@ function searchStep(job, work){
 
         if(!free(job.occ, entry)) continue;
 
-        if(job.placements >= job.maxTries || job.placements >= job.maxTries * MAX_PLACEMENTS_SAFETY){
+        if(job.placements >= job.maxTries){
             job.exhausted = true;
             continue;
         }
@@ -349,34 +476,185 @@ function unplace(job, entry){
     }
 }
 
+// ---------------------------------------------------------------------------- layout choice
+
+/** Ore cells of a selection that nothing else in it mines. */
+function selectionScore(selection){
+    var covered = {};
+    var count = 0;
+    for(var i = 0; i < selection.length; i++){
+        var keys = selection[i].mineableKeys;
+        for(var k = 0; k < keys.length; k++){
+            if(covered[keys[k]] !== true){
+                covered[keys[k]] = true;
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+/**
+ * The best translation of the lattice, gap-filled. Candidates congruent to (ax, ay) modulo the
+ * drill size cannot overlap each other (their centres differ by whole block widths), so every
+ * translation is a legal, perfectly tiled layout without a single overlap test - and the filler
+ * then patches whatever the tiling missed at the rim.
+ *
+ * All size*size translations are tried because the winner depends on how the patch happens to
+ * line up: on a one-tile-wide vein, for instance, only the translation that matches the vein's
+ * start covers it end to end, while the others leave the last two tiles with nowhere to go.
+ */
+function bestLattice(job){
+    var size = job.size;
+    var entries = job.entries;
+    var best = null;
+
+    for(var ax = 0; ax < size; ax++){
+        for(var ay = 0; ay < size; ay++){
+            var selection = [];
+
+            for(var i = 0; i < entries.length; i++){
+                var entry = entries[i];
+                if((api.tx(entry.tile) - ax) % size !== 0) continue;
+                if((api.ty(entry.tile) - ay) % size !== 0) continue;
+                selection.push(entry);
+            }
+
+            var filled = fillGaps(job, selection);
+            var score = selectionScore(filled);
+            if(best == null || score > best.score) best = {selection: filled, score: score};
+        }
+    }
+    return best;
+}
+
+/**
+ * Keeps adding drills while any still-free candidate mines an ore tile that nothing mines yet.
+ * Terminates because every added drill covers at least one new tile and a blocked candidate
+ * stays blocked (placing only ever fills space). One pass is therefore enough.
+ */
+function fillGaps(job, selection){
+    var entries = job.entries;
+    var occ = {};
+    var covered = {};
+    var i = 0, k = 0, keys = null;
+
+    for(i = 0; i < selection.length; i++){
+        keys = selection[i].cellKeys;
+        for(k = 0; k < keys.length; k++) occ[keys[k]] = true;
+        keys = selection[i].mineableKeys;
+        for(k = 0; k < keys.length; k++) covered[keys[k]] = true;
+    }
+
+    var added = [];
+    for(i = 0; i < entries.length; i++){
+        var entry = entries[i];
+
+        var blocked = false;
+        var cells = entry.cellKeys;
+        for(k = 0; k < cells.length; k++){
+            if(occ[cells[k]] === true){
+                blocked = true;
+                break;
+            }
+        }
+        if(blocked) continue;
+
+        var gain = 0;
+        var mine = entry.mineableKeys;
+        for(k = 0; k < mine.length; k++){
+            if(covered[mine[k]] !== true) gain++;
+        }
+        if(gain === 0) continue;
+
+        added.push(entry);
+        for(k = 0; k < cells.length; k++) occ[cells[k]] = true;
+        for(k = 0; k < mine.length; k++) covered[mine[k]] = true;
+    }
+
+    if(added.length === 0) return selection;
+
+    var out = selection.slice();
+    for(i = 0; i < added.length; i++) out.push(added[i]);
+    return out;
+}
+
+/** The final layout: the better of the lattice seed and the search, both gap-filled. */
+function chooseSelection(job){
+    var lattice = bestLattice(job);
+
+    var searched = job.result.selection == null ? [] : job.result.selection;
+    var searchFilled = fillGaps(job, searched);
+    var searchScore = selectionScore(searchFilled);
+
+    if(lattice.score > searchScore){
+        return {selection: lattice.selection, score: lattice.score, source: "lattice"};
+    }
+    return {selection: searchFilled, score: searchScore, source: "search"};
+}
+
 // ---------------------------------------------------------------------------- finish
 
 function finish(job){
-    var selection = job.result.selection == null ? [] : job.result.selection;
+    var selection = [];
+    var score = 0;
+    var source = "none";
+    var covered = 0, unreachable = 0, blocked = 0;
+
+    if(prepareDone(job) && !job.cancelled){
+        var chosen = chooseSelection(job);
+        selection = chosen.selection;
+        score = chosen.score;
+        source = chosen.source;
+
+        covered = score;
+        unreachable = Math.max(0, job.targetCells - job.coverable);
+        blocked = Math.max(0, job.coverable - covered);
+    }
+
     var team = job.team;
+    var allPlans = [];
+    var occupied = {};
     var i = 0;
 
-    var allPlans = [];
     for(i = 0; i < selection.length; i++){
-        var chosen = selection[i].tile;
-        var plan = util.newPlan(api.tx(chosen), api.ty(chosen), 0, job.drill);
-        if(util.canPlaceWithoutPlanCollision(plan, team, allPlans)){
+        var chosenTile = selection[i].tile;
+        var plan = util.newPlan(api.tx(chosenTile), api.ty(chosenTile), 0, job.drill);
+        if(util.canPlacePlan(plan, team) && util.freeInOccupancy(occupied, plan.block, plan.x, plan.y)){
             allPlans.push(plan);
+            util.markOccupancy(occupied, plan.block, plan.x, plan.y, true);
         }else{
             util.markRefused();
         }
     }
 
     if(job.withSupport && api.settingBool(KEY_SUPPORT, true)){
-        placeWaterExtractorsAndPowerNodes(selection, job.drill, team, allPlans);
+        placeWaterExtractorsAndPowerNodes(selection, job.drill, team, allPlans, occupied);
     }
 
-    var routed = routeOutputs(job, allPlans);
+    var routed = routeOutputs(job, allPlans, occupied);
+
+    job.stats = {
+        source: source,
+        covered: covered,
+        target: job.targetCells,
+        unreachable: unreachable,
+        blocked: blocked,
+        drills: selection.length,
+        plans: allPlans.length,
+        candidates: job.entries.length,
+        truncated: job.truncated === true,
+        stopped: job.cancelled ? "cancel" : (job.aborted ? "time" : (job.exhausted ? "budget" : "no"))
+    };
 
     // ---- feedback ----
     if(job.cancelled){
         api.toast("[AutoDrill] planning cancelled");
     }else{
+        if(job.truncated){
+            api.toast("[AutoDrill] patch is larger than Max Tiles (" + job.maxTiles
+                + ") - raise it in settings to cover the rest");
+        }
         if(job.exhausted){
             api.toast("[AutoDrill] quality limit reached (" + job.placements + " layouts explored) - raise Optimization Quality for better results");
         }else if(job.aborted){
@@ -385,31 +663,35 @@ function finish(job){
 
         if(allPlans.length === 0 && job.entries.length > 0){
             api.toast("[AutoDrill] nothing could be placed here - is this inside your build range?");
-        }else{
-            var covered = 0;
-            for(var key in job.covered){
-                if(job.covered[key] > 0) covered++;
-            }
-            if(allPlans.length > 0 && covered < job.targetCells){
-                api.toast("[AutoDrill] mined " + covered + " of " + job.targetCells + " ore tiles here"
-                    + (routed > 0 ? " (incl. " + routed + " routing tiles)" : ""));
-            }
+        }else if(selection.length > 0 && covered < job.targetCells){
+            var why = unreachable > 0
+                ? unreachable + " out of reach (lower Min Ores)"
+                : blocked + " blocked (raise Optimization Quality)";
+            api.toast("[AutoDrill] mined " + covered + " of " + job.targetCells + " ore tiles - " + why
+                + (routed > 0 ? ", incl. " + routed + " routing tiles" : ""));
         }
     }
 
-    debugLog("patch=" + job.entries.length + " candidates=" + job.entries.length
-        + " selected=" + selection.length + " score=" + job.result.score
+    debugLog("patch=" + job.targetCells + " coverable=" + job.coverable
+        + " candidates=" + job.entries.length + " selected=" + selection.length + " drills"
+        + " score=" + score + " source=" + source
         + " placements=" + job.placements + " checks=" + job.checks
-        + " plans=" + allPlans.length
-        + " stopped=" + (job.cancelled ? "cancel" : (job.aborted ? "time" : (job.exhausted ? "budget" : "no"))));
+        + " plans=" + allPlans.length + " truncated=" + job.truncated
+        + " stopped=" + job.stats.stopped);
 
     util.commitPlans(allPlans);
     util.reportRefused("planned buildings");
     return allPlans;
 }
 
-/** Java: OptimizationDrill.placeWaterExtractorsAndPowerNodes */
-function placeWaterExtractorsAndPowerNodes(selection, drill, team, allPlans){
+/**
+ * Java: OptimizationDrill.placeWaterExtractorsAndPowerNodes
+ *
+ * One water extractor (for the drill's liquid boost) and one power node per drill. Uses the
+ * occupancy map built from the drill plans instead of rescanning every plan, which is what
+ * keeps a several-hundred-drill fill quick.
+ */
+function placeWaterExtractorsAndPowerNodes(selection, drill, team, allPlans, occupied){
     var waterExtractor = api.block("waterExtractor");
     var powerNode = api.block("powerNode");
     var drillSize = api.size(drill);
@@ -424,14 +706,18 @@ function placeWaterExtractorsAndPowerNodes(selection, drill, team, allPlans){
         var best = null, bestWater = -1e9;
         for(j = 0; j < nearby.length; j++){
             var plan = util.newPlan(api.tx(nearby[j]), api.ty(nearby[j]), 0, waterExtractor);
-            if(!util.canPlaceWithoutPlanCollision(plan, team, allPlans)) continue;
+            if(!util.canPlacePlan(plan, team)) continue;
+            if(!util.freeInOccupancy(occupied, waterExtractor, plan.x, plan.y)) continue;
             var water = api.waterAt(nearby[j]);
             if(water > bestWater){
                 bestWater = water;
                 best = plan;
             }
         }
-        if(best != null) allPlans.push(best);
+        if(best != null){
+            allPlans.push(best);
+            util.markOccupancy(occupied, waterExtractor, best.x, best.y, true);
+        }
     }
 
     for(i = 0; i < selection.length; i++){
@@ -439,8 +725,9 @@ function placeWaterExtractorsAndPowerNodes(selection, drill, team, allPlans){
         var nearby2 = util.nearbyTiles(api.tx(tile2), api.ty(tile2), drillSize, api.size(powerNode));
         for(j = 0; j < nearby2.length; j++){
             var plan2 = util.newPlan(api.tx(nearby2[j]), api.ty(nearby2[j]), 0, powerNode);
-            if(util.canPlaceWithoutPlanCollision(plan2, team, allPlans)){
+            if(util.canPlacePlan(plan2, team) && util.freeInOccupancy(occupied, powerNode, plan2.x, plan2.y)){
                 allPlans.push(plan2);
+                util.markOccupancy(occupied, powerNode, plan2.x, plan2.y, true);
                 break;
             }
         }
@@ -452,7 +739,7 @@ function placeWaterExtractorsAndPowerNodes(selection, drill, team, allPlans){
  * from every optimised drill, so the player does not have to place transport by hand.
  * Length 0 disables it. The Java mod never placed transport for these drills at all.
  */
-function routeOutputs(job, allPlans){
+function routeOutputs(job, allPlans, occupied){
     if(job.direction == null || job.routeLength <= 0) return 0;
 
     var block = isErekirDrill(job.drill) ? api.block("duct") : api.block("conveyor");
@@ -469,11 +756,12 @@ function routeOutputs(job, allPlans){
 
         for(step = 0; step < job.routeLength; step++){
             var plan = util.newPlan(x, y, job.direction.r, block);
-            if(!util.canPlaceWithoutPlanCollision(plan, job.team, allPlans)){
+            if(!util.canPlacePlan(plan, job.team) || !util.freeInOccupancy(occupied, block, x, y)){
                 util.markRefused();
                 break;
             }
             allPlans.push(plan);
+            util.markOccupancy(occupied, block, x, y, true);
             placed++;
             x += job.direction.x;
             y += job.direction.y;
@@ -496,18 +784,36 @@ function fill(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction
 
 exports.fill = fill;
 
-/**
- * Chunked fill: runs the search across frames with a progress bar and a cancel button, then
- * calls onDone(plans). Used by the UI so a large patch never freezes the game.
- */
-exports.fillAsync = function(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction, routeLength, onDone){
+/** Same as fill, plus the layout statistics (used by the engine checks). */
+exports.fillDetailed = function(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction, routeLength){
     var job = prepare(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction,
         routeLength == null ? api.settingInt(KEY_ROUTE, 0) : routeLength);
-
-    if(job.entries.length === 0 || job.maxTries <= 0){
-        onDone(finish(job));
-        return;
+    while(!searchStep(job, Infinity)){
+        // run to completion
     }
+    return {plans: finish(job), stats: job.stats};
+};
+
+/**
+ * How far the patch scan has got, 0..1. The chunked path shows this first and the search
+ * progress after it, so a huge patch reports progress instead of freezing the game.
+ */
+function prepareProgress(job){
+    if(job.phase === PHASE_TILES) return 0;
+    if(job.tiles == null || job.tiles.length === 0) return 1;
+    var part = job.tileIndex / job.tiles.length;
+    if(job.phase === PHASE_FACTS) return 0.5 * part;
+    if(job.phase === PHASE_CANDIDATES) return 0.5 + 0.5 * part;
+    return 1;
+}
+
+/**
+ * Chunked fill: runs the patch scan and the search across frames with a progress bar and a
+ * cancel button, then calls onDone(plans). Used by the UI so a big patch never freezes.
+ */
+exports.fillAsync = function(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction, routeLength, onDone){
+    var job = newJob(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction,
+        routeLength == null ? api.settingInt(KEY_ROUTE, 0) : routeLength);
 
     api.showProgress("[accent]AutoDrill[] planning...");
     api.setProgressCancel(function(){
@@ -515,8 +821,21 @@ exports.fillAsync = function(tile, drill, waterExtractorsAndPowerNodes, teamOver
     });
 
     function step(){
+        if(!prepareDone(job)){
+            prepareStep(job, SCAN_WORK);
+            api.setProgress(0.35 * prepareProgress(job));
+
+            if(job.cancelled){
+                api.hideProgress();
+                onDone(finish(job));
+                return;
+            }
+            api.postStep(step);
+            return;
+        }
+
         var done = searchStep(job, STEP_WORK);
-        api.setProgress(Math.min(0.95, job.placements / job.maxTries));
+        api.setProgress(0.35 + 0.6 * Math.min(1, job.placements / job.maxTries));
 
         if(done || job.cancelled){
             api.hideProgress();
@@ -528,3 +847,12 @@ exports.fillAsync = function(tile, drill, waterExtractorsAndPowerNodes, teamOver
 
     api.postStep(step);
 };
+
+// Exposed for the test rigs: prepare + searchStep let a probe or test inspect the search
+// (patch size, candidate count, coverage) without going through the game, and let the guard
+// checks assert coverage guarantees directly. Not used by the UI.
+exports.prepare = prepare;
+exports.prepareStep = prepareStep;
+exports.prepareDone = prepareDone;
+exports.searchStep = searchStep;
+exports.finish = finish;

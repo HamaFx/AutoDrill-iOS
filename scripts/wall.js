@@ -262,8 +262,11 @@ function getConnectedWallTiles(tile, direction){
     var visited = {};
 
     var sourceItemId = api.itemId(api.wallDrop(tile));
-    var baseSetting = api.settingInt("mechanical-drill-max-tiles", 200);
-    var maxTiles = Math.trunc(baseSetting * 0.25);
+    // The wall fill explores a quarter of what a normal fill does (as in the original), but
+    // bounded: it is a different tool with its own cost, and the patch-size setting is not
+    // about it.
+    var baseSetting = api.settingInt("mechanical-drill-max-tiles", 2500);
+    var maxTiles = Math.min(600, Math.max(100, Math.trunc(baseSetting * 0.25)));
 
     while(queueIndex < queue.length && tiles.length < maxTiles){
         var current = queue[queueIndex++];

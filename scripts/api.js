@@ -322,6 +322,12 @@ function buildReal(){
         return Core.settings.getString(key, def);
     };
 
+    /** Writes an int setting. Arc's Settings.put rejects a boxed Double, which is what a
+     *  plain JS number becomes on the way into Java, so the value must be boxed as an int. */
+    api.putSettingInt = function(key, value){
+        Core.settings.putInt(key, value | 0);
+    };
+
     api.putSetting = function(key, value){
         Core.settings.put(key, value);
     };
@@ -525,7 +531,9 @@ function buildReal(){
     };
 
     api.elementSetVisible = function(element, visible){
-        element.visible = visible;
+        // null-guard: a failed init leaves the tables unset, and a broken init must not throw
+        // somewhere else entirely (the test rig caught exactly that)
+        if(element != null) element.visible = visible;
     };
 
     api.elementIsVisible = function(element){

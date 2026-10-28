@@ -11,6 +11,7 @@ can read, and the listing is generated from the repository, not from a zip).
 - [ ] In-engine suite, desktop mode: `tools/run-tests.sh normal` → `failed=0`
 - [ ] In-engine suite, **iOS mode**: `tools/run-tests.sh ios` → `failed=0`
 - [ ] Guard test: `tools/guard-check.sh` → mod stands down when the Java mod is present
+- [ ] Engine checks: `tools/engine-tests.sh` → `failed=0` (coverage, overlap, determinism)
 - [ ] `./tools/pack.sh` → zip contains `mod.hjson`, `scripts/`, `sprites/`, `bundles/` at the root
 - [ ] Device test on a real iPhone/iPad (see below)
 

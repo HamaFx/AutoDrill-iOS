@@ -6,6 +6,7 @@
 
 var api = require("api");
 var util = require("util");
+var optimization = require("optimization");
 
 var DEBUG = false;
 
@@ -20,12 +21,9 @@ function dbg(msg){
     }
 }
 
-var SETTING_DEFAULTS = {
-    mechanical: {tiles: 200, ores: 1},
-    pneumatic: {tiles: 150, ores: 2},
-    laser: {tiles: 100, ores: 5},
-    airblast: {tiles: 100, ores: 9}
-};
+// The patch-size / min-ores defaults live in optimization.js: one table, so the fillers
+// cannot drift apart.
+var SETTING_DEFAULTS = optimization.settingDefaults;
 
 /** Java: BridgeDrill.isDrillTile */
 function isDrillTile(tile){

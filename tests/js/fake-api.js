@@ -4,7 +4,11 @@
 var fakeLog = [];
 
 function makeApi(){
-    var WORLD = 64;
+    var SCENARIO = (typeof AUTODRILL_FAKE_SCENARIO !== "undefined") ? AUTODRILL_FAKE_SCENARIO : null;
+    var OPTS = SCENARIO == null ? {} : SCENARIO;
+
+    var WORLD = OPTS.world == null ? 64 : OPTS.world;
+    var WORLD_H = OPTS.worldH == null ? WORLD : OPTS.worldH;
     var TILESIZE = 8;
 
     var blocks = {};      // name -> block
@@ -44,12 +48,28 @@ function makeApi(){
     var batch = {oreX0: 20, oreX1: 40, oreY0: 20, oreY1: 40};
 
     function pos(x, y){ return x + y * WORLD; }
-    function inWorld(x, y){ return x >= 0 && y >= 0 && x < WORLD && y < WORLD; }
+    function inWorld(x, y){ return x >= 0 && y >= 0 && x < WORLD && y < WORLD_H; }
 
-    var i = 0, j = 0;
-    for(i = batch.oreX0; i <= batch.oreX1; i++){
-        for(j = batch.oreY0; j <= batch.oreY1; j++){
-            ore[pos(i, j)] = true;
+    var rect = OPTS.ore == null ? batch : OPTS.ore;
+    var shapes = OPTS.patches == null
+        ? [{oreX0: rect.oreX0, oreY0: rect.oreY0, x1: rect.x1, y1: rect.y1, round: OPTS.round === true}]
+        : OPTS.patches;
+
+    var i = 0, j = 0, si = 0;
+    for(si = 0; si < shapes.length; si++){
+        var sh = shapes[si];
+        var cx = (sh.oreX0 + sh.x1) / 2, cy = (sh.oreY0 + sh.y1) / 2;
+        var r = Math.min(sh.x1 - sh.oreX0, sh.y1 - sh.oreY0) / 2;
+
+        for(i = sh.oreX0; i <= sh.x1; i++){
+            for(j = sh.oreY0; j <= sh.y1; j++){
+                if(sh.round === true){
+                    // round blob, like the map generator's patches
+                    var d = (i - cx) * (i - cx) + (j - cy) * (j - cy);
+                    if(d > r * r * 0.8) continue;
+                }
+                ore[pos(i, j)] = true;
+            }
         }
     }
 
@@ -74,7 +94,7 @@ function makeApi(){
     api.tx = function(tile){ return tile.x; };
     api.ty = function(tile){ return tile.y; };
     api.worldW = function(){ return WORLD; };
-    api.worldH = function(){ return WORLD; };
+    api.worldH = function(){ return WORLD_H; };
 
     api.drop = function(tile){ return ore[pos(tile.x, tile.y)] === true ? copper : null; };
     api.wallDrop = function(){ return null; };
@@ -163,7 +183,9 @@ function makeApi(){
     };
     api.addPlan = function(){ return true; };
 
-    api.settingInt = function(key, def){ return def; };
+    api.settingInt = function(key, def){
+        return (OPTS.settings != null && OPTS.settings[key] != null) ? OPTS.settings[key] : def;
+    };
     api.settingBool = function(key, def){ return def; };
     api.settingString = function(key, def){ return def; };
     api.putSetting = function(){};

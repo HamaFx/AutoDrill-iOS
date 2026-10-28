@@ -225,6 +225,57 @@ fell outside the plan set removed the whole chain. In a real campaign sector thi
 bridge only when it is a genuinely dead end (no target *and* nothing feeding it). Verified in a
 real sector: mechanical fill now plans 40 drills + 25 bridges (before: 40 drills, 0 bridges).
 
+### Engine pass 1.4.0 — "it does not cover the patch"
+
+Reported from the device: *"too much space is left behind, it will not cover all the resources
+and not enough drills get built."* Reproduced with `tools/coverage-probe.sh`, which measures
+coverage straight off the committed plans:
+
+| Case (laser drill) | Before | After |
+|---|---|---|
+| 21×21 square patch (441 ore tiles) | 144 tiles mined (32.7 %), 16 drills | **441 (100 %), 49 drills** |
+| 45×45 round patch (1,280) | 882 (68.9 %), 98 drills | **1,280 (100 %), 145 drills** |
+| 41×41 patch, in-game suite | 40 drills | **196 drills, 100 % seen and mined** |
+| Same patch, plans + support | 4,056 ms | **1,417 ms** |
+
+Four causes, all fixed:
+
+1. **The patch scan was truncated by Max Tiles** (100 ore tiles for laser, 200 mechanical),
+   silently and in flood-fill order, so a big patch was filled in the middle and nowhere else.
+   Defaults are now 2,500 (range 100–5,000), the scan is resumable so it cannot freeze the
+   game, and a patch bigger than the limit is *reported* instead of half-filled.
+2. **Min Ores made part of every patch unreachable.** A 3×3 drill on a one-tile-wide vein holds
+   3 ore tiles, so the old default of 5 left the whole vein unmined - on a round patch it cost
+   the rim. Defaults are now 2 for laser and airblast (1 for the 2×2 drills).
+3. **The search could stop half-packed.** The budget (`quality × 1000` placements) also paid
+   for the search's own alternatives, so on a big patch it ran out before the layout was
+   complete. The budget is now `max(quality × 1000, candidates × 3)`: exploration is optional,
+   a complete descent always fits.
+4. **Coverage was never actually maximised** - the search maximises *marginal gain* but stops
+   wherever the budget ends, and it may leave a rim that a lattice would have closed. Two
+   layouts now compete with the search result, all three gap-filled, best score committed:
+   - **lattice seed**: candidates congruent to (ax, ay) modulo the drill size cannot overlap
+     each other, so every one of the size² translations is a perfect tiling - one pass, no
+     overlap tests - and the filler patches whatever the tiling missed at the rim;
+   - **gap filler**: single pass adding any still-free candidate that mines an ore tile nothing
+     else mines. Placing only ever fills space, so one pass reaches the fixed point, and the
+     result is guaranteed to have no "one more drill would have mined that" tile left.
+
+Also fixed: the "mined X of N ore tiles" toast counted the search's *scratch* map, which is
+empty by the time the search ends, so it always claimed 0 tiles mined. It now counts the
+committed layout, splits what is left into *out of reach* (→ lower Min Ores) and *blocked*
+(→ raise Optimization Quality), and stays quiet when coverage is complete.
+
+Performance work needed to make the bigger defaults safe: plan collisions in the support pass
+(water extractors, power nodes) and in routing were O(plans) per candidate - quadratic, and the
+reason a several-hundred-drill fill took seconds. `util.occupancyOf/markOccupancy/freeInOccupancy`
+make each test and insertion O(footprint); the same patch now plans in a third of the time.
+
+Verified by `tools/engine-tests.sh` (15 checks: patch seen whole, 100 % coverage on square/round/
+irregular/vein patches for 2×2/3×3 drills, no overlap, no free candidate with ore left, identical
+repeat fills) and by the in-engine suite in both script modes (69/69), which now asserts the
+coverage guarantee on a 1,681-tile patch in the real game.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

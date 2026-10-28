@@ -116,6 +116,54 @@ function canPlaceWithoutPlanCollision(plan, team, planned){
 
 exports.canPlaceWithoutPlanCollision = canPlaceWithoutPlanCollision;
 
+// ---------------------------------------------------------------- plan occupancy
+
+/**
+ * Packed-cell occupancy for a set of plans. Collision tests against the whole plan list are
+ * O(plans) each; the support/routing passes make thousands of them, which is what made a
+ * large fill spend most of its time comparing rectangles. These three helpers make each test
+ * and each insertion O(footprint).
+ */
+function occupancyOf(plans){
+    var occ = {};
+    for(var i = 0; i < plans.length; i++){
+        markOccupancy(occ, plans[i].block, plans[i].x, plans[i].y, true);
+    }
+    return occ;
+}
+
+exports.occupancyOf = occupancyOf;
+
+function markOccupancy(occ, block, x, y, on){
+    var size = api.size(block);
+    var offset = Math.floor((size - 1) / 2);
+    var worldW = api.worldW();
+    for(var cx = x - offset; cx < x - offset + size; cx++){
+        for(var cy = y - offset; cy < y - offset + size; cy++){
+            var key = cx + cy * worldW;
+            if(on) occ[key] = true;
+            else delete occ[key];
+        }
+    }
+}
+
+exports.markOccupancy = markOccupancy;
+
+/** True when no cell of the block's footprint is taken in `occ`. */
+function freeInOccupancy(occ, block, x, y){
+    var size = api.size(block);
+    var offset = Math.floor((size - 1) / 2);
+    var worldW = api.worldW();
+    for(var cx = x - offset; cx < x - offset + size; cx++){
+        for(var cy = y - offset; cy < y - offset + size; cy++){
+            if(occ[cx + cy * worldW] === true) return false;
+        }
+    }
+    return true;
+}
+
+exports.freeInOccupancy = freeInOccupancy;
+
 // ---------------------------------------------------------------- tile helpers
 
 /** Java: Util.getNearbyTiles(x, y, block) and the (size1, size2) and (x, y, size) overloads. */

@@ -42,22 +42,46 @@ Settings → Auto Drill. Everything the Java mod offers is there: activation key
 button visibility, per-drill maximum tiles and minimum ores, optimization quality, and
 whether water extractors/power nodes are added to optimised drills. Two extras:
 
+- **Max Tiles** — how many ore tiles the fill looks at, nearest the tap first. It is a safety
+  limit, not a target: 2,500 ships by default, which covers any normal patch whole. If a patch
+  is bigger the fill says so and fills the part it saw.
+- **Min Ores** — how many ore tiles a drill must cover to be built. Lower it to reach thin ore
+  veins and the rim of a patch (1 mines everything); higher keeps only efficient drills.
 - **Output Routing Length** — when above 0, optimised drills also get a straight run of
   conveyors (ducts on Erekir) leading out in the direction you pick, so you do not have to
   place transport by hand. 0 keeps the original behaviour.
 - A help paragraph and a "show the tutorial again" button at the bottom of the page.
 
-Large fills run with a progress bar and a cancel button instead of freezing the game.
+Large fills run with a progress bar and a cancel button instead of freezing the game: both the
+patch scan and the layout search are resumable, so a patch with a few thousand ore tiles
+reports progress instead of freezing.
+
+### How a fill decides what to build
+
+Three layouts compete and the best score wins:
+
+1. **Lattice seed** — drills placed on a grid translation of the patch. It is the layout that
+   closes a patch completely, and it costs one pass over the candidates.
+2. **Layout search** — explores alternative placements (canonical order, marginal-gain
+   scoring, optimistic pruning) within the *Optimization Quality* budget and a 3-second
+   wall-clock backstop.
+3. **Gap filler** — adds any drill that still mines an ore tile nothing else mines.
+
+The promise that follows: **every ore tile a drill can reach is mined**, Ore is only counted
+once per drill, and nothing overlaps. A toast reports anything left over, naming the cause
+(raise *Optimization Quality* for tiles blocked by other drills, lower *Min Ores* for tiles no
+drill can reach at the current setting, raise *Max Tiles* when the patch was bigger than the
+scan limit). Mindustry pays a drill out in proportion to the ore tiles of its dominant item
+under it, so covered ore tiles *are* throughput.
 
 Two differences from the Java version, both caused by iOS mod limits:
 
 - The settings page has no decorative divider/description rows (iOS cannot subclass the
   game's setting classes). The descriptions are available as tooltips instead.
-- The layout search for laser/airblast/impact/eruption drills is capped at **2 seconds** and
-  at *Optimization Quality × 1000* explored layouts, so the game never freezes; a toast tells
-  you when the cap was hit. Each step now explores a *distinct* layout, so raising the quality
-  goes further than it used to, and the drill it replays mines ore no other selected drill
-  mines (no double counting).
+- The layout search is capped at **3 seconds** and at *Optimization Quality × 1000* explored
+  layouts (never below a full greedy descent), so the game never freezes; a toast reports when
+  the cap was hit. Each step explores a *distinct* layout, so raising the quality goes further
+  than it used to.
 
 ## Notes
 
@@ -73,6 +97,10 @@ Two differences from the Java version, both caused by iOS mod limits:
   exactly as the iOS build does).
 - `tools/engine-probe.sh` — runs the placement engine against a fake world in seconds, with
   no game needed. First stop when the engine misbehaves.
+- `tools/engine-tests.sh` — the engine's promises as checks (whole patch seen, every reachable
+  tile mined, no free drill left with ore, nothing overlapping, same patch = same layout).
+- `tools/coverage-probe.sh` — reports what fraction of a patch a fill mines, for any drill,
+  patch shape and setting (`WORLD=… ORE=… ROUND=1 MAXTILES=… tools/coverage-probe.sh`).
 - `tools/run-tests.sh <normal|ios>` — the in-engine suite in both script modes;
   `tools/guard-check.sh` — the "another AutoDrill is installed" check.
 - `tools/pack.sh` — builds the release zip.
