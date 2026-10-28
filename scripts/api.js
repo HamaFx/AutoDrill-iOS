@@ -368,6 +368,10 @@ function buildReal(){
         return Core.scene.getWidth();
     };
 
+    api.sceneHeight = function(){
+        return Core.scene.getHeight();
+    };
+
     // ------------------------------------------------------------ events / input
 
     /** Runs `fn` on the next frame - used to spread long work over frames. */
@@ -485,18 +489,27 @@ function buildReal(){
         return new Table(Styles.black3);
     };
 
+    // 44px is the smallest comfortable touch target on a phone; the game's UI scale
+    // multiplies this, so it stays proportional on tablets.
+    var TOUCH_SIZE = 44;
+
     api.toolbarAddButton = function(table, drawable, onClick){
         var cell = table.button(drawable, Styles.defaulti, new java.lang.Runnable({run: onClick}));
         var button = cell.get();
-        button.resizeImage(30);
+        button.resizeImage(TOUCH_SIZE);
         return button;
     };
 
     api.directionAddButton = function(table, iconName, onClick){
         var cell = table.button(Icon[iconName], Styles.defaulti, new java.lang.Runnable({run: onClick}));
         var button = cell.get();
-        button.resizeImage(30);
+        button.resizeImage(TOUCH_SIZE);
         return button;
+    };
+
+    /** Swaps an existing button's icon (used to turn the cancel button into a confirm tick). */
+    api.setButtonIcon = function(button, iconName){
+        button.getImage().setDrawable(Icon[iconName]);
     };
 
     api.tableRow = function(table){
@@ -580,7 +593,7 @@ function buildReal(){
             t.top().right();
             var cell = t.button(drawable, Styles.emptyTogglei, new java.lang.Runnable({run: onClick}));
             var button = cell.get();
-            button.resizeImage(30);
+            button.resizeImage(38);
             // NOTE: Element.visible exists as BOTH a field and a method; Rhino always
             // resolves the name to the field, so the Boolp provider must be assigned
             // to the separate 'visibility' field (Group.act applies it every frame).
@@ -598,11 +611,11 @@ function buildReal(){
         var handle = {element: null};
         V.ui.hudGroup.fill(new Cons({get: function(t){
             t.margin(5);
-            t.marginRight(191);
+            t.marginRight(201);
             t.top().right();
             var cell = t.button(Icon[iconName], Styles.defaulti, new java.lang.Runnable({run: onClick}));
             var button = cell.get();
-            button.resizeImage(30);
+            button.resizeImage(38);
             button.visibility = new Boolp({get: visibleFn});
             handle.element = button;
         }}));
@@ -648,10 +661,10 @@ function buildReal(){
             // The 7-argument sliderPref overload is the only unambiguous one; the 6-argument
             // forms are ambiguous for a JS function (StringProcessor vs Intc).
             builder({
-                slider: function(key, def, min, max, step){
+                slider: function(key, def, min, max, step, format){
                     st.sliderPref(key, def, min, max, step,
                         new SettingsMenuDialog.StringProcessor({get: function(v){
-                            return "" + v;
+                            return format == null ? "" + v : format(v);
                         }}), null);
                 },
                 check: function(key, def){

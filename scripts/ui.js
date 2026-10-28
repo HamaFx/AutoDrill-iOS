@@ -66,7 +66,12 @@ exports.init = function(){
 
 // ---------------------------------------------------------------- toolbar handling
 
-function setEnabled(value){
+function setEnabled(value, announce){
+    if(announce && value !== enabled){
+        api.toast(value
+            ? "[AutoDrill] active - tap an ore tile to fill it"
+            : "[AutoDrill] off");
+    }
     enabled = value;
     api.elementSetVisible(selectTable, false);
     api.elementSetVisible(directionTable, false);
@@ -75,9 +80,18 @@ function setEnabled(value){
 
 function reposition(element){
     if(selectedTile == null) return;
+
     var size = api.tilesize();
     var v = api.cameraProject(api.centerXTile(selectedTile) * size, (api.centerYTile(selectedTile) + 1) * size);
-    api.elementSetPosition(element, v.x, v.y);
+
+    // keep the pop-up inside the screen: tapping near an edge used to push it off-view
+    var bounds = api.elementBounds(element);
+    var screenW = api.sceneWidth(), screenH = api.sceneHeight();
+    var margin = 6;
+
+    var x = Math.max(bounds.w / 2 + margin, Math.min(screenW - bounds.w / 2 - margin, v.x));
+    var y = Math.max(margin, Math.min(screenH - bounds.h - margin, v.y));
+    api.elementSetPosition(element, x, y);
 }
 
 function buildSelectTable(){
@@ -118,10 +132,12 @@ function addDrillButton(spriteName, onClick){
 
 /** Drill buttons that need an output direction: remember the action, show the direction table. */
 var directionFillDone = false;
+var directionConfirmButton = null;
 
 function requireDirection(action){
     directionAction = action;
     directionFillDone = false;
+    if(directionConfirmButton != null) api.setButtonIcon(directionConfirmButton, "cancel");
     api.elementSetVisible(directionTable, true);
 }
 
@@ -141,6 +157,7 @@ function chooseDirection(direction){
     }
 
     directionFillDone = true;
+    if(directionConfirmButton != null) api.setButtonIcon(directionConfirmButton, "ok");
     directionAction(direction);
 }
 
@@ -174,11 +191,13 @@ function buildDirectionTable(){
     api.directionAddButton(row, "left", function(){
         chooseDirection(direction.LEFT);
     });
-    api.directionAddButton(row, "cancel", function(){
+    var confirmButton = api.directionAddButton(row, "cancel", function(){
         // done: keep whatever has been planned and close the picker
         api.elementSetVisible(directionTable, false);
         if(directionFillDone) api.toast("[AutoDrill] direction confirmed");
     });
+
+    directionConfirmButton = confirmButton;
     api.directionAddButton(row, "right", function(){
         chooseDirection(direction.RIGHT);
     });
@@ -241,6 +260,12 @@ function updateSelectTable(){
         addDrillButton("block-eruption-drill-full",
             function(){ startOptimization(eruption, false); });
     }
+
+    // Nothing here to mine: hide the empty box and say so instead of showing a blank pop-up.
+    if(drillButtons.length === 0){
+        api.elementSetVisible(selectTable, false);
+        api.toast(api.bundle("auto-drill-ios-nothing-to-mine"));
+    }
 }
 
 /**
@@ -265,9 +290,10 @@ function buildHudButton(){
         api.modDrawable("logo"),
         function(){ return api.settingBool(KEY_SHOW_BUTTON, true); },
         function(){
-            enabled = !enabled;
+            var next = !enabled;
             api.elementSetVisible(selectTable, false);
             api.elementSetVisible(directionTable, false);
+            setEnabled(next, true);
         });
 }
 
@@ -292,7 +318,7 @@ function registerInput(){
 
         var wanted = api.keyCodeByName(String(api.settingString(KEY_ACTIVATION, "H")).toUpperCase());
         if(api.keyCodeOrdinal(wanted) >= 0 && api.keyCodeOrdinal(wanted) === api.keyCodeOrdinal(keyCode)){
-            setEnabled(!enabled);
+            setEnabled(!enabled, true);
         }
         return false;
     }});
@@ -354,22 +380,29 @@ function buildSettings(){
         });
         st.check(KEY_SHOW_BUTTON, true);
 
-        st.slider("mechanical-drill-max-tiles", 200, 25, 500, 25);
-        st.slider("mechanical-drill-min-ores", 1, 1, 4, 1);
+        var tiles = function(v){ return v + " " + api.bundle("auto-drill-ios-unit-tiles"); };
+        var ores = function(v){
+            return v === 1 ? "1 " + api.bundle("auto-drill-ios-unit-ore") : v + " " + api.bundle("auto-drill-ios-unit-ores");
+        };
 
-        st.slider("pneumatic-drill-max-tiles", 150, 25, 500, 25);
-        st.slider("pneumatic-drill-min-ores", 2, 1, 4, 1);
+        st.slider("mechanical-drill-max-tiles", 200, 25, 500, 25, tiles);
+        st.slider("mechanical-drill-min-ores", 1, 1, 4, 1, ores);
 
-        st.slider("laser-drill-max-tiles", 100, 25, 500, 25);
-        st.slider("laser-drill-min-ores", 5, 1, 9, 1);
+        st.slider("pneumatic-drill-max-tiles", 150, 25, 500, 25, tiles);
+        st.slider("pneumatic-drill-min-ores", 2, 1, 4, 1, ores);
 
-        st.slider("airblast-drill-max-tiles", 100, 25, 500, 25);
-        st.slider("airblast-drill-min-ores", 9, 1, 16, 1);
+        st.slider("laser-drill-max-tiles", 100, 25, 500, 25, tiles);
+        st.slider("laser-drill-min-ores", 5, 1, 9, 1, ores);
 
-        st.slider(KEY_QUALITY, 2, 1, 10, 1);
+        st.slider("airblast-drill-max-tiles", 100, 25, 500, 25, tiles);
+        st.slider("airblast-drill-min-ores", 9, 1, 16, 1, ores);
+
+        st.slider(KEY_QUALITY, 2, 1, 10, 1, function(v){ return "level " + v; });
         st.check(KEY_SUPPORT, true);
 
-        st.slider(KEY_ROUTE, 0, 0, 12, 1);
+        st.slider(KEY_ROUTE, 0, 0, 12, 1, function(v){
+            return v === 0 ? api.bundle("auto-drill-ios-unit-off") : v + " " + api.bundle("auto-drill-ios-unit-tiles");
+        });
 
         // Extra rows are allowed here (the table cannot be subclassed on iOS, but it is a
         // Table, so plain rows work as long as they come after the preferences).
