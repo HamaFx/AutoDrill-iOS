@@ -1,0 +1,7 @@
+displayName: "AutoDrill Reproduction"
+name: "autodrill-repro"
+author: "dev"
+description: "Runs the fills in a real campaign sector and reports the plan composition. Not for players."
+version: "1.0"
+minGameVersion: 160
+hidden: true

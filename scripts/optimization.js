@@ -362,6 +362,8 @@ function finish(job){
         var plan = util.newPlan(api.tx(chosen), api.ty(chosen), 0, job.drill);
         if(util.canPlaceWithoutPlanCollision(plan, team, allPlans)){
             allPlans.push(plan);
+        }else{
+            util.markRefused();
         }
     }
 
@@ -402,6 +404,7 @@ function finish(job){
         + " stopped=" + (job.cancelled ? "cancel" : (job.aborted ? "time" : (job.exhausted ? "budget" : "no"))));
 
     util.commitPlans(allPlans);
+    util.reportRefused("planned buildings");
     return allPlans;
 }
 
@@ -466,7 +469,10 @@ function routeOutputs(job, allPlans){
 
         for(step = 0; step < job.routeLength; step++){
             var plan = util.newPlan(x, y, job.direction.r, block);
-            if(!util.canPlaceWithoutPlanCollision(plan, job.team, allPlans)) break;
+            if(!util.canPlaceWithoutPlanCollision(plan, job.team, allPlans)){
+                util.markRefused();
+                break;
+            }
             allPlans.push(plan);
             placed++;
             x += job.direction.x;

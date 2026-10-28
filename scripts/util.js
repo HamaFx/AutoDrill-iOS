@@ -371,6 +371,27 @@ exports.findDuctPath = findDuctPath;
 // ---------------------------------------------------------------- commit
 
 var lastCommitted = [];
+var refusedPlans = 0;
+
+/** Counts a plan we wanted but the game's placement rules refused. */
+function markRefused(){
+    refusedPlans++;
+}
+
+/**
+ * Reports how many wanted plans were refused, once per fill. The game silently refuses
+ * anything outside the core build radius (or on blocked terrain), which is the usual reason
+ * a player sees drills appear but no belts - the belts are simply rejected.
+ */
+function reportRefused(what){
+    if(refusedPlans > 0){
+        api.toast("[AutoDrill] " + refusedPlans + " " + what + " could not be placed (build range or blocked ground?)");
+    }
+    refusedPlans = 0;
+}
+
+exports.markRefused = markRefused;
+exports.reportRefused = reportRefused;
 
 /** Java: Util.commitPlans - submits plans to the player's build queue. */
 function commitPlans(plans){

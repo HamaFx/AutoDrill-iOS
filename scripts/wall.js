@@ -248,6 +248,7 @@ function fill(tile, drill, direction, teamOverride){
     }
 
     util.commitPlans(allPlans);
+    util.reportRefused("wall-drill blocks");
     return allPlans;
 }
 

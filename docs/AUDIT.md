@@ -215,6 +215,16 @@ Items 5–10 of the recommended order are implemented as well (suite still 66/66
 | E3 | `main` is treated as the release branch (what players install); work goes through `dev` |
 | A8b | Upstream quirk fixed: a tap on a non-ore tile used to plan a pointless bridge matrix; with no drill candidates nothing is planned now |
 
+### Hotfix 1.2.1 — belts/bridges sometimes missing
+
+The item-bridge chain used Manhattan distance 3 to find a partner, which accepts *diagonal*
+neighbours that an item bridge cannot link to, and whichever match came first in tile order
+decided the outcome. On top of that, the orphan pruning cascaded: a single bridge whose target
+fell outside the plan set removed the whole chain. In a real campaign sector this showed up as
+"drills but no belts". Fixed by only accepting cardinal (axis) partners and by dropping a
+bridge only when it is a genuinely dead end (no target *and* nothing feeding it). Verified in a
+real sector: mechanical fill now plans 40 drills + 25 bridges (before: 40 drills, 0 bridges).
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

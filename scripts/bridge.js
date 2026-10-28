@@ -7,6 +7,19 @@
 var api = require("api");
 var util = require("util");
 
+var DEBUG = false;
+
+exports.setDebug = function(value){
+    DEBUG = value;
+};
+
+function dbg(msg){
+    if(DEBUG){
+        api.log("[bridge] " + msg);
+        api.trace("[bridge] " + msg);
+    }
+}
+
 var SETTING_DEFAULTS = {
     mechanical: {tiles: 200, ores: 1},
     pneumatic: {tiles: 150, ores: 2},
@@ -94,6 +107,7 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
     var minOresPerDrill = api.settingInt(prefix + "-drill-min-ores", SETTING_DEFAULTS[prefix].ores);
 
     var sourceDropId = api.itemId(api.drop(source));
+    dbg("tiles=" + tiles.length + " drillTiles=" + drillTiles.length + " bridgeTiles=" + bridgeTiles.length);
 
     // --- Pre-filter drill candidates: correct resource, enough ores, placeable,
     // --- and reachable by at least one bridge-eligible neighbour.
@@ -144,6 +158,8 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
     }
     drillTiles = filtered;
 
+    dbg("after filter: drills=" + drillTiles.length + " bridgeTiles=" + bridgeTiles.length + " sourceDrop=" + sourceDropId);
+
     // No drill means no job: the chain only exists to carry their output. Upstream planned a
     // bridge matrix anyway when a non-ore tile was tapped, filling the map with useless plans.
     if(drillTiles.length === 0) return [];
@@ -170,11 +186,14 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
         var drillPlan = util.newPlan(api.tx(drillTiles[i]), api.ty(drillTiles[i]), 0, drill);
         if(util.canPlaceWithoutPlanCollision(drillPlan, team, allPlans)){
             allPlans.push(drillPlan);
+        }else{
+            util.markRefused();
         }
     }
 
     var bridgePlans = [];
     var itemBridge = api.block("itemBridge");
+    var withPartner = 0, asOutlet = 0, orphans = 0;
 
     for(i = 0; i < bridgeTiles.length; i++){
         var bridgeTile = bridgeTiles[i];
@@ -183,7 +202,13 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
         for(var k = 0; k < bridgeTiles.length; k++){
             var candidate = bridgeTiles[k];
             if(candidate === bridgeTile) continue;
-            if(Math.abs(api.tx(candidate) - api.tx(bridgeTile)) + Math.abs(api.ty(candidate) - api.ty(bridgeTile)) === 3){
+            // Item bridges only link along an axis, so a diagonal "distance 3" partner (e.g.
+            // +1/+2) produces a dead bridge. The original only checked Manhattan distance and
+            // took whichever match came first in tile order, which is why chains were
+            // sometimes built and sometimes not.
+            var dx = api.tx(candidate) - api.tx(bridgeTile);
+            var dy = api.ty(candidate) - api.ty(bridgeTile);
+            if((dx === 0 && Math.abs(dy) === 3) || (dy === 0 && Math.abs(dx) === 3)){
                 plannedPartner = candidate;
                 break;
             }
@@ -197,7 +222,9 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
             for(var m = 0; m < bridgeTiles.length; m++){
                 var other = bridgeTiles[m];
                 if(other === outlet) continue;
-                if(Math.abs(api.tx(other) - api.tx(outlet)) + Math.abs(api.ty(other) - api.ty(outlet)) === 3){
+                var odx = api.tx(other) - api.tx(outlet);
+                var ody = api.ty(other) - api.ty(outlet);
+                if((odx === 0 && Math.abs(ody) === 3) || (ody === 0 && Math.abs(odx) === 3)){
                     hasIncoming = true;
                     break;
                 }
@@ -205,22 +232,33 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
             var hasExistingIncoming = findExistingBridgePartner(outlet) != null;
 
             if(!hasIncoming && !hasExistingIncoming){
+                orphans++;
                 continue;
             }
+            asOutlet++;
 
             var outletPlan = util.newPlan(api.tx(bridgeTile), api.ty(bridgeTile), 0, itemBridge, 0, 0);
             if(util.canPlaceWithoutPlanCollision(outletPlan, team, allPlans)){
                 bridgePlans.push(outletPlan);
+            }else{
+                util.markRefused();
             }
         }else if(partner != null){
+            withPartner++;
             var plan = util.newPlan(api.tx(bridgeTile), api.ty(bridgeTile), 0, itemBridge,
                 api.tx(partner) - api.tx(bridgeTile), api.ty(partner) - api.ty(bridgeTile));
             if(util.canPlaceWithoutPlanCollision(plan, team, allPlans)){
                 bridgePlans.push(plan);
+            }else{
+                util.markRefused();
             }
         }
         // No partner and not the outlet: an orphan bridge is skipped.
+        else{
+            orphans++;
+        }
     }
+    dbg("bridge plans: partner=" + withPartner + " outlet=" + asOutlet + " orphans=" + orphans);
 
     // --- Prune bridges whose target did not survive validation, until stable.
     var changed = true;
@@ -252,6 +290,15 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
             var targetX = bp.x + bp.configX;
             var targetY = bp.y + bp.configY;
 
+            if(DEBUG && n >= bridgePlans.length - 3){
+                var coords = [];
+                for(var c = 0; c < bridgePlans.length && c < 8; c++){
+                    coords.push(bridgePlans[c].x + "," + bridgePlans[c].y + "cfg" + bridgePlans[c].configX + "," + bridgePlans[c].configY);
+                }
+                dbg("prune check plan@" + bp.x + "," + bp.y + " cfg=" + bp.configX + "," + bp.configY
+                    + " target=" + targetX + "," + targetY + " sample[" + coords.join(" ") + "]");
+            }
+
             var targetExists = false;
             for(var q = 0; q < bridgePlans.length; q++){
                 var other2 = bridgePlans[q];
@@ -268,8 +315,20 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
                 }
             }
             if(!targetExists){
-                bridgePlans.splice(n, 1);
-                changed = true;
+                // A bridge whose target is missing is still worth keeping when something feeds
+                // into it: dropping it used to cascade through the whole chain, which is why
+                // belts appeared for some patches and not others. Only dead ends go.
+                var fed = false;
+                for(var r = 0; r < bridgePlans.length && !fed; r++){
+                    var feeder = bridgePlans[r];
+                    if(feeder !== bp && feeder.x + feeder.configX === bp.x && feeder.y + feeder.configY === bp.y){
+                        fed = true;
+                    }
+                }
+                if(!fed){
+                    bridgePlans.splice(n, 1);
+                    changed = true;
+                }
             }
         }
     }
@@ -278,7 +337,9 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
         allPlans.push(bridgePlans[i]);
     }
 
+    dbg("committing: drills+bridge plans=" + allPlans.length + " (bridges kept=" + bridgePlans.length + ")");
     util.commitPlans(allPlans);
+    util.reportRefused("buildings");
     return allPlans;
 }
 
