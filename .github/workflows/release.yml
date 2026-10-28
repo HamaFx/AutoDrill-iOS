@@ -1,0 +1,36 @@
+name: Release
+
+# Publishing a new version for the in-game browser:
+#   1. bump `version` in mod.hjson (and commit)
+#   2. git tag v<version> && git push --tags
+#   3. this workflow attaches the packed zip to a GitHub release whose title carries the
+#      Mindustry build tag (e.g. "[v160]"), which is what the mod browser matches on.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pack the mod
+        run: ./tools/pack.sh
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="$(grep -o 'version: *"[^"]*"' mod.hjson | head -1 | sed 's/.*"\(.*\)"/\1/')"
+          TAG="${GITHUB_REF_NAME:-v$VERSION}"
+          ZIP="dist/auto-drill-ios_v${VERSION}.zip"
+          gh release create "$TAG" "$ZIP" \
+            --title "AutoDrill iOS $VERSION [v160]" \
+            --notes "Install from the in-game mod browser, or import \`$ZIP\` manually (Mods -> Import -> File). Requires Mindustry 8.160 or newer." \
+            --latest || gh release upload "$TAG" "$ZIP" --clobber
