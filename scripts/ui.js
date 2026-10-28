@@ -122,6 +122,22 @@ function requireDirection(action){
     api.elementSetVisible(directionTable, true);
 }
 
+/** Runs the pending fill for a chosen direction, with feedback so the tap is unmistakable. */
+function chooseDirection(direction){
+    api.elementSetVisible(directionTable, false);
+    if(directionAction == null) return;
+
+    api.toast("[AutoDrill] output facing " + directionName(direction));
+    directionAction(direction);
+}
+
+function directionName(direction){
+    if(direction.r === 0) return "right";
+    if(direction.r === 1) return "up";
+    if(direction.r === 2) return "left";
+    return "down";
+}
+
 function buildDirectionTable(){
     api.elementUpdate(directionTable, function(){
         if(api.isMenu() || selectedTile == null){
@@ -137,29 +153,25 @@ function buildDirectionTable(){
     }});
 
     api.directionAddButton(directionTable, "up", function(){
-        api.elementSetVisible(directionTable, false);
-        if(directionAction != null) directionAction(direction.UP);
+        chooseDirection(direction.UP);
     });
     api.tableRow(directionTable);
 
     var row = api.tableCell(directionTable);
     api.directionAddButton(row, "left", function(){
-        api.elementSetVisible(directionTable, false);
-        if(directionAction != null) directionAction(direction.LEFT);
+        chooseDirection(direction.LEFT);
     });
     api.directionAddButton(row, "cancel", function(){
         api.elementSetVisible(directionTable, false);
     });
     api.directionAddButton(row, "right", function(){
-        api.elementSetVisible(directionTable, false);
-        if(directionAction != null) directionAction(direction.RIGHT);
+        chooseDirection(direction.RIGHT);
     });
 
     api.tableRow(directionTable);
 
     api.directionAddButton(directionTable, "down", function(){
-        api.elementSetVisible(directionTable, false);
-        if(directionAction != null) directionAction(direction.DOWN);
+        chooseDirection(direction.DOWN);
     });
 
     api.elementAttach(directionTable);
