@@ -501,6 +501,24 @@ map. Every fill's result line now starts with the version of the mod the game ac
 read back from the game's mod list rather than from a constant. The in-game mod list refresh
 takes up to two hours, so a device can lag several releases behind while the map looks identical.
 
+### 1.7.7 — patches next to walls and blocks
+
+Reported from the device: *"it's only like that for some shape of veins, mostly the ones that
+are near walls and blocks"* - which names the mechanism exactly. The belt tool places a drill
+only when a belt tile fits **beside** it, because a drill with nowhere to put its ore just fills
+up and stops. Walls, cliffs, other buildings or a neighbouring ore field take those tiles, so
+those drills were dropped - a patch that fits ten drills got four.
+
+What the fill does now, in order:
+1. a belt tile of the grid right next to the drill (as before);
+2. one conveyor next to the drill that pushes into a belt tile beside it;
+3. **a conveyor line routed around the obstruction** to the nearest belt tile (bounded
+   breadth-first search over tiles a conveyor fits on, up to 12 tiles long) - this is what makes
+   veins pressed against a wall work;
+4. if none of that fits, the drill is dropped and **counted**, and the result line says so:
+   *"mined 38 of 42 Copper tiles - 6 more drills fit here but have no belt room next to them -
+   free the ground beside the patch (or use the laser or airblast drill, which needs none)"*.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

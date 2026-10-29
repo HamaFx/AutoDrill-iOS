@@ -71,6 +71,16 @@ function makeApi(){
     function pos(x, y){ return x + y * WORLD; }
     function inWorld(x, y){ return x >= 0 && y >= 0 && x < WORLD && y < WORLD_H; }
 
+    // solid ground (walls) from the scenario
+    if(OPTS.wallRect != null){
+        var wr = OPTS.wallRect;
+        for(var wx = wr.x0; wx <= wr.x1; wx++){
+            for(var wy = wr.y0; wy <= wr.y1; wy++){
+                walls[pos(wx, wy)] = true;
+            }
+        }
+    }
+
     var rect = OPTS.ore == null ? batch : OPTS.ore;
     var shapes = OPTS.patches == null
         ? [{oreX0: rect.oreX0, oreY0: rect.oreY0, x1: rect.x1, y1: rect.y1, round: OPTS.round === true}]

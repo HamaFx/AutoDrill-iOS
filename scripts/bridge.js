@@ -51,14 +51,86 @@ function isDrillTile(tile, phaseX, phaseY){
 
 exports.isDrillTile = isDrillTile;
 
-/** True when the tile can link (item bridges link three tiles along an axis) to one in the list. */
-function pairsWithAny(tile, list){
-    for(var i = 0; i < list.length; i++){
-        var dx = api.tx(list[i]) - api.tx(tile);
-        var dy = api.ty(list[i]) - api.ty(tile);
-        if((dx === 0 && Math.abs(dy) === 3) || (dy === 0 && Math.abs(dx) === 3)) return true;
+/**
+ * Runs a conveyor line from the drill to the nearest belt tile, routing around whatever is in
+ * the way. This is what makes a patch that sits against a wall, a cliff or a building work: the
+ * drill's own neighbours are all taken, so the ore has to travel a little further to leave.
+ *
+ * Returns 1 when the line was laid (its plans are queued in `beltPlans`).
+ */
+function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occupied){
+    var conveyor = api.block("conveyor");
+    if(conveyor == null || bridgeTiles.length === 0) return 0;
+
+    var worldW = api.worldW();
+    for(var i = 0; i < neighbours.length; i++){
+        var start = neighbours[i];
+        var sx = api.tx(start), sy = api.ty(start);
+        if(occupied[sx + sy * worldW] === true) continue;                 // a drill sits there
+        if(!util.canPlaceBlock(conveyor, team, sx, sy, 0)) continue;      // wall or building
+
+        var path = util.findDuctPath(start, bridgeTiles, conveyor, team, 80, occupied);
+        if(path == null || path.length === 0 || path.length > 12) continue;
+
+        // lay it: every conveyor points at the next tile, the last one at the belt
+        var plans = [];
+        var ok = true;
+
+        // where the line ends: the belt tile the last conveyor pushes into
+        var last = path[path.length - 1];
+        var goal = null;
+        for(var b = 0; b < bridgeTiles.length && goal == null; b++){
+            var bdx = api.tx(bridgeTiles[b]) - api.tx(last);
+            var bdy = api.ty(bridgeTiles[b]) - api.ty(last);
+            if(Math.abs(bdx) + Math.abs(bdy) === 1) goal = bridgeTiles[b];
+        }
+        if(goal == null) continue;
+
+        for(var k = 0; k < path.length && ok; k++){
+            var cur = path[k];
+            var next = k + 1 < path.length ? path[k + 1] : goal;
+            var dx = api.tx(next) - api.tx(cur);
+            var dy = api.ty(next) - api.ty(cur);
+            var rot = dx === 1 ? 0 : (dy === 1 ? 1 : (dx === -1 ? 2 : 3));
+
+            if(!util.canPlaceBlock(conveyor, team, api.tx(cur), api.ty(cur), rot)) ok = false;
+            else plans.push(util.newPlan(api.tx(cur), api.ty(cur), rot, conveyor));
+        }
+        if(!ok || plans.length === 0) continue;
+
+        for(var p = 0; p < plans.length; p++) beltPlans.push(plans[p]);
+        return 1;
     }
-    return false;
+    return 0;
+}
+
+/**
+ * Adds a conveyor at `tile` when a belt tile sits right next to it, so the drill beside it can
+ * hand its ore over. Returns 1 when the conveyor was taken (its plan is queued in `beltPlans`).
+ *
+ * A conveyor accepts on every face and passes on in its rotation, so all it needs is a belt tile
+ * next to it: this is what lets drills at a patch edge - where the belt grid does not reach -
+ * work at all.
+ */
+function addConveyorToGrid(tile, team, bridgeTiles, beltPlans){
+    var conveyor = api.block("conveyor");
+    if(conveyor == null) return 0;
+    if(util.containsTile(bridgeTiles, tile)) return 0;
+
+    var x = api.tx(tile), y = api.ty(tile);
+    if(!util.canPlaceBlock(conveyor, team, x, y, 0)) return 0;
+
+    // which way is the belt? conveyors only push forward, so point at it
+    var directions = [{x: 1, y: 0, r: 0}, {x: 0, y: 1, r: 1}, {x: -1, y: 0, r: 2}, {x: 0, y: -1, r: 3}];
+    for(var i = 0; i < directions.length; i++){
+        var beside = api.tile(x + directions[i].x, y + directions[i].y);
+        if(beside == null || !util.containsTile(bridgeTiles, beside)) continue;
+        if(!util.canPlaceBlock(conveyor, team, x, y, directions[i].r)) continue;
+
+        beltPlans.push(util.newPlan(x, y, directions[i].r, conveyor));
+        return 1;
+    }
+    return 0;
 }
 
 /** True when the tile carries the ore this fill is about. */
@@ -71,10 +143,13 @@ function isOreTile(tile, sourceDropId){
  * fits on free ground, and has a belt or bridge next to it (or can have one added) to carry its
  * ore out - a drill with nowhere to put its ore just fills up.
  *
- * Returns 1 when taken. NOTE: a number, not an object - helpers that build an object and are
- * called inside a hot loop are the Rhino trap documented in docs/AUDIT.md.
+ * Returns 1 when taken, 2 when the only thing missing is transport for its ore (which is worth
+ * reporting - a drill that cannot get rid of its ore is not built), 0 otherwise.
+ *
+ * NOTE: a number, not an object - helpers that build an object and are called inside a hot loop
+ * are the Rhino trap documented in docs/AUDIT.md.
  */
-function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridgeTiles, occupied, phaseX, phaseY){
+function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridgeTiles, beltPlans, occupied, phaseX, phaseY){
     var size = api.size(drill);
     var offset = Math.floor((size - 1) / 2);
     var worldW = api.worldW();
@@ -89,7 +164,10 @@ function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridg
 
     var ore = util.countOre(t, drill);
     if(ore == null || api.itemId(ore.item) !== sourceDropId || ore.count < minOresPerDrill) return 0;
-    if(!util.canPlaceBlock(drill, team, x, y, 0)) return 0;
+    if(!util.canPlaceBlock(drill, team, x, y, 0)){
+        dbg("skip " + x + "," + y + ": the game refuses a drill here");
+        return 0;
+    }
 
     var neighbours = util.nearbyTilesOfBlock(x, y, drill);
     var eligible = [];
@@ -108,27 +186,34 @@ function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridg
     if(!connected){
         var placeable = [];
 
-        // first choice: the grid tiles the pattern keeps for its belts
+        // first choice: a belt tile of the grid, right next to the drill
         for(j = 0; j < eligible.length; j++){
             if(util.canPlaceBlock(api.block("itemBridge"), team, api.tx(eligible[j]), api.ty(eligible[j]), 0)){
                 placeable.push(eligible[j]);
             }
         }
 
-        // otherwise any free tile next to the drill that can link to the chain: an item bridge
-        // reaches three tiles along an axis, so a tile that pairs with one already planned joins
-        // the chain - which is what lets drills sit on ore the fixed pattern never covered
-        for(j = 0; j < neighbours.length; j++){
-            var candidate = neighbours[j];
-            if(util.containsTile(bridgeTiles, candidate)) continue;
-            if(util.containsTile(placeable, candidate)) continue;
-            if(!util.canPlaceBlock(api.block("itemBridge"), team, api.tx(candidate), api.ty(candidate), 0)) continue;
-            if(!pairsWithAny(candidate, bridgeTiles)) continue;
-
-            placeable.push(candidate);
+        if(placeable.length === 0){
+            // second choice: one conveyor next to the drill that pushes into a belt tile beside
+            // it. A conveyor takes and passes on any face, so this is all it takes for a drill
+            // the grid misses - and a patched patch has plenty of those at its edges.
+            for(j = 0; j < neighbours.length; j++){
+                if(!addConveyorToGrid(neighbours[j], team, bridgeTiles, beltPlans)) continue;
+                placeable.push(neighbours[j]);
+                break;
+            }
         }
 
-        if(placeable.length === 0) return 0;
+        if(placeable.length === 0){
+            // last resort, and the one that matters next to walls and buildings: a conveyor line
+            // laid around the obstruction, from the drill to the nearest belt tile
+            if(connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occupied)) return 1;
+        }
+
+        if(placeable.length === 0){
+            dbg("skip " + x + "," + y + ": no belt tile or conveyor fits next to it");
+            return 2;      // this one only fails for want of transport
+        }
 
         for(j = 0; j < placeable.length; j++){
             if(!util.containsTile(bridgeTiles, placeable[j])) bridgeTiles.push(placeable[j]);
@@ -219,10 +304,11 @@ function fill(tile, drill, direction, teamOverride){
     var phase = pickPhase(tiles, drill, targetSet);
     dbg("phase=" + phase.x + "," + phase.y + " patternOre=" + phase.score + " of " + targetCells);
 
-    var plans = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride, phase.x, phase.y);
+    var outcome = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride, phase.x, phase.y);
 
-    reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles);
-    return plans;
+    reportCoverage(outcome.plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles,
+        outcome.skipped);
+    return outcome.plans;
 }
 
 /**
@@ -230,7 +316,7 @@ function fill(tile, drill, direction, teamOverride){
  * where a second ore is the only thing left - looked like the fill had stopped working. Same
  * plain result line the optimiser fills print.
  */
-function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles){
+function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles, skipped){
     var size = api.size(drill);
     var offset = Math.floor((size - 1) / 2);
     var covered = {};
@@ -292,9 +378,12 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
                 + ") - the fill covers the part nearest your tap, raise Max Tiles for the rest";
         }else if(built > 0){
             why = built + " tiles already have buildings on them";
+        }else if(skipped > 0){
+            // a drill fits on that ore, but nothing can carry its ore out: either the ground
+            // around the patch takes no belts, or every tile next to it is already taken
+            why = skipped + " more drills fit here but have no belt room next to them - free the"
+                + " ground beside the patch (or use the laser or airblast drill, which needs none)";
         }else{
-            // the belt layout has to keep tiles for its belts, so a strip is always left; the
-            // optimiser drills fill a patch right to its edge
             why = "the belt layout keeps tiles for its bridges - use the laser or airblast drill"
                 + " to cover every tile";
         }
@@ -318,12 +407,14 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
 exports.fill = fill;
 
 function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, phaseX, phaseY){
+    // returns {plans, skipped} - skipped counts ore tiles a drill fits on but a belt cannot reach
     var team = teamOverride != null ? teamOverride : api.team();
     var configX = direction.x * 3;
     var configY = direction.y * 3;
 
     var drillTiles = [];
     var bridgeTiles = [];
+    var beltPlans = [];       // conveyors added so a drill can reach the belt grid
     var leftovers = [];       // ore the pattern does not cover; picked up below
     var sourceDropId = api.itemId(api.drop(source));
     var i = null;
@@ -359,38 +450,41 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
     // --- whatever ore the pattern missed is picked up with the same rules.
     var occupied = {};
     var filtered = [];
+    var skipped = 0;
 
     for(i = 0; i < drillTiles.length; i++){
-        if(takeDrillCandidate(drillTiles[i], drill, sourceDropId, minOresPerDrill, team,
-            bridgeTiles, occupied, phaseX, phaseY)){
-            filtered.push(drillTiles[i]);
-        }
+        var takenOne = takeDrillCandidate(drillTiles[i], drill, sourceDropId, minOresPerDrill, team,
+            bridgeTiles, beltPlans, occupied, phaseX, phaseY);
+        if(takenOne === 1) filtered.push(drillTiles[i]);
+        else if(takenOne === 2) skipped++;
     }
 
     for(i = 0; i < leftovers.length; i++){
-        if(takeDrillCandidate(leftovers[i], drill, sourceDropId, minOresPerDrill, team,
-            bridgeTiles, occupied, phaseX, phaseY)){
-            filtered.push(leftovers[i]);
-        }
+        var takenTwo = takeDrillCandidate(leftovers[i], drill, sourceDropId, minOresPerDrill, team,
+            bridgeTiles, beltPlans, occupied, phaseX, phaseY);
+        if(takenTwo === 1) filtered.push(leftovers[i]);
+        else if(takenTwo === 2) skipped++;
     }
     drillTiles = filtered;
+    dbg("filter: kept=" + filtered.length + " skipped=" + skipped
+        + " (no room for belts next to them)");
 
     dbg("after filter: drills=" + drillTiles.length + " bridgeTiles=" + bridgeTiles.length + " sourceDrop=" + sourceDropId);
 
     // No drill means no job: the chain only exists to carry their output. Upstream planned a
     // bridge matrix anyway when a non-ore tile was tapped, filling the map with useless plans.
-    if(drillTiles.length === 0) return [];
+    if(drillTiles.length === 0) return {plans: [], skipped: skipped};
 
-    if(bridgeTiles.length === 0) return [];
+    if(bridgeTiles.length === 0) return {plans: [], skipped: skipped};
 
     // --- Outlet: the bridge tile furthest in the chosen direction, plus one tile further out.
     var outerMost = util.argMax(bridgeTiles, function(t2){
         return direction.x === 0 ? api.ty(t2) * direction.y : api.tx(t2) * direction.x;
     });
-    if(outerMost == null) return [];
+    if(outerMost == null) return {plans: [], skipped: skipped};
 
     var outlet = api.nearby(outerMost, configX, configY);
-    if(outlet == null) return [];
+    if(outlet == null) return {plans: [], skipped: skipped};
 
     bridgeTiles.push(outlet);
     util.sortStable(bridgeTiles, function(t2){
@@ -403,6 +497,14 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
         var drillPlan = util.newPlan(api.tx(drillTiles[i]), api.ty(drillTiles[i]), 0, drill);
         if(util.canPlaceWithoutPlanCollision(drillPlan, team, allPlans)){
             allPlans.push(drillPlan);
+        }else{
+            util.markRefused();
+        }
+    }
+
+    for(i = 0; i < beltPlans.length; i++){
+        if(util.canPlaceWithoutPlanCollision(beltPlans[i], team, allPlans)){
+            allPlans.push(beltPlans[i]);
         }else{
             util.markRefused();
         }
@@ -557,7 +659,7 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
     dbg("committing: drills+bridge plans=" + allPlans.length + " (bridges kept=" + bridgePlans.length + ")");
     util.commitPlans(allPlans);
     util.reportRefused("buildings");
-    return allPlans;
+    return {plans: allPlans, skipped: skipped};
 }
 
 /** Java: BridgeDrill.findExistingBridgePartner */

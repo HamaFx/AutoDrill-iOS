@@ -2,7 +2,7 @@ displayName: "AutoDrill (iOS)"
 name: "auto-drill-ios"
 author: "Pointifix (original mod), HamaFx (iOS port)"
 description: "Adds tools for automatically filling resource patches with drills. iOS-compatible script edition of AutoDrill."
-version: "1.7.6"
+version: "1.7.7"
 minGameVersion: 160
 iosCompatible: true
 hidden: true

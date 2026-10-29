@@ -261,17 +261,24 @@ function testBridge(){
     check("bridge: has bridge chain", bridges > 0, "bridges=" + bridges);
     report("bridge: drills=" + drills + " bridges=" + bridges);
 
-    // drThe classic 6-pattern: drills only on drill tiles, bridges only on bridge tiles
-    var wrongDrill = null;
+    // Every drill has to actually mine the tapped ore. (Older versions also required every
+    // drill to sit on the fixed belt pattern; the pattern is now aligned to the patch and the
+    // tiles it misses are filled in as well, so that check would be wrong.)
+    var badDrill = null;
+    var onPattern = 0;
+    var tapDrop = api.itemId(api.drop(ore));
     for(var i = 0; i < plans.length; i++){
-        if(api.blockId(plans[i].block) === api.blockId(Blocks.mechanicalDrill)
-            && !bridge.isDrillTile(api.tile(plans[i].x, plans[i].y))){
-            wrongDrill = plans[i].x + "," + plans[i].y;
-        }
-    }
-    check("bridge: drills sit on pattern tiles", wrongDrill == null, "wrong=" + wrongDrill);
+        if(api.blockId(plans[i].block) !== api.blockId(Blocks.mechanicalDrill)) continue;
 
-    report("bridge: pattern check done");
+        var drillTile = api.tile(plans[i].x, plans[i].y);
+        var mined = util.countOre(drillTile, Blocks.mechanicalDrill);
+        if(mined == null || api.itemId(mined.item) !== tapDrop){
+            badDrill = plans[i].x + "," + plans[i].y;
+        }
+        if(bridge.isDrillTile(drillTile)) onPattern++;
+    }
+    check("bridge: every drill mines the tapped ore", badDrill == null, "wrong=" + badDrill);
+    report("bridge: " + onPattern + " of " + drills + " drills on the belt pattern, rest fill gaps");
 
     // pneumatic
     var pneu = bridge.fill(ore, Blocks.pneumaticDrill, dir.UP, team);
