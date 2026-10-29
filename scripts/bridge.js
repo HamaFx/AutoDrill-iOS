@@ -502,21 +502,29 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
     // the drills at its edge.
     var itemBridgeBlock = api.block("itemBridge");
     var ring = [];
+    var ringSeen = {};
+    var gridSeen = {};
+    for(i = 0; i < bridgeTiles.length; i++) gridSeen[api.pos(bridgeTiles[i])] = true;
     for(i = 0; i < tiles.length; i++){
         for(var rx = -1; rx <= 1; rx++){
             for(var ry = -1; ry <= 1; ry++){
                 if(rx === 0 && ry === 0) continue;
                 var ringTile = api.nearby(tiles[i], rx, ry);
                 if(ringTile == null) continue;
+                var ringKey = api.pos(ringTile);
+                if(ringSeen[ringKey] === true) continue;
+                ringSeen[ringKey] = true;
+                if(gridSeen[ringKey] === true) continue;
                 if(!isBridgeTile(ringTile, phaseX, phaseY)) continue;
-                if(util.containsTile(bridgeTiles, ringTile)) continue;
-                if(util.containsTile(ring, ringTile)) continue;
                 if(!util.canPlaceBlock(itemBridgeBlock, team, api.tx(ringTile), api.ty(ringTile), 0)) continue;
                 ring.push(ringTile);
             }
         }
     }
-    for(i = 0; i < ring.length; i++) bridgeTiles.push(ring[i]);
+    for(i = 0; i < ring.length; i++){
+        gridSeen[api.pos(ring[i])] = true;
+        bridgeTiles.push(ring[i]);
+    }
 
     // every ore cell this fill could cover at all (the leftovers rule above)
     var oreSet = {};
