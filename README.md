@@ -27,8 +27,11 @@ Nothing about the tool itself changed: same buttons, same layouts, same settings
 
 - Tap the **AutoDrill icon** next to the minimap (or press `H` on a hardware keyboard) to
   arm the tool. A toolbar appears above the next tile you tap.
-- Choose a drill. Mechanical/pneumatic drills and the Erekir plasma bore ask for an output
-  direction first; the optimizer drills start filling immediately.
+- Choose a tool. Mechanical/pneumatic drills and the plasma bores (small and large) ask for an
+  output direction first; the optimizer drills start filling immediately.
+- Drills are not the only ground worth tapping: a **steam vent** gets vent condensers (your
+  water source on Erekir) and **oil ground** gets oil extractors, powered and with a conduit
+  line run to the nearest water, since the extractor needs it to run.
 - Press the icon (or the key) again to disarm.
 - Mis-tapped? The **arrow button** next to the AutoDrill icon removes the buildings the last
   fill planned, as long as they have not been built yet.
@@ -94,6 +97,19 @@ Two differences from the Java version, both caused by iOS mod limits:
   the cap was hit. Each step explores a *distinct* layout, so raising the quality goes further
   than it used to.
 
+## Tools
+
+| Tap this | And you get |
+|---|---|
+| Ore patch | Mechanical, pneumatic, laser, airblast drills (Serpulo) or plasma bore, impact, eruption drills (Erekir) |
+| Ore wall (Erekir) | Plasma bores, or **large plasma bores** for the harder walls (thorium, tungsten) |
+| Steam vent | Vent condensers, powered - Erekir's water supply |
+| Oil ground | Oil extractors, powered, with a pump on the nearest water and conduits run to them |
+| Water / bare ground | Nothing, and the toolbar says so |
+
+Optimised fills (laser, airblast, impact, eruption) also plan what the drills need: water
+extractors and power nodes on Serpulo, beam towers or beam nodes on Erekir, wired to your grid.
+
 ## Notes
 
 - The Java AutoDrill can stay installed on desktop/Android. If it is enabled on the same
@@ -110,6 +126,7 @@ Two differences from the Java version, both caused by iOS mod limits:
   no game needed. First stop when the engine misbehaves.
 - `tools/engine-tests.sh` — the engine's promises as checks (whole patch seen, every reachable
   tile mined, no free drill left with ore, nothing overlapping, same patch = same layout).
+- `scripts/liquid.js` — the attribute fills (steam vents, oil) and the liquid routing they use.
 - `tools/compile-check.sh` — loads the mod in the *compiled* script engine (desktop/Android).
   The interpreted engine iOS uses runs code the compiler rejects, so this catches desktop
   breakage in under a minute.

@@ -45,7 +45,9 @@ function makeApi(){
     var waterExtractor = block("waterExtractor", 2, "serpulo");
     var ventCondenser = block("ventCondenser", 3, "erekir");
     var electrolyzer = block("electrolyzer", 3, "erekir");
-    var oilExtractor = block("oilExtractor", 3, "serpulo");
+    var oilExtractor = block("oilExtractor", 3, "any");
+    var mechanicalPump = block("mechanicalPump", 2, "serpulo");
+    var impulsePump = block("impulsePump", 3, "erekir");
     var powerNode = block("powerNode", 1, "serpulo");
     // link ranges as the game exposes them (PowerNode: laserRange, BeamNode/BeamTower: range)
     beamNode.range = 10;
@@ -191,7 +193,42 @@ function makeApi(){
     // ---- pieces the optimiser/reporting paths touch ----
     api.waterAt = function(tile){ return ((tile.x * 7 + tile.y * 13) % 5) / 10; };
     api.waterTile = function(){ return false; };   // the fake world has no water
-    api.pumpsWaterAt = function(block, x, y){ return api.waterAt({x: x, y: y}) > 0; };
+    api.pumpsWaterAt = function(block, x, y){
+        // standing water, or ground water where the scenario says there is any
+        if(OPTS.waterRect != null
+            && x >= OPTS.waterRect.x0 && x <= OPTS.waterRect.x1
+            && y >= OPTS.waterRect.y0 && y <= OPTS.waterRect.y1){
+            return true;
+        }
+        return api.waterAt({x: x, y: y}) > 0;
+    };
+
+    api.attributeAt = function(tile, name){
+        var rect = name === "oil" ? OPTS.oilRect : (name === "steam" ? OPTS.steamRect : OPTS.waterRect);
+        if(rect == null || tile == null) return 0;
+        if(tile.x < rect.x0 || tile.x > rect.x1 || tile.y < rect.y0 || tile.y > rect.y1) return 0;
+        return name === "steam" ? 1 : (name === "oil" ? 1.5 : 1);
+    };
+
+    api.powerSupportInfo = function(){
+        var tower = blocks.beamTower;
+        var beam = blocks.beamNode;
+        var node = blocks.powerNode;
+        if(OPTS.erekir === true){
+            if(api.environmentBuildable(tower)) return {block: tower, range: tower.range, size: tower.size, linkBlock: api.environmentBuildable(beam) ? beam : tower};
+            if(api.environmentBuildable(beam)) return {block: beam, range: beam.range, size: beam.size, linkBlock: beam};
+        }
+        return {block: node, range: node.laserRange, size: node.size, linkBlock: node};
+    };
+
+    api.liquidConduit = function(){
+        return api.environmentBuildable(blocks.reinforcedConduit) ? blocks.reinforcedConduit : blocks.conduit;
+    };
+
+    api.pumpBlock = function(){
+        if(api.environmentBuildable(blocks.mechanicalPump)) return blocks.mechanicalPump;
+        return blocks.impulsePump;
+    };
     api.powerLinkRange = function(){ return 6; };
     api.powerTargetNear = function(x, y, radius){
         var target = OPTS.powerTarget;

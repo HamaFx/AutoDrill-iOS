@@ -354,6 +354,31 @@ Two further bugs surfaced while fixing these:
   comparisons, documented next to the two other Rhino landmines, and `tools/compile-check.sh`
   (about 40 s, no game needed beyond loading) now guards the whole class of breakage.
 
+### Water, walls and oil pass 1.7.0 — the rest of the approved list
+
+* **Large Plasma Bore** — the original mod has this button written and commented out. It is
+  tier 5 against the plasma bore's tier 3, so it is the only thing that bores **thorium** and
+  **tungsten** wall ore; offered now whenever the wall under the tap is within its tier.
+  Verified in-engine (bores + ducts + beam nodes, placeable, no overlaps).
+* **Steam vents** — tapping a steam vent (Erekir) places vent condensers over it, powered. The
+  condenser needs a lot of steam under it (`baseEfficiency + sumAttribute(steam) >= 9`, from the
+  game's own `AttributeCrafter.canPlaceOn`), which is exactly a 3x3 patch of vent tiles, so the
+  fill only accepts footprints that meet it. This is Erekir's water source.
+* **Oil ground** (Serpulo) — tapping oil ground places oil extractors on the richest footprints,
+  powered, and runs a pump and a conduit trunk from the nearest water: the extractor consumes
+  water to run, so a fill without one would be dead machines. Verified in-engine (7 extractors,
+  1 pump, 72 conduits on a test field) and in the real game (7 extractors, 1 pump, 11 conduits
+  with the map's pool).
+* The toolbar now says what it accepts when a tap turns up nothing: "nothing to mine here - tap
+  an ore tile, a steam vent or oil ground".
+
+**Known limit, reported honestly:** impact drills need water and eruption drills need hydrogen
+*before they will run at all*, and a solidly packed drill field has no tile left for a conduit
+to reach the interior. Delivering liquid to a dense field needs the layout to keep a conduit
+lane between drill rows (about one tile in five, sharing the lane with the power blocks), which
+is a layout change of its own and is **not** in this release. Until then the fills place the
+drills and the player supplies the liquid - the toast says so.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

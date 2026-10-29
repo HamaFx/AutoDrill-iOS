@@ -357,26 +357,7 @@ function setupSearch(job){
  * power to the player.
  */
 function powerSupport(){
-    var tower = api.block("beamTower");
-    var beam = api.block("beamNode");
-    var node = api.block("powerNode");
-
-    if(api.isErekir()){
-        if(tower != null && api.environmentBuildable(tower)){
-            return {
-                block: tower, range: api.powerRangeOf(tower), size: api.size(tower),
-                linkBlock: beam != null && api.environmentBuildable(beam) ? beam : tower
-            };
-        }
-        if(beam != null && api.environmentBuildable(beam)){
-            return {block: beam, range: api.powerRangeOf(beam), size: api.size(beam), linkBlock: beam};
-        }
-    }
-
-    if(node != null && api.environmentBuildable(node)){
-        return {block: node, range: api.powerRangeOf(node), size: api.size(node), linkBlock: node};
-    }
-    return null;
+    return api.powerSupportInfo();
 }
 
 function linkRange(info, block){

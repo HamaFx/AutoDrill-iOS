@@ -13,6 +13,7 @@
 
 var api = require("api");
 var optimization = require("optimization");
+var liquid = require("liquid");
 
 var S = AUTODRILL_FAKE_SCENARIO;
 var W = S.world;
@@ -476,6 +477,48 @@ check("a patch with no power nearby is not wired to anything",
         unpowered === 0, "unpowered=" + unpowered + "/" + drills.length + " range=" + ereRange);
 
     S.erekir = false;
+})();
+
+// ---------------------------------------------------------------- 6d. vents and oil
+
+// Erekir steam vents hold a steam attribute; the vent condenser only fits where a 3x3 holds
+// enough of it. Serpulo oil ground is the same idea with the oil extractor, which also needs
+// water piped to it - so the fill has to find water and run conduits.
+(function(){
+    S.erekir = true;                     // vents are Erekir ground
+    S.steamRect = {x0: 70, y0: 120, x1: 74, y1: 124};
+    var ventPlans = liquid.fillVent({x: 72, y: 122}, "sharded");
+    S.steamRect = null;
+    S.erekir = false;
+
+    var condensers = 0, ventPower = 0;
+    for(var i = 0; i < ventPlans.length; i++){
+        if(ventPlans[i].block === api.block("ventCondenser")) condensers++;
+        if(isPowerBlock(ventPlans[i].block) || ventPlans[i].block === api.block("mechanicalPump")) ventPower++;
+    }
+    check("vent: a condenser is placed on the vent", condensers >= 1,
+        "condensers=" + condensers + " plans=" + ventPlans.length);
+    check("vent: the condensers get power", ventPower > 0, "power blocks=" + ventPower);
+    check("vent: nothing overlaps", overlapCells(ventPlans) === 0, "overlap=" + overlapCells(ventPlans));
+
+    S.oilRect = {x0: 10, y0: 90, x1: 16, y1: 96};
+    S.waterRect = {x0: 22, y0: 90, x1: 28, y1: 96};
+    var oilPlans = liquid.fillOil({x: 13, y: 93}, "sharded");
+    S.oilRect = null;
+    S.waterRect = null;
+
+    var extractors = 0, pumps = 0, conduits = 0;
+    for(i = 0; i < oilPlans.length; i++){
+        var name = api.blockName(oilPlans[i].block);
+        if(name === "oilExtractor") extractors++;
+        if(name === "mechanicalPump" || name === "impulsePump") pumps++;
+        if(name === "conduit" || name === "reinforcedConduit") conduits++;
+    }
+    check("oil: extractors are placed on the oil", extractors >= 1,
+        "extractors=" + extractors + " plans=" + oilPlans.length);
+    check("oil: a pump and a conduit line are run to them", pumps >= 1 && conduits > 0,
+        "pumps=" + pumps + " conduits=" + conduits);
+    check("oil: nothing overlaps", overlapCells(oilPlans) === 0, "overlap=" + overlapCells(oilPlans));
 })();
 
 // ---------------------------------------------------------------- 7. same patch, same layout

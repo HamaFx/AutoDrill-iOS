@@ -12,6 +12,7 @@ var util = require("auto-drill-ios/util");
 var bridge = require("auto-drill-ios/bridge");
 var optimization = require("auto-drill-ios/optimization");
 var wall = require("auto-drill-ios/wall");
+var liquidFill = require("auto-drill-ios/liquid");
 var ui = require("auto-drill-ios/ui");
 
 var Vars = Packages.mindustry.Vars;
@@ -54,6 +55,7 @@ function runAll(){
     try{ testBridge(); }catch(e){ failed++; report("testBridge threw: " + e); }
     try{ testOptimization(); }catch(e){ failed++; report("testOptimization threw: " + e); }
     try{ testWall(); }catch(e){ failed++; report("testWall threw: " + e); }
+    try{ testLiquid(); }catch(e){ failed++; report("testLiquid threw: " + e); }
     try{ testEdges(); }catch(e){ failed++; report("testEdges threw: " + e); }
     try{ testUi(); }catch(e){ failed++; report("testUi threw: " + e); }
     try{ testPerformance(); }catch(e){ failed++; report("testPerformance threw: " + e); }
@@ -82,6 +84,8 @@ var COPPER = {x0: 20, x1: 30, y0: 20, y1: 30};
 // surface wall-ore generation (ore only on tiles adjacent to open air).
 var WALL = {x0: 10, x1: 24, y0: 40, y1: 54};
 var POOL = {x0: 32, x1: 40, y0: 20, y1: 30};
+var VENT = {x0: 145, x1: 149, y0: 20, y1: 24};
+var OIL = {x0: 44, x1: 50, y0: 20, y1: 28};
 
 function buildMap(){
     Vars.world.loadGenerator(MAP, MAP, function(tiles){
@@ -106,6 +110,18 @@ function buildMap(){
         for(x = POOL.x0; x <= POOL.x1; x++){
             for(y = POOL.y0; y <= POOL.y1; y++){
                 tiles.get(x, y).setFloor(Blocks.water);
+            }
+        }
+
+        // a steam vent for the vent condensers and oil ground for the oil extractors
+        for(x = VENT.x0; x <= VENT.x1; x++){
+            for(y = VENT.y0; y <= VENT.y1; y++){
+                tiles.get(x, y).setFloor(Blocks.rhyoliteVent);
+            }
+        }
+        for(x = OIL.x0; x <= OIL.x1; x++){
+            for(y = OIL.y0; y <= OIL.y1; y++){
+                tiles.get(x, y).setFloor(Blocks.darksand);
             }
         }
 
@@ -402,6 +418,14 @@ function testWall(){
 
     var plans = wall.fill(ore, Blocks.plasmaBore, dir.RIGHT, team);
     check("wall: produced plans", plans.length > 0, "plans=" + plans.length);
+
+    // the large plasma bore (3x3, higher tier) bores the wall ores the plasma bore cannot
+    var largePlans = wall.fill(ore, Blocks.largePlasmaBore, dir.RIGHT, team);
+    var largeBores = tileCount(largePlans, Blocks.largePlasmaBore);
+    check("wall: large plasma bore produced plans", largeBores > 0, "bores=" + largeBores);
+    check("wall: large plasma bore no overlaps", noOverlaps(largePlans));
+    check("wall: large plasma bore plans placeable", allPlaceable(largePlans, team) === true,
+        String(allPlaceable(largePlans, team)));
     check("wall: only bores, ducts and beam nodes", allBlocksAllowed(plans, [Blocks.plasmaBore, Blocks.duct, Blocks.beamNode]) === true,
         String(allBlocksAllowed(plans, [Blocks.plasmaBore, Blocks.duct, Blocks.beamNode])));
     check("wall: no overlapping footprints", noOverlaps(plans));
@@ -479,6 +503,37 @@ function testUi(){
 }
 
 var BIG = {x0: 100, x1: 140, y0: 100, y1: 140};
+
+function testLiquid(){
+    var team = Team.sharded;
+
+    var ventPlans = liquidFill.fillVent(api.tile((VENT.x0 + VENT.x1) / 2 | 0, (VENT.y0 + VENT.y1) / 2 | 0), team);
+    var condensers = tileCount(ventPlans, Blocks.ventCondenser);
+    // whichever power block this environment wires with
+    var ventPower = 0;
+    for(var i = 0; i < ventPlans.length; i++){
+        var b = api.blockId(ventPlans[i].block);
+        if(b === api.blockId(Blocks.powerNode) || b === api.blockId(Blocks.beamNode)
+            || b === api.blockId(Blocks.beamTower)) ventPower++;
+    }
+    report("liquid: vent condensers=" + condensers + " power=" + ventPower + " plans=" + ventPlans.length);
+    check("liquid: vent condenser planned on the vent", condensers > 0, "condensers=" + condensers);
+    check("liquid: vent condensers have power", ventPower > 0, "power=" + ventPower);
+    check("liquid: vent plans placeable", allPlaceable(ventPlans, team) === true, String(allPlaceable(ventPlans, team)));
+    check("liquid: vent no overlaps", noOverlaps(ventPlans));
+
+    var oilPlans = liquidFill.fillOil(api.tile((OIL.x0 + OIL.x1) / 2 | 0, (OIL.y0 + OIL.y1) / 2 | 0), team);
+    var extractors = tileCount(oilPlans, Blocks.oilExtractor);
+    var pumps = tileCount(oilPlans, Blocks.mechanicalPump);
+    var conduits = tileCount(oilPlans, Blocks.conduit);
+    report("liquid: oil extractors=" + extractors + " pumps=" + pumps + " conduits=" + conduits
+        + " plans=" + oilPlans.length);
+    check("liquid: oil extractors planned on the oil", extractors > 0, "extractors=" + extractors);
+    check("liquid: a pump and conduits were run to them", pumps > 0 && conduits > 0,
+        "pumps=" + pumps + " conduits=" + conduits);
+    check("liquid: oil plans placeable", allPlaceable(oilPlans, team) === true, String(allPlaceable(oilPlans, team)));
+    check("liquid: oil no overlaps", noOverlaps(oilPlans));
+}
 
 function testPerformance(){
     // a big patch: how long does the iphone-side algorithm take on the desktop JVM?

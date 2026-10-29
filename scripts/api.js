@@ -38,6 +38,7 @@ function buildReal(){
     var InputProcessor = Packages.arc.input.InputProcessor;
     var BaseDialog = Packages.mindustry.ui.dialogs.BaseDialog;
     var SettingsMenuDialog = Packages.mindustry.ui.dialogs.SettingsMenuDialog;
+    var Attribute = Packages.mindustry.world.meta.Attribute;
     var Fx = Packages.mindustry.content.Fx;
     var Cons = Packages.arc.func.Cons;
     var Boolp = Packages.arc.func.Boolp;
@@ -275,6 +276,60 @@ function buildReal(){
     /** How far a power node reaches - links are wireless within this many tiles. */
     api.powerLinkRange = function(){
         return Blocks.powerNode.laserRange;
+    };
+
+    /**
+     * The power block this environment wires with: beam towers or beam nodes on Erekir, power
+     * nodes on Serpulo. Beam towers reach 23 tiles from a 3x3 footprint, so one or two of them
+     * power a whole patch - they are preferred when the game has them unlocked and buildable.
+     *
+     * Returns null when nothing power-related can be built here.
+     */
+    api.powerSupportInfo = function(){
+        var tower = Blocks.beamTower;
+        var beam = Blocks.beamNode;
+        var node = Blocks.powerNode;
+
+        if(api.isErekir()){
+            if(tower != null && tower.environmentBuildable()){
+                return {block: tower, range: api.powerRangeOf(tower), size: tower.size,
+                    linkBlock: beam != null && beam.environmentBuildable() ? beam : tower};
+            }
+            if(beam != null && beam.environmentBuildable()){
+                return {block: beam, range: api.powerRangeOf(beam), size: beam.size, linkBlock: beam};
+            }
+        }
+
+        if(node != null && node.environmentBuildable()){
+            return {block: node, range: api.powerRangeOf(node), size: node.size, linkBlock: node};
+        }
+        return null;
+    };
+
+    /** The liquid pipe for this environment: conduits, reinforced conduits on Erekir. */
+    api.liquidConduit = function(){
+        var candidates = [Blocks.conduit, Blocks.reinforcedConduit, Blocks.platedConduit];
+        for(var i = 0; i < candidates.length; i++){
+            var block = candidates[i];
+            if(block != null && block.environmentBuildable()) return block;
+        }
+        return null;
+    };
+
+    /** The water pump for this environment (Erekir pipes water with its own pump). */
+    api.pumpBlock = function(){
+        var candidates = [Blocks.mechanicalPump, Blocks.impulsePump, Blocks.rotaryPump];
+        for(var i = 0; i < candidates.length; i++){
+            var block = candidates[i];
+            if(block != null && block.environmentBuildable()) return block;
+        }
+        return null;
+    };
+
+    /** Floor attribute of a tile by name: "water", "oil" or "steam". */
+    api.attributeAt = function(tile, name){
+        var attribute = name === "oil" ? Attribute.oil : (name === "steam" ? Attribute.steam : Attribute.water);
+        return tile.floor().attributes.get(attribute);
     };
 
     /**

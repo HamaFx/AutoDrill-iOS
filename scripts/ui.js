@@ -10,6 +10,7 @@ var util = require("util");
 var bridge = require("bridge");
 var optimization = require("optimization");
 var wall = require("wall");
+var liquid = require("liquid");
 
 var KEY_ACTIVATION = "auto-drill-ios-activation-key";
 var KEY_SHOW_BUTTON = "auto-drill-ios-display-toggle-button";
@@ -247,6 +248,7 @@ function updateSelectTable(){
     var laser = api.block("laserDrill");
     var blast = api.block("blastDrill");
     var plasmaBore = api.block("plasmaBore");
+    var largePlasmaBore = api.block("largePlasmaBore");
     var impact = api.block("impactDrill");
     var eruption = api.block("eruptionDrill");
 
@@ -277,6 +279,14 @@ function updateSelectTable(){
             function(){ requireDirection(function(d){ wall.fill(selectedTile, plasmaBore, d); }); });
     }
 
+    // The large plasma bore bores harder ore walls (thorium and tungsten, not just beryllium
+    // and graphite). The original mod had this button written and commented out.
+    if(largePlasmaBore != null && api.environmentBuildable(largePlasmaBore) && wallDrop != null
+        && api.itemHardness(wallDrop) <= api.beamTier(largePlasmaBore)){
+        addDrillButton("block-large-plasma-bore-full",
+            function(){ requireDirection(function(d){ wall.fill(selectedTile, largePlasmaBore, d); }); });
+    }
+
     if(api.environmentBuildable(impact) && api.canMine(impact, selectedTile)){
         addDrillButton("block-impact-drill-full",
             function(){ startOptimization(impact, true); });
@@ -285,6 +295,21 @@ function updateSelectTable(){
     if(api.environmentBuildable(eruption) && api.canMine(eruption, selectedTile)){
         addDrillButton("block-eruption-drill-full",
             function(){ startOptimization(eruption, true); });
+    }
+
+    // Erekir steam vents and Serpulo oil ground: machines that sit on a ground attribute.
+    var ventCondenser = api.block("ventCondenser");
+    if(ventCondenser != null && api.environmentBuildable(ventCondenser)
+        && api.attributeAt(selectedTile, "steam") >= 0.9){
+        addDrillButton("block-vent-condenser-full",
+            function(){ liquid.fillVent(selectedTile, null); });
+    }
+
+    var oilExtractor = api.block("oilExtractor");
+    if(oilExtractor != null && api.environmentBuildable(oilExtractor)
+        && api.attributeAt(selectedTile, "oil") > 0){
+        addDrillButton("block-oil-extractor-full",
+            function(){ liquid.fillOil(selectedTile, null); });
     }
 
     // Nothing here to mine: hide the empty box and say so instead of showing a blank pop-up.
