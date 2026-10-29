@@ -472,6 +472,27 @@ now prints the same plain result line as the optimiser fills, including the cut-
 Both wordings are pinned by engine checks, and the in-engine suite now asserts that the belt
 layout covers at least 80 % of the patch it was given.
 
+### 1.7.5 — why the belt tool covered less, and why 8/9 is its ceiling
+
+The same belt fill on the same patch covered different amounts depending on *where the patch sat
+on the map*: `BridgeDrill` lays its drills and belts on a pattern fixed to the world coordinates
+(`x % 6`, `x % 3`), so coverage was decided by the pattern's phase against the ore, not by the
+ore. Measured on four identical patches at different offsets: 74 % / 76 % / 78 % / 84 %.
+
+The pattern is now aligned to the patch: all nine offsets are scored against the ore that is
+actually under them and the best one wins, and a drill whose ring misses the belt grid may add a
+bridge tile that pairs (three tiles along an axis) with the chain. Same four patches now: all
+identical (77.8 % / 75 % / 79 % / 84.4 % - the small ones lose more to their edges).
+
+**The ceiling is 8/9 = 88.9 % and that is arithmetic, not a shortcut.** A belt tile carries the
+ore of the drills around it; one bridge tile per 3x3 cell (the sparsest grid that keeps every
+drill adjacent to transport, since a bridge reaches three tiles over the drills in between)
+leaves eight tiles for drills, and 2x2 drills fit exactly two per cell: 8 of 9 tiles covered.
+The belt tool hits that on a patch of any size; the remaining tile in nine is the minimum
+transport needs. The optimiser drills cover every tile because they plan no transport at all -
+their ore then has nowhere to go until the player makes room, which is the trade the user picks
+by choosing the tool. The fill's own message says so, and names the tool to use instead.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

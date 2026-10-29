@@ -26,24 +26,24 @@ function dbg(msg){
 var SETTING_DEFAULTS = optimization.settingDefaults;
 
 /** Java: BridgeDrill.isDrillTile */
-function isDrillTile(tile){
-    var x = api.tx(tile);
-    var y = api.ty(tile);
+function isDrillTile(tile, phaseX, phaseY){
+    var x = api.tx(tile) - (phaseX == null ? 0 : phaseX);
+    var y = api.ty(tile) - (phaseY == null ? 0 : phaseY);
 
-    switch(x % 6){
+    switch(((x % 6) + 6) % 6){
         case 0:
         case 2:
-            if((y - 1) % 6 === 0) return true;
+            if(((y - 1) % 6 + 6) % 6 === 0) return true;
             break;
         case 1:
-            if((y - 3) % 6 === 0 || (y - 3) % 6 === 2) return true;
+            if(((y - 3) % 6 + 6) % 6 === 0 || ((y - 3) % 6 + 6) % 6 === 2) return true;
             break;
         case 3:
         case 5:
-            if((y - 4) % 6 === 0) return true;
+            if(((y - 4) % 6 + 6) % 6 === 0) return true;
             break;
         case 4:
-            if(y % 6 === 0 || y % 6 === 2) return true;
+            if(y % 6 === 0 || ((y % 6) + 6) % 6 === 2) return true;
             break;
     }
     return false;
@@ -51,9 +51,138 @@ function isDrillTile(tile){
 
 exports.isDrillTile = isDrillTile;
 
-/** Java: BridgeDrill.isBridgeTile */
-function isBridgeTile(tile){
-    return api.tx(tile) % 3 === 0 && api.ty(tile) % 3 === 0;
+/** True when the tile can link (item bridges link three tiles along an axis) to one in the list. */
+function pairsWithAny(tile, list){
+    for(var i = 0; i < list.length; i++){
+        var dx = api.tx(list[i]) - api.tx(tile);
+        var dy = api.ty(list[i]) - api.ty(tile);
+        if((dx === 0 && Math.abs(dy) === 3) || (dy === 0 && Math.abs(dx) === 3)) return true;
+    }
+    return false;
+}
+
+/** True when the tile carries the ore this fill is about. */
+function isOreTile(tile, sourceDropId){
+    return api.itemId(api.drop(tile)) === sourceDropId;
+}
+
+/**
+ * Takes a drill candidate when it can actually work: it mines the tapped ore, meets Min Ores,
+ * fits on free ground, and has a belt or bridge next to it (or can have one added) to carry its
+ * ore out - a drill with nowhere to put its ore just fills up.
+ *
+ * Returns 1 when taken. NOTE: a number, not an object - helpers that build an object and are
+ * called inside a hot loop are the Rhino trap documented in docs/AUDIT.md.
+ */
+function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridgeTiles, occupied, phaseX, phaseY){
+    var size = api.size(drill);
+    var offset = Math.floor((size - 1) / 2);
+    var worldW = api.worldW();
+    var x = api.tx(t), y = api.ty(t);
+    var i = 0, j = 0;
+
+    for(i = 0; i < size; i++){
+        for(j = 0; j < size; j++){
+            if(occupied[(x - offset + i) + (y - offset + j) * worldW] === true) return 0;
+        }
+    }
+
+    var ore = util.countOre(t, drill);
+    if(ore == null || api.itemId(ore.item) !== sourceDropId || ore.count < minOresPerDrill) return 0;
+    if(!util.canPlaceBlock(drill, team, x, y, 0)) return 0;
+
+    var neighbours = util.nearbyTilesOfBlock(x, y, drill);
+    var eligible = [];
+    for(j = 0; j < neighbours.length; j++){
+        if(isBridgeTile(neighbours[j], phaseX, phaseY)) eligible.push(neighbours[j]);
+    }
+
+    var connected = false;
+    for(j = 0; j < eligible.length; j++){
+        if(util.containsTile(bridgeTiles, eligible[j])){
+            connected = true;
+            break;
+        }
+    }
+
+    if(!connected){
+        var placeable = [];
+
+        // first choice: the grid tiles the pattern keeps for its belts
+        for(j = 0; j < eligible.length; j++){
+            if(util.canPlaceBlock(api.block("itemBridge"), team, api.tx(eligible[j]), api.ty(eligible[j]), 0)){
+                placeable.push(eligible[j]);
+            }
+        }
+
+        // otherwise any free tile next to the drill that can link to the chain: an item bridge
+        // reaches three tiles along an axis, so a tile that pairs with one already planned joins
+        // the chain - which is what lets drills sit on ore the fixed pattern never covered
+        for(j = 0; j < neighbours.length; j++){
+            var candidate = neighbours[j];
+            if(util.containsTile(bridgeTiles, candidate)) continue;
+            if(util.containsTile(placeable, candidate)) continue;
+            if(!util.canPlaceBlock(api.block("itemBridge"), team, api.tx(candidate), api.ty(candidate), 0)) continue;
+            if(!pairsWithAny(candidate, bridgeTiles)) continue;
+
+            placeable.push(candidate);
+        }
+
+        if(placeable.length === 0) return 0;
+
+        for(j = 0; j < placeable.length; j++){
+            if(!util.containsTile(bridgeTiles, placeable[j])) bridgeTiles.push(placeable[j]);
+        }
+    }
+
+    for(i = 0; i < size; i++){
+        for(j = 0; j < size; j++){
+            occupied[(x - offset + i) + (y - offset + j) * worldW] = true;
+        }
+    }
+    return 1;
+}
+
+/** Java: BridgeDrill.isBridgeTile (same phase as the drill pattern it belongs to) */
+function isBridgeTile(tile, phaseX, phaseY){
+    var x = api.tx(tile) - (phaseX == null ? 0 : phaseX);
+    var y = api.ty(tile) - (phaseY == null ? 0 : phaseY);
+    return ((x % 3) + 3) % 3 === 0 && ((y % 3) + 3) % 3 === 0;
+}
+
+/**
+ * The pattern offset that covers the most ore under it.
+ *
+ * The original pattern is fixed to the world coordinates, so a patch got covered or barely
+ * touched purely by where it happened to sit on the map - the same tap, twice, on two patches,
+ * looked like a broken mod. Both the drill pattern and the belt grid are shifted together here,
+ * and the offset that puts the most drills on ore wins.
+ */
+function pickPhase(tiles, drill, targetSet){
+    var size = api.size(drill);
+    var offset = Math.floor((size - 1) / 2);
+    var worldW = api.worldW();
+    var best = {x: 0, y: 0, score: -1};
+    var i = 0, dx = 0, dy = 0;
+
+    for(var px = 0; px < 3; px++){
+        for(var py = 0; py < 3; py++){
+            var score = 0;
+
+            for(i = 0; i < tiles.length; i++){
+                if(!isDrillTile(tiles[i], px, py)) continue;
+
+                var x = api.tx(tiles[i]) - offset, y = api.ty(tiles[i]) - offset;
+                for(dx = 0; dx < size; dx++){
+                    for(dy = 0; dy < size; dy++){
+                        if(targetSet[(x + dx) + (y + dy) * worldW] === true) score++;
+                    }
+                }
+            }
+            if(score > best.score) best = {x: px, y: py, score: score};
+        }
+    }
+    return best;
 }
 
 exports.isBridgeTile = isBridgeTile;
@@ -86,7 +215,11 @@ function fill(tile, drill, direction, teamOverride){
 
     var tiles = reached;
     util.expandArea(tiles, Math.floor(api.size(drill) / 2));
-    var plans = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride);
+
+    var phase = pickPhase(tiles, drill, targetSet);
+    dbg("phase=" + phase.x + "," + phase.y + " patternOre=" + phase.score + " of " + targetCells);
+
+    var plans = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride, phase.x, phase.y);
 
     reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles);
     return plans;
@@ -160,10 +293,10 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
         }else if(built > 0){
             why = built + " tiles already have buildings on them";
         }else{
-            // the belt layout keeps one drill per belt line, so a strip of the patch is always
-            // left; the optimiser drills fill a patch right to its edge
-            why = "the belt layout leaves the patch edge (the laser and airblast drills fill a"
-                + " patch completely if you want every tile)";
+            // the belt layout has to keep tiles for its belts, so a strip is always left; the
+            // optimiser drills fill a patch right to its edge
+            why = "the belt layout keeps tiles for its bridges - use the laser or airblast drill"
+                + " to cover every tile";
         }
         api.toast("[AutoDrill] mined " + n + " of " + targetCells + " " + word + " tiles - " + why);
     }
@@ -184,20 +317,23 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
 
 exports.fill = fill;
 
-function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
+function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, phaseX, phaseY){
     var team = teamOverride != null ? teamOverride : api.team();
     var configX = direction.x * 3;
     var configY = direction.y * 3;
 
     var drillTiles = [];
     var bridgeTiles = [];
+    var leftovers = [];       // ore the pattern does not cover; picked up below
+    var sourceDropId = api.itemId(api.drop(source));
     var i = null;
 
     for(i = 0; i < tiles.length; i++){
-        if(isDrillTile(tiles[i])) drillTiles.push(tiles[i]);
+        if(isDrillTile(tiles[i], phaseX, phaseY)) drillTiles.push(tiles[i]);
+        else if(isOreTile(tiles[i], sourceDropId)) leftovers.push(tiles[i]);
     }
     for(i = 0; i < tiles.length; i++){
-        if(isBridgeTile(tiles[i])) bridgeTiles.push(tiles[i]);
+        if(isBridgeTile(tiles[i], phaseX, phaseY)) bridgeTiles.push(tiles[i]);
     }
 
     var prefix = null;
@@ -212,54 +348,29 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride){
     }
     var minOresPerDrill = api.settingInt(prefix + "-drill-min-ores", SETTING_DEFAULTS[prefix].ores);
 
-    var sourceDropId = api.itemId(api.drop(source));
-    dbg("tiles=" + tiles.length + " drillTiles=" + drillTiles.length + " bridgeTiles=" + bridgeTiles.length);
+    // The pattern keeps the tiles its belts run on and whatever falls between its cells. Ore
+    // the pattern misses is picked up here, so a fill covers the patch instead of a sample of it.
 
-    // --- Pre-filter drill candidates: correct resource, enough ores, placeable,
-    // --- and reachable by at least one bridge-eligible neighbour.
+    dbg("tiles=" + tiles.length + " drillTiles=" + drillTiles.length
+        + " bridgeTiles=" + bridgeTiles.length + " leftovers=" + leftovers.length);
+
+    // --- Pre-filter: correct resource, enough ores, placeable, and with something to carry the
+    // --- ore away. The pattern's own tiles go first - its belts are laid out around them - then
+    // --- whatever ore the pattern missed is picked up with the same rules.
+    var occupied = {};
     var filtered = [];
+
     for(i = 0; i < drillTiles.length; i++){
-        var t = drillTiles[i];
-        var ore = util.countOre(t, drill);
+        if(takeDrillCandidate(drillTiles[i], drill, sourceDropId, minOresPerDrill, team,
+            bridgeTiles, occupied, phaseX, phaseY)){
+            filtered.push(drillTiles[i]);
+        }
+    }
 
-        if(ore == null || api.itemId(ore.item) !== sourceDropId || ore.count < minOresPerDrill){
-            continue;
-        }
-        if(!util.canPlaceBlock(drill, team, api.tx(t), api.ty(t), 0)){
-            continue;
-        }
-
-        var neighbours = util.nearbyTilesOfBlock(api.tx(t), api.ty(t), drill);
-        var bridgeEligible = [];
-        var j = null;
-        for(j = 0; j < neighbours.length; j++){
-            if(isBridgeTile(neighbours[j])) bridgeEligible.push(neighbours[j]);
-        }
-
-        var connected = false;
-        for(j = 0; j < bridgeEligible.length; j++){
-            if(util.containsTile(bridgeTiles, bridgeEligible[j])){
-                connected = true;
-                break;
-            }
-        }
-        if(connected){
-            filtered.push(t);
-            continue;
-        }
-
-        var placeable = [];
-        for(j = 0; j < bridgeEligible.length; j++){
-            if(util.canPlaceBlock(api.block("itemBridge"), team, api.tx(bridgeEligible[j]), api.ty(bridgeEligible[j]), 0)){
-                placeable.push(bridgeEligible[j]);
-            }
-        }
-
-        if(placeable.length > 0){
-            for(j = 0; j < placeable.length; j++){
-                bridgeTiles.push(placeable[j]);
-            }
-            filtered.push(t);
+    for(i = 0; i < leftovers.length; i++){
+        if(takeDrillCandidate(leftovers[i], drill, sourceDropId, minOresPerDrill, team,
+            bridgeTiles, occupied, phaseX, phaseY)){
+            filtered.push(leftovers[i]);
         }
     }
     drillTiles = filtered;
