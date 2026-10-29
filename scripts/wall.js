@@ -18,6 +18,7 @@
 "use strict";
 
 var api = require("api");
+var optimization = require("optimization");
 
 var DEBUG = false;
 exports.setDebug = function(value){ DEBUG = value; };
@@ -62,7 +63,7 @@ function wallOrePatch(tile){
     var visited = {};
     var sourceItemId = api.itemId(api.wallDrop(tile));
 
-    var baseSetting = api.settingInt("mechanical-drill-max-tiles", 2500);
+    var baseSetting = api.settingInt("mechanical-drill-max-tiles", optimization.settingDefaults.mechanical.tiles);
     var maxTiles = Math.min(600, Math.max(100, Math.trunc(baseSetting * 0.25)));
 
     visited[api.pos(tile)] = true;
@@ -527,7 +528,7 @@ function getConnectedWallTiles(tile, direction){
     // The wall fill explores a quarter of what a normal fill does (as in the original), but
     // bounded: it is a different tool with its own cost, and the patch-size setting is not
     // about it.
-    var baseSetting = api.settingInt("mechanical-drill-max-tiles", 2500);
+    var baseSetting = api.settingInt("mechanical-drill-max-tiles", optimization.settingDefaults.mechanical.tiles);
     var maxTiles = Math.min(600, Math.max(100, Math.trunc(baseSetting * 0.25)));
 
     while(queueIndex < queue.length && tiles.length < maxTiles){

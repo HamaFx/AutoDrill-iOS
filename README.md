@@ -43,7 +43,7 @@ review or cancel them before they are built.
 
 Settings → Auto Drill. Everything the Java mod offers is there: activation key, toggle
 button visibility, per-drill maximum tiles and minimum ores, optimization quality, and
-whether water extractors/power nodes are added to optimised drills. Two extras:
+whether water extractors/power nodes are added to optimised drills. What the extras do:
 
 - **Water Extractors & Power Nodes** — optimised fills (laser, airblast, impact, eruption) plan
   water extractors for the drills that can have one — the pump is placed where its whole 2×2
@@ -54,10 +54,13 @@ whether water extractors/power nodes are added to optimised drills. Two extras:
   while a thin vein costs nothing extra, because the nodes sit on the empty ground beside it.
   Turning the setting off fills every tile but leaves the wiring (and the free tiles it needs)
   to you.
+- **Build Belt Lanes** — off by default. Keeps lanes through the patch for belts and puts the
+  power blocks and water extractors on them, so the patch runs without being wired by hand; it
+  costs about a quarter of the patch's tiles, because the belt bridges need room between drills.
 - **Optimization Quality** — how many layout attempts the fill makes (plus the search budget).
   Higher = fewer ore tiles left behind, slower fill.
 - **Max Tiles** — how many ore tiles the fill looks at, nearest the tap first. It is a safety
-  limit, not a target: 2,500 ships by default, which covers any normal patch whole. If a patch
+  limit, not a target: 5,000 ships by default, which covers any normal patch whole. If a patch
   is bigger the fill says so and fills the part it saw.
 - **Min Ores** — how many ore tiles a drill must cover to be built. Lower it to reach thin ore
   veins and the rim of a patch (1 mines everything); higher keeps only efficient drills.

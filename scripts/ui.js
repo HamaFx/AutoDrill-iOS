@@ -74,9 +74,9 @@ var SETTINGS_VERSION = 3;
 /**
  * The fill limits shipped by older versions made the fill look broken: a laser fill saw 100 ore
  * tiles (so a big patch was filled in the middle and nowhere else), Min Ores was up to 9 (so
- * the rim of every patch was out of reach), and 2,500 tiles still truncated the biggest
- * patches. Those values were the bug, not a preference, so they are rewritten once per step
- * for anyone updating from an older version.
+ * the rim of every patch was out of reach), and the old 2,500-tile limit still truncated the
+ * biggest patches. Those values were the bug, not a preference, so they are rewritten once per
+ * step for anyone updating from an older version.
  */
 function migrateFillLimits(){
     if(api.settingInt(KEY_SETTINGS_VERSION, 0) >= SETTINGS_VERSION) return;
@@ -84,13 +84,18 @@ function migrateFillLimits(){
     var d = optimization.settingDefaults;
     var names = ["mechanical", "pneumatic", "laser", "airblast"];
 
+    // A fresh install has none of these keys yet - it should get the defaults without the
+    // "upgraded" message (nothing was upgraded). Only an older install, whose keys exist with
+    // the old values, gets the toast.
+    var upgrading = api.settingInt("mechanical-drill-max-tiles", -1) >= 0;
+
     for(var i = 0; i < names.length; i++){
         api.putSettingInt(names[i] + "-drill-max-tiles", d[names[i]].tiles);
         api.putSettingInt(names[i] + "-drill-min-ores", d[names[i]].ores);
     }
 
     api.putSettingInt(KEY_SETTINGS_VERSION, SETTINGS_VERSION);
-    api.toast("[AutoDrill] fill limits upgraded - the whole ore patch gets covered now");
+    if(upgrading) api.toast("[AutoDrill] fill limits upgraded - the whole ore patch gets covered now");
 }
 
 // ---------------------------------------------------------------- toolbar handling
