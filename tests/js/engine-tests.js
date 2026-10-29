@@ -220,6 +220,18 @@ var c6 = coverageOf(round, r6.plans, blast);
 check("4x4 airblast: fully mined", c6.covered === c6.total,
     "covered=" + c6.covered + "/" + c6.total + " drills=" + c6.drills);
 
+// A thin vein is the case where power support used to cost ore: the lattice point at the
+// patch centre sits on the vein, and the node reservation held that ore tile - plus its
+// whole footprint - against every drill that could reach it. Nodes reach six tiles, so they
+// belong on the empty ground beside a vein up to six tiles wide, where their footprint
+// overlaps no candidate at all and the reservation costs nothing.
+var rVeinPow = fillAt(vein, laser, null, true);
+var cVeinPow = coverageOf(vein, rVeinPow.plans, laser);
+check("1-wide vein with power support ON: 100% of ore tiles are mined (power nodes sit outside the vein)",
+    cVeinPow.covered === cVeinPow.total,
+    "covered=" + cVeinPow.covered + "/" + cVeinPow.total + " drills=" + cVeinPow.drills
+        + " reserved=" + rVeinPow.stats.reserved + " nodes=" + rVeinPow.stats.nodes);
+
 // ---------------------------------------------------------------- 2b. vein shapes
 
 // Thin, irregular vein shapes are the hard case for the three layout families: over 200 random
@@ -442,27 +454,25 @@ check("no two plans claim the same tile (drills, extractors, nodes, routes)",
     }
     var plans = optimization.finish(job);
 
-    // occupancy of the committed drills
+    // occupancy of every plan - drills, extractors, bridges, power blocks - and the ore the
+    // drills mine. The support passes place their blocks first, and a free candidate has to
+    // respect all of them, not just the drills.
     var occ = {}, covered = {}, k = 0;
     for(var i = 0; i < plans.length; i++){
-        if(api.blockId(plans[i].block) !== api.blockId(laser)) continue;
-        var size = api.size(laser), offset = Math.floor((size - 1) / 2);
+        var size = api.size(plans[i].block), offset = Math.floor((size - 1) / 2);
+        var isDrill = api.blockId(plans[i].block) === api.blockId(laser);
         for(var dx = 0; dx < size; dx++){
             for(var dy = 0; dy < size; dy++){
                 var key = (plans[i].x - offset + dx) + (plans[i].y - offset + dy) * W;
                 occ[key] = true;
-                covered[key] = true;
+                if(isDrill) covered[key] = true;
             }
         }
     }
 
-    // the reserved power tiles, and every power block actually placed (the fill bridges gaps
-    // in the network with extra blocks), count as taken: no drill may sit on one
+    // the reserved power tiles count as taken too: no drill may sit on one
     for(i = 0; i < job.reservedNodes.length; i++){
         occ[job.reservedNodes[i].x + job.reservedNodes[i].y * W] = true;
-    }
-    for(i = 0; i < plans.length; i++){
-        if(isPowerBlock(plans[i].block)) occ[plans[i].x + plans[i].y * W] = true;
     }
 
     var freeWithGain = 0;
@@ -487,8 +497,17 @@ check("no two plans claim the same tile (drills, extractors, nodes, routes)",
         }
     }
 
-    check("no free drill could mine one more ore tile (gap filler)",
-        freeWithGain === 0, "candidates with leftover ore=" + freeWithGain);
+    check("no free drill could mine one more ore tile (gap filler, after power stitching and grid linking)",
+        freeWithGain === 0, "candidates with leftover ore=" + freeWithGain
+            + " removedDrills=" + job.powerRemovedDrills + " refilled=" + job.stats.refilled);
+
+    // When the only route for a link block ran across a drill, the drill is gone - but the
+    // ground it freed can usually take a neighbouring candidate that avoids the new 1x1 block
+    // (measured on this patch: the dropped drill left three ore tiles, and the candidate one
+    // tile over still fits). The refill pass must take it rather than report the loss.
+    check("a drill dropped for the power network is replaced by a candidate on the freed ground",
+        job.powerRemovedDrills === 0 || job.stats.refilled > 0,
+        "removedDrills=" + job.powerRemovedDrills + " refilled=" + job.stats.refilled);
 })();
 
 // ---------------------------------------------------------------- 5. truncation is reported
@@ -525,6 +544,19 @@ check("the new Min Ores default mines the vein end to end",
     }
     check("water extractors only on ground that holds water", dry === 0,
         "dry=" + dry + "/" + total);
+})();
+
+// ---------------------------------------------------------------- 6a. water extractors
+
+// One 2x2 water extractor produces 6.6 water/s, enough to boost two laser drills (4.8/s)
+// or airblast drills (6.0/s) when touching both. A packed patch must share extractors
+// across adjacent drills rather than placing 1 per drill.
+(function(){
+    var extCount = r1.stats.extractors;
+    var drillCount = r1.stats.drills;
+    check("water extractors are shared across adjacent drills (fewer extractors than drills)",
+        extCount > 0 && extCount <= Math.ceil(drillCount * 0.75),
+        "extractors=" + extCount + " drills=" + drillCount);
 })();
 
 // ---------------------------------------------------------------- 6b. power wiring
@@ -1060,6 +1092,25 @@ check("a patch with no power nearby is not wired to anything",
             && overlapCells(blastLaneFill.plans) === 0,
         "drills=" + blastLaneFill.stats.drills + " covered=" + blastLaneFill.stats.covered
             + "/" + blastLaneFill.stats.target + " overlap=" + overlapCells(blastLaneFill.plans));
+})();
+
+// ---------------------------------------------------------------- 6j. output routing
+
+// Output routing plans a straight conveyor (duct) run away from every drill. With support
+// blocks on, the routing has to happen before the extractors and power blocks: those are
+// placed through the occupancy map and used to claim the ring tiles on the requested output
+// side, leaving the conveyors truncated ("+11 routing tiles" instead of one run per drill).
+(function(){
+    util.undoLastCommitted();
+    var routedRes = optimization.fillDetailed(centreOf(small), laser, true, "sharded", direction.RIGHT, 4);
+    var convCount = 0;
+    for(var i = 0; i < routedRes.plans.length; i++){
+        if(api.blockName(routedRes.plans[i].block) === "conveyor") convCount++;
+    }
+    check("output routing with support ON: conveyors are placed before extractors/nodes can block them",
+        convCount >= 8 && overlapCells(routedRes.plans) === 0,
+        "conveyors=" + convCount + " drills=" + routedRes.stats.drills
+            + " extractors=" + routedRes.stats.extractors + " nodes=" + routedRes.stats.nodes);
 })();
 
 // ---------------------------------------------------------------- 7. same patch, same layout

@@ -46,11 +46,14 @@ button visibility, per-drill maximum tiles and minimum ores, optimization qualit
 whether water extractors/power nodes are added to optimised drills. Two extras:
 
 - **Water Extractors & Power Nodes** — optimised fills (laser, airblast, impact, eruption) plan
-  a water extractor next to every drill that can have one (on water or ground water — never on
-  dry land, where it would pump nothing) and build the power network the patch needs: a node
-  lattice that puts every drill in link range, chained to your own grid when one is near. This
-  costs a few ore tiles — the drills leave room for the nodes — so turning the setting off
-  fills every tile but leaves the wiring (and the free tiles it needs) to you.
+  water extractors for the drills that can have one — the pump is placed where its whole 2×2
+  footprint holds the most ground water (never on standing water, which a water extractor cannot
+  pump) and one pump is shared by two adjacent drills — and build the power network the patch
+  needs: a node lattice that puts every drill in link range, chained to your own grid when one
+  is near. On a wide patch this costs a few ore tiles — the drills leave room for the nodes —
+  while a thin vein costs nothing extra, because the nodes sit on the empty ground beside it.
+  Turning the setting off fills every tile but leaves the wiring (and the free tiles it needs)
+  to you.
 - **Optimization Quality** — how many layout attempts the fill makes (plus the search budget).
   Higher = fewer ore tiles left behind, slower fill.
 - **Max Tiles** — how many ore tiles the fill looks at, nearest the tap first. It is a safety

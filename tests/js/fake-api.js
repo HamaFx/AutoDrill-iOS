@@ -282,7 +282,32 @@ function makeApi(){
     // ---- pieces the optimiser/reporting paths touch ----
     api.waterAt = function(tile){ return ((tile.x * 7 + tile.y * 13) % 5) / 10; };
     api.waterTile = function(){ return false; };   // the fake world has no water
+    /**
+     * `SolidPump.canPlaceOn` over the whole footprint: base efficiency 1.0 plus the tile's
+     * water attribute on every tile (the fake has no liquid floors, so every tile counts).
+     * Mirrors scripts/api.js so the optimiser's footprint scoring runs in the fake world too.
+     */
+    api.waterAtFootprint = function(block, x, y){
+        var size = block.size;
+        var offset = Math.floor((size - 1) / 2);
+        var sum = 0;
+        for(var dx = 0; dx < size; dx++){
+            for(var dy = 0; dy < size; dy++){
+                var t = api.tile(x - offset + dx, y - offset + dy);
+                if(t == null) continue;
+                sum += 1.0 + api.waterAt(t);
+            }
+        }
+        return sum;
+    };
     api.pumpsWaterAt = function(block, x, y){
+        // A water extractor is a SolidPump: placeable wherever the footprint's ground-water
+        // sum passes (base efficiency is 1.0 per tile), never on a fully liquid footprint.
+        // The fake world has no liquid floors, so every 2x2 within the world passes - exactly
+        // what the real block does on a Serpulo map with ground water.
+        if(api.blockName(block) === "waterExtractor"){
+            return api.waterAtFootprint(block, x, y) > 0.00001;
+        }
         // standing water, or ground water where the scenario says there is any
         if(OPTS.waterRect != null
             && x >= OPTS.waterRect.x0 && x <= OPTS.waterRect.x1

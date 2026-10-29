@@ -538,12 +538,21 @@ function powerName(info){
 
 /**
  * The tile a power block should take: the one within `radius` that costs the fewest ore tiles
- * to hold free. A tile no drill can use is free (cost 0); otherwise the cost is how much ore
- * the drill sitting there would have mined, so a rim drill is dropped before a full one.
+ * to hold free. The cost is the sum, over the block's whole footprint, of what the drills would
+ * mine there: a tile no candidate drill overhangs is free, a tile at the rim of a drill's
+ * footprint costs a little, and a tile under a full 3x3 or 4x4 drill costs that drill's yield.
+ *
+ * Summing the footprint (not just the centre tile) is what lets the search step off a thin
+ * vein onto the empty ground beside it: there the whole footprint is free, so the node costs
+ * the patch nothing and drops no drill at all - while the old centre-only test called such a
+ * spot free whenever no candidate happened to be *centred* on it, letting drills overhang and
+ * block the node later. `laserRange = 6` and a lattice step of `range - size = 5` leave room
+ * for a shift of up to three tiles, so a zero-cost spot is reachable from any lattice point
+ * beside a vein up to six tiles wide (the half-width every 3x3/4x4 footprint adds on top).
  */
-function cheapestSpot(job, candidateAt, x, y, radius){
+function cheapestSpot(job, info, cellCost, x, y, radius){
     var bestX = x, bestY = y;
-    var bestCost = spotCost(job, candidateAt, x, y);
+    var bestCost = spotCost(job, info, cellCost, x, y);
     var i = 0, j = 0;
 
     for(i = 1; i <= radius && bestCost > 0; i++){
@@ -553,7 +562,7 @@ function cheapestSpot(job, candidateAt, x, y, radius){
                 {x: x - i, y: y + j}, {x: x + i, y: y + j}
             ];
             for(var k = 0; k < 4; k++){
-                var cost = spotCost(job, candidateAt, spots[k].x, spots[k].y);
+                var cost = spotCost(job, info, cellCost, spots[k].x, spots[k].y);
                 if(cost < bestCost){
                     bestCost = cost;
                     bestX = spots[k].x;
@@ -565,9 +574,23 @@ function cheapestSpot(job, candidateAt, x, y, radius){
     return {x: bestX, y: bestY, cost: bestCost};
 }
 
-function spotCost(job, candidateAt, x, y){
-    var entry = candidateAt[x + y * job.worldW];
-    return entry === undefined ? 0 : entry.winnerCount;
+/**
+ * What reserving the block's footprint at `(x, y)` would cost: the sum of `cellCost` over every
+ * footprint cell. A tile the block cannot even be built on costs `1e9`, which keeps the search
+ * from picking it while some buildable tile is in reach.
+ */
+function spotCost(job, info, cellCost, x, y){
+    if(!util.canPlaceBlock(info.block, job.team, x, y, 0)) return 1e9;
+
+    var offset = Math.floor((info.size - 1) / 2);
+    var total = 0;
+    for(var dx = 0; dx < info.size; dx++){
+        for(var dy = 0; dy < info.size; dy++){
+            var cost = cellCost[(x - offset + dx) + (y - offset + dy) * job.worldW];
+            if(cost !== undefined) total += cost;
+        }
+    }
+    return total;
 }
 
 /**
@@ -675,13 +698,30 @@ function reservePowerTiles(job){
     // the outermost blocks are pushed outside the drill area: those tiles are free
     var pad = Math.ceil(range / 2);
 
-    // What each tile holds, so a block can be given the cheapest one nearby: a tile no drill
-    // wanted costs nothing, and a tile under a poor drill (a rim drill covering two ore tiles)
-    // costs far less than one under a full 3x3 drill.
+    // What each tile holds, so a block can be given the cheapest one nearby. The cost of a
+    // tile is what the drills would mine there, and it is built from the *whole footprint* of
+    // every candidate: a tile where no drill is centred can still be overhung by up to four of
+    // them, and reserving it drops every one of those drills. Direct ore tiles cost the drill's
+    // yield (a full 3x3 drill much more than a rim drill covering two tiles); the non-ore rim of
+    // a footprint costs a little, because reserving it still costs the overhanging drill.
+    var cellCost = {};
     var candidateAt = {};
     for(i = 0; i < job.candidates.length; i++){
-        var candTile = job.candidates[i].tile;
-        candidateAt[api.tx(candTile) + api.ty(candTile) * job.worldW] = job.candidates[i];
+        var cand = job.candidates[i];
+        var candTile = cand.tile;
+        candidateAt[api.tx(candTile) + api.ty(candTile) * job.worldW] = cand;
+
+        var mineCostKeys = cand.mineableKeys;
+        for(var mk = 0; mk < mineCostKeys.length; mk++){
+            var mineCost = cellCost[mineCostKeys[mk]];
+            if(mineCost === undefined || mineCost < cand.winnerCount){
+                cellCost[mineCostKeys[mk]] = cand.winnerCount;
+            }
+        }
+        var footKeys = cand.cellKeys;
+        for(var fk = 0; fk < footKeys.length; fk++){
+            if(cellCost[footKeys[fk]] === undefined) cellCost[footKeys[fk]] = 1;
+        }
     }
     job.candidateAt = candidateAt;
     var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
@@ -716,14 +756,39 @@ function reservePowerTiles(job){
             var x = cx + gi * step, y = cy + gj * step;
             if(x < minX - pad || x > maxX + pad || y < minY - pad || y > maxY + pad) continue;
 
-            // give the block the cheapest tile within reach of where it belongs
-            var spot = cheapestSpot(job, candidateAt, x, y, 2);
-            positions.push(spot);
+            // give the block the cheapest tile within reach of where it belongs: up to three
+            // tiles of shift keep the far nodes inside link range of their neighbours, and a
+            // zero-cost spot beside a narrow vein drops no drill at all
+            var spot = cheapestSpot(job, info, cellCost, x, y, 3);
 
-            if(spot.cost === 0) continue;    // nothing wanted that tile: no drill loses its place
-
-            // the whole footprint is held, not just the centre
+            // Two lattice points can shift onto the same tile (the step is `range - size` and
+            // the search reaches 3 tiles out), and a block whose held ground overlaps one
+            // already reserved would be a duplicate plan. Skip it: the first reservation
+            // carries the node for both.
             var offset = Math.floor((size - 1) / 2);
+            var spotOverlaps = false;
+            for(var ox = 0; ox < size && !spotOverlaps; ox++){
+                for(var oy = 0; oy < size; oy++){
+                    if(reserved[(spot.x - offset + ox) + (spot.y - offset + oy) * job.worldW] === true){
+                        spotOverlaps = true;
+                        break;
+                    }
+                }
+            }
+            if(spotOverlaps) continue;
+            positions.push(spot);
+            if(DEBUG && spot.cost > 0 && spot.cost < 1e9){
+                debugLog("power spot " + spot.x + "," + spot.y + " cost=" + spot.cost
+                    + " lattice=" + x + "," + y);
+            }
+
+            // Nowhere buildable in reach: record the lattice point so the node pass may still
+            // find a tile beside it, but reserve nothing - holding tiles for a block that cannot
+            // be built there would only cost drills.
+            if(spot.cost >= 1e9) continue;
+
+            // the whole footprint is held, not just the centre - and even a free spot is held,
+            // so no later placement can overhang it and block the node
             for(var hx = 0; hx < size; hx++){
                 for(var hy = 0; hy < size; hy++){
                     reserved[(spot.x - offset + hx) + (spot.y - offset + hy) * job.worldW] = true;
@@ -748,7 +813,13 @@ function reservePowerTiles(job){
             }
         }
         if(!blocked) kept.push(entry);
-        else job.reservedCost++;
+        else{
+            job.reservedCost++;
+            if(DEBUG){
+                debugLog("dropped candidate " + api.tx(entry.tile) + "," + api.ty(entry.tile)
+                    + " winner=" + entry.winnerCount);
+            }
+        }
     }
     job.candidates = kept;
     job.entries = kept;      // the layouts iterate entries: filtering one and not the other
@@ -2098,8 +2169,24 @@ function finish(job){
     }
 
     var info = support ? powerSupport() : null;
+
+    // Hold the reserved tiles first - before the output routing, so a conveyor can never take
+    // the spot a power block needs. The occupancy map holds one flag per cell; the pass that
+    // releases a reservation for its node is careful not to release a drill or route with it.
+    if(support && info != null){
+        for(i = 0; i < job.reservedNodes.length; i++){
+            var hold = job.reservedNodes[i];
+            util.markOccupancy(occupied, info.block, hold.x, hold.y, true);
+        }
+    }
+
+    // The drills' output routes go down before the support blocks: a conveyor the player asked
+    // for is worth more than a shifted node or a pump, and the supports then place themselves
+    // around it.
+    var routed = routeOutputs(job, allPlans, occupied);
+
     var counts = support
-        ? placeWaterExtractorsAndPowerNodes(job, selection, job.drill, team, allPlans, occupied, powerTarget)
+        ? placePowerSupplies(job, selection, job.drill, team, allPlans, occupied, powerTarget)
         : null;
 
     if(support && job.lanes && info != null){
@@ -2109,7 +2196,7 @@ function finish(job){
     }
     var linked = 0;
     if(support && !job.lanes){
-        linked += stitchPowerNetwork(job, allPlans, occupied, info);
+        linked += stitchPowerNetwork(job, allPlans, occupied, info, selection);
         linked += linkPowerGrid(job, allPlans, occupied, selection, powerTarget, info);
     }else if(support && info != null){
         // lanes: the network on the lanes is connected by construction, but it used to stop
@@ -2117,15 +2204,28 @@ function finish(job){
         linked += linkPowerGrid(job, allPlans, occupied, selection, powerTarget, info);
     }
 
-    var routed = routeOutputs(job, allPlans, occupied);
+    // The power network can drop a drill when a link block has to cross one. The freed ground
+    // is refilled with any candidate that still fits and mines ore nothing mines, so a patch
+    // does not lose coverage to its own wiring; the report then counts the ore and drills that
+    // actually survived, instead of subtracting an estimate of what the drops cost.
+    var drillCount = selection.length;
+    if(job.powerRemovedDrills > 0){
+        var refilled = refillAfterPowerBridge(job, selection, allPlans, occupied);
+        job.refilled = refilled.added;
+        covered = refilled.covered;
+        drillCount = refilled.drills;
+    }else{
+        job.refilled = 0;
+    }
 
-    var extractorCount = counts == null ? 0 : counts.extractors;
+    // Water extractors come last: a pump is a bonus, so it may never take a tile a drill, a
+    // routed conveyor or a power block needed. The refill above has first pick of the ground a
+    // dropped drill freed, and the pump only sits where nothing else could go.
+    var extractorCount = 0;
+    if(support) extractorCount = placeWaterExtractors(selection, job.size, team, allPlans, occupied);
+
     var nodeCount = counts == null ? 0 : counts.nodes;
     var laneCount = counts == null || counts.lanes === undefined ? 0 : counts.lanes;
-
-    // a drill dropped for a power bridge is no longer mined, so the coverage report is honest
-    covered = Math.max(0, covered - job.powerRemovedOre);
-    var drillCount = Math.max(0, selection.length - job.powerRemovedDrills);
     var oreWord = api.itemName(job.sourceDropId);
     if(oreWord == null) oreWord = "ore";
 
@@ -2150,6 +2250,8 @@ function finish(job){
         powerName: counts == null || counts.powerName == null ? "power nodes" : counts.powerName,
         linkNodes: linked,
         reserved: job.reservedNodes.length,
+        removedDrills: job.powerRemovedDrills,
+        refilled: job.refilled == null ? 0 : job.refilled,
         covered: covered,
         target: job.targetCells,
         unreachable: unreachable,
@@ -2275,27 +2377,78 @@ function finish(job){
 }
 
 /**
- * Java: OptimizationDrill.placeWaterExtractorsAndPowerNodes
- *
- * A water extractor for the liquid boost of every optimised drill that can have one - on water
- * or ground water, never on dry land where it would do nothing - and the power network the
- * patch needs. Everything is placed through the occupancy map, so nothing overlaps and the pass
- * stays linear in the number of drills.
+ * How many drills one water extractor can boost: its 0.11 l/t output feeds two drills, so a
+ * pump is reused by an adjacent drill before a second one is planned.
  */
-function placeWaterExtractorsAndPowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget){
-    var waterExtractor = api.block("waterExtractor");
-    var drillSize = api.size(drill);
-    var info = powerSupport();
-    var i = 0, j = 0;
-    var extractors = 0;
+var EXTRACTOR_MAX_USERS = 2;
 
-    // Hold the reserved tiles first: nothing else may take the spots the power blocks need.
-    // A separate map of where the drills are is kept too, because the occupancy map holds one
-    // flag per cell: releasing a reserved tile would release a drill's tile with it.
+/**
+ * True when two block footprints share a cardinal edge - they touch along a side. Corner-only
+ * contact does not count: a 2x2 pump feeds the drills it shares an edge with.
+ */
+function rectsTouchCardinal(ax, ay, asize, bx, by, bsize){
+    var ao = Math.floor((asize - 1) / 2), bo = Math.floor((bsize - 1) / 2);
+    var al = ax - ao, ar = al + asize - 1;
+    var at = ay - ao, ab = at + asize - 1;
+    var bl = bx - bo, br = bl + bsize - 1;
+    var bt = by - bo, bb = bt + bsize - 1;
+
+    if(ar + 1 === bl || br + 1 === al) return at <= bb && bt <= ab;
+    if(ab + 1 === bt || bb + 1 === at) return al <= br && bl <= ar;
+    return false;
+}
+
+/**
+ * How many still-unboosted drills a water extractor placed at (x, y) would touch, capped at
+ * its user limit (that is the neighbour bonus of the extractor score). Looks only at the
+ * drills whose anchor is close enough to reach the spot, through the anchor-tile map.
+ */
+function adjacentUnboostedDrills(selection, drillAt, served, x, y, drillSize, waterSize){
+    var count = 0;
+    var reach = drillSize + waterSize;
+    var worldW = api.worldW();
+
+    for(var dx = -reach; dx <= reach; dx++){
+        for(var dy = -reach; dy <= reach; dy++){
+            var idx = drillAt[(x + dx) + (y + dy) * worldW];
+            if(idx === undefined) continue;
+            if(served[idx] === true) continue;
+
+            var dt = selection[idx].tile;
+            if(!rectsTouchCardinal(api.tx(dt), api.ty(dt), drillSize, x, y, waterSize)) continue;
+            count++;
+            if(count >= EXTRACTOR_MAX_USERS) return count;
+        }
+    }
+    return count;
+}
+
+/**
+ * Java: OptimizationDrill.placeWaterExtractorsAndPowerNodes (the power half)
+ *
+ * The power network the patch needs: blocks on the tiles reserved before the layout, so the
+ * drills left room for them, and a repair pass for any drill the network still misses.
+ * Everything is placed through the occupancy map, so nothing overlaps.
+ *
+ * The reserved tiles are held before the output routing runs (see `finish`), and the water
+ * extractors are placed later (`placeWaterExtractors`): a pump is a bonus, and it may never
+ * cost a drill or a route its ground.
+ */
+function placePowerSupplies(job, selection, drill, team, allPlans, occupied, powerTarget){
+    var info = powerSupport();
+    var i = 0;
+
+    // A separate map of where the drills (and already-routed conveyors) are is kept, because
+    // the occupancy map holds one flag per cell: releasing a reserved tile would release a
+    // drill's tile with it, and a released route tile would let a node cut a conveyor line.
+    var conveyorId = api.blockId(api.block("conveyor"));
+    var ductId = api.blockId(api.block("duct"));
     var drillCells = {};
     for(i = 0; i < allPlans.length; i++){
         var planBlock = allPlans[i].block;
-        if(planBlock === drill || api.size(planBlock) > 1){
+        var planId = api.blockId(planBlock);
+        if(planBlock === drill || api.size(planBlock) > 1
+            || planId === conveyorId || planId === ductId){
             util.markOccupancy(drillCells, planBlock, allPlans[i].x, allPlans[i].y, true);
         }
     }
@@ -2307,45 +2460,108 @@ function placeWaterExtractorsAndPowerNodes(job, selection, drill, team, allPlans
         }
     }
 
-    // Water extractors are Serpulo's liquid boost; Erekir's liquids are handled by their own
-    // pass (vent condensers and conduits).
-    if(!api.isErekir()) for(i = 0; i < selection.length; i++){
-        var tile = selection[i].tile;
-        var nearby = util.nearbyTiles(api.tx(tile), api.ty(tile), drillSize, api.size(waterExtractor));
-
-        // Among the valid spots, take the one with the most ground water: the extractor's
-        // output depends on that attribute, and the original took whatever came first.
-        var best = null, bestWater = -1e9;
-        for(j = 0; j < nearby.length; j++){
-            var plan = util.newPlan(api.tx(nearby[j]), api.ty(nearby[j]), 0, waterExtractor);
-            if(!util.canPlacePlan(plan, team)) continue;
-            if(!util.freeInOccupancy(occupied, waterExtractor, plan.x, plan.y)) continue;
-
-            // Only where it would actually pump: standing water under it, or ground water.
-            // (The original placed one next to every drill whenever the tile was free, dry or
-            // not, which is why filled patches ended up with useless extractors on stone.)
-            if(!api.pumpsWaterAt(waterExtractor, plan.x, plan.y, team)) continue;
-
-            var water = api.waterAt(nearby[j]);
-            if(water > bestWater){
-                bestWater = water;
-                best = plan;
-            }
-        }
-        if(best != null){
-            allPlans.push(best);
-            util.markOccupancy(occupied, waterExtractor, best.x, best.y, true);
-            extractors++;
-        }
-    }
-
     // With lanes on, the power rides the lanes (placeLaneSupplies does that afterwards); the
     // lattice of nodes beside the drills would only take the very tiles the belts need.
     var nodes = job.lanes
         ? 0
         : placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget, info, drillCells);
 
-    return {extractors: extractors, nodes: nodes, powerName: info == null ? null : powerName(info)};
+    return {nodes: nodes, powerName: info == null ? null : powerName(info)};
+}
+
+/**
+ * Java: OptimizationDrill.placeWaterExtractorsAndPowerNodes (the water half)
+ *
+ * A water extractor for the liquid boost of every optimised drill that can have one, on ground
+ * water the pump can actually draw from, never on a liquid footprint (`SolidPump.canPlaceOn`).
+ *
+ * One 2x2 extractor makes enough water for two drills, so an extractor placed for one drill is
+ * reused by an adjacent one that has no pump yet (`EXTRACTOR_MAX_USERS`), and a new pump is
+ * scored by the ground water of its whole footprint plus how many still-unboosted drills it
+ * touches - which puts it in the corner between drills, where it boosts two for the price of
+ * one. The Java original placed one per drill and scored only the anchor tile.
+ *
+ * Runs after the power network and the post-stitch refill: a pump may only sit on ground no
+ * drill, node or routed conveyor needed.
+ */
+function placeWaterExtractors(selection, drillSize, team, allPlans, occupied){
+    var waterExtractor = api.block("waterExtractor");
+
+    // Water extractors are Serpulo's liquid boost; Erekir's liquids are handled by their own
+    // pass (vent condensers and conduits).
+    if(api.isErekir()) return 0;
+    if(selection.length === 0) return 0;
+
+    var i = 0, j = 0;
+    var waterSize = api.size(waterExtractor);
+    var extractors = 0;
+
+    // Drill anchor tile -> index into `selection`, so the neighbour score only looks at the
+    // few drills a candidate spot can physically touch instead of the whole patch. Keyed the
+    // way every occupancy map here is keyed (x + y * worldW), never by api.pos: `Tile.pos()`
+    // packs the coordinates into 16-bit halves, a different encoding.
+    var drillAt = {};
+    for(i = 0; i < selection.length; i++){
+        var anchor = selection[i].tile;
+        drillAt[api.tx(anchor) + api.ty(anchor) * api.worldW()] = i;
+    }
+
+    var placedExtractors = [];
+    var served = [];
+
+    for(i = 0; i < selection.length; i++){
+        var tile = selection[i].tile;
+        var tx = api.tx(tile), ty = api.ty(tile);
+
+        // An extractor already touching this drill - and still under its user cap - boosts
+        // it too: reusing it saves the second pump and the tiles it would have taken.
+        var shared = false;
+        for(j = 0; j < placedExtractors.length; j++){
+            var used = placedExtractors[j];
+            if(used.users >= EXTRACTOR_MAX_USERS) continue;
+            if(!rectsTouchCardinal(tx, ty, drillSize, used.x, used.y, waterSize)) continue;
+            used.users++;
+            served[i] = true;
+            shared = true;
+            break;
+        }
+        if(shared) continue;
+
+        var nearby = util.nearbyTiles(tx, ty, drillSize, waterSize);
+
+        // Score each spot by the water its whole 2x2 footprint holds - the pump's output is
+        // the footprint sum, not the anchor tile - plus a bonus for every still unboosted
+        // drill it touches, which packs the pumps into the corners between drills.
+        var best = null, bestScore = -1e9;
+        for(j = 0; j < nearby.length; j++){
+            var plan = util.newPlan(api.tx(nearby[j]), api.ty(nearby[j]), 0, waterExtractor);
+            if(!util.canPlacePlan(plan, team)) continue;
+            if(!util.freeInOccupancy(occupied, waterExtractor, plan.x, plan.y)) continue;
+
+            // Only where it would actually pump: SolidPump's canPlaceOn, so never on a
+            // liquid footprint and never where the ground-water sum is zero. (The original
+            // placed one next to every drill whenever the tile was free, dry or not, which
+            // is why filled patches ended up with useless extractors on stone.)
+            if(!api.pumpsWaterAt(waterExtractor, plan.x, plan.y, team)) continue;
+
+            var score = api.waterAtFootprint(waterExtractor, plan.x, plan.y) * 100
+                + adjacentUnboostedDrills(selection, drillAt, served, plan.x, plan.y,
+                    drillSize, waterSize) * 50;
+            if(score > bestScore){
+                bestScore = score;
+                best = plan;
+            }
+        }
+        if(best != null){
+            allPlans.push(best);
+            util.markOccupancy(occupied, waterExtractor, best.x, best.y, true);
+            placedExtractors.push({x: best.x, y: best.y, users: 1});
+            served[i] = true;
+            extractors++;
+        }
+    }
+
+    return extractors;
 }
 
 /**
@@ -2486,8 +2702,12 @@ var POWER_LINK_RADIUS = 90;      // how far away something on a power grid is st
 /**
  * Places a chain of link blocks from (fromX, fromY) to (toX, toY) over tiles a block can
  * actually sit on, spaced so every hop stays inside link range. Returns how many were placed.
+ *
+ * When the only route runs over one of the fill's own drills, the drill goes (the drill's
+ * entry is removed from the selection with `dropSelectionEntry`), so the caller can refill
+ * the freed ground afterwards.
  */
-function chainBetween(job, allPlans, occupied, fromX, fromY, toX, toY, info, centrePlans){
+function chainBetween(job, allPlans, occupied, fromX, fromY, toX, toY, info, centrePlans, selection){
     var block = info.linkBlock;
     var range = Math.floor(linkRange(info, block));
     if(range < 2) return 0;
@@ -2532,6 +2752,7 @@ function chainBetween(job, allPlans, occupied, fromX, fromY, toX, toY, info, cen
 
             removePlan(allPlans, occupied, blocker);
             centrePlans[t.x + t.y * job.worldW] = null;
+            dropSelectionEntry(selection, blocker);
             job.powerRemovedDrills++;
             if(job.candidateAt != null){
                 var dropped = job.candidateAt[t.x + t.y * job.worldW];
@@ -2558,6 +2779,21 @@ function removePlan(allPlans, occupied, plan){
         }
     }
     util.markOccupancy(occupied, plan.block, plan.x, plan.y, false);
+}
+
+/**
+ * Removes the selection entry a dropped drill plan belonged to, matched by the plan's anchor
+ * tile: the entry and the plan are the same drill, and leaving the entry in the selection
+ * would report a drill that is no longer planned (and let the refill pass count it twice).
+ */
+function dropSelectionEntry(selection, plan){
+    if(selection == null) return;
+    for(var i = 0; i < selection.length; i++){
+        if(api.tx(selection[i].tile) === plan.x && api.ty(selection[i].tile) === plan.y){
+            selection.splice(i, 1);
+            return;
+        }
+    }
 }
 
 /** True when a plan is one of the power blocks this fill uses. */
@@ -2665,7 +2901,7 @@ function centrePlansOf(allPlans, worldW){
  * drills, the drill goes: a bridge through the power network is worth a drill, and the report
  * counts what that cost.
  */
-function stitchPowerNetwork(job, allPlans, occupied, info){
+function stitchPowerNetwork(job, allPlans, occupied, info, selection){
     var range = info.range;
     var block = info.linkBlock;
     var bridged = 0;
@@ -2685,7 +2921,7 @@ function stitchPowerNetwork(job, allPlans, occupied, info){
         var midY = Math.round((blocks[pair.from].y + blocks[pair.to].y) / 2);
 
         if(!placeBridge(job, allPlans, occupied, centrePlansOf(allPlans, job.worldW), block, range,
-            midX, midY, blocks[pair.from], blocks[pair.to])){
+            midX, midY, blocks[pair.from], blocks[pair.to], selection)){
             break;      // nowhere to put it: leave the rest to the player rather than loop
         }
         bridged++;
@@ -2697,8 +2933,15 @@ function stitchPowerNetwork(job, allPlans, occupied, info){
     return bridged;
 }
 
-/** Places a link block near (x, y) - searching rings, clearing a drill if needed. */
-function placeBridge(job, allPlans, occupied, centrePlans, block, range, x, y, from, to){
+/**
+ * Places a link block near (x, y): a free tile in the rings is preferred over one that is
+ * taken, and only a search that finds no free spot at all clears a drill. (The original took
+ * the first in-range tile and cleared whatever stood on it - so a bridge that could have
+ * shifted one tile was paid for with a full 3x3 or 4x4 drill instead.)
+ */
+function placeBridge(job, allPlans, occupied, centrePlans, block, range, x, y, from, to, selection){
+    var fallback = null;
+
     for(var r = 0; r <= 3; r++){
         for(var dx = -r; dx <= r; dx++){
             for(var dy = -r; dy <= r; dy++){
@@ -2713,15 +2956,10 @@ function placeBridge(job, allPlans, occupied, centrePlans, block, range, x, y, f
                 if(to != null && !inRange(px, py, to.x, to.y, range)) continue;
 
                 if(!util.freeInOccupancy(occupied, block, px, py)){
-                    var blocker = centrePlans[px + py * job.worldW];
-                    if(blocker == null) continue;
-                    removePlan(allPlans, occupied, blocker);
-                    centrePlans[px + py * job.worldW] = null;
-                    job.powerRemovedDrills++;
-                    if(job.candidateAt != null){
-                        var dropped = job.candidateAt[px + py * job.worldW];
-                        if(dropped != null) job.powerRemovedOre += dropped.mineableKeys.length;
-                    }
+                    // taken: remember the first tile this bridge *could* clear, but keep
+                    // looking for a free spot first
+                    if(fallback == null && centrePlans[px + py * job.worldW] != null) fallback = plan;
+                    continue;
                 }
 
                 allPlans.push(plan);
@@ -2731,7 +2969,24 @@ function placeBridge(job, allPlans, occupied, centrePlans, block, range, x, y, f
             }
         }
     }
-    return false;
+
+    // nothing free in reach: the only way through is over one of our own drills
+    if(fallback == null) return false;
+
+    var blocker = centrePlans[fallback.x + fallback.y * job.worldW];
+    removePlan(allPlans, occupied, blocker);
+    centrePlans[fallback.x + fallback.y * job.worldW] = null;
+    dropSelectionEntry(selection, blocker);
+    job.powerRemovedDrills++;
+    if(job.candidateAt != null){
+        var dropped = job.candidateAt[fallback.x + fallback.y * job.worldW];
+        if(dropped != null) job.powerRemovedOre += dropped.mineableKeys.length;
+    }
+
+    allPlans.push(fallback);
+    util.markOccupancy(occupied, block, fallback.x, fallback.y, true);
+    centrePlans[fallback.x + fallback.y * job.worldW] = fallback;
+    return true;
 }
 
 /**
@@ -2778,7 +3033,83 @@ function linkPowerGrid(job, allPlans, occupied, selection, target, info){
     if(start == null) return 0;
     if(startDist <= range * range) return 0;    // already inside the grid's reach
 
-    return chainBetween(job, allPlans, occupied, start.x, start.y, targetX, targetY, info);
+    return chainBetween(job, allPlans, occupied, start.x, start.y, targetX, targetY, info, null, selection);
+}
+
+/**
+ * Refills the ground a power link freed: `placeBridge` / `chainBetween` drop a drill when the
+ * only route for a link block runs across it, and that drill's ore is then uncovered even
+ * though a neighbouring candidate may still fit beside the new `1x1` block.
+ *
+ * Runs after the stitching and the grid link, on the final plan set: every entry that is free
+ * in the occupancy map and mines at least one ore tile nothing mines is taken, in the same
+ * order the layouts use. Returns the ore actually covered and the drills actually planned:
+ * the report is counted from the surviving plans, not estimated from what the drops cost.
+ */
+function refillAfterPowerBridge(job, selection, allPlans, occupied){
+    var worldW = job.worldW;
+    var entryAt = {};
+    var i = 0, k = 0;
+
+    // anchor tile -> entry, keyed the way every occupancy map here is keyed, never by
+    // api.pos: `Tile.pos()` packs the coordinates into 16-bit halves, a different encoding
+    for(i = 0; i < job.entries.length; i++){
+        entryAt[api.tx(job.entries[i].tile) + api.ty(job.entries[i].tile) * worldW] = job.entries[i];
+    }
+    for(i = 0; i < job.rimCandidates.length; i++){
+        entryAt[api.tx(job.rimCandidates[i].tile) + api.ty(job.rimCandidates[i].tile) * worldW] = job.rimCandidates[i];
+    }
+
+    // what the surviving drills mine, and how many there are
+    var covered = {};
+    var coveredCount = 0;
+    var drills = 0;
+    for(i = 0; i < allPlans.length; i++){
+        if(api.blockId(allPlans[i].block) !== api.blockId(job.drill)) continue;
+        drills++;
+        var live = entryAt[allPlans[i].x + allPlans[i].y * worldW];
+        if(live == null) continue;
+        var mine = live.mineableKeys;
+        for(k = 0; k < mine.length; k++){
+            if(covered[mine[k]] !== true){
+                covered[mine[k]] = true;
+                coveredCount++;
+            }
+        }
+    }
+
+    var entries = job.entries;
+    var added = 0;
+    for(i = 0; i < entries.length; i++){
+        var entry = entries[i];
+        var tx = api.tx(entry.tile), ty = api.ty(entry.tile);
+        if(!util.freeInOccupancy(occupied, job.drill, tx, ty)) continue;
+
+        var gain = 0;
+        var keys = entry.mineableKeys;
+        for(k = 0; k < keys.length; k++){
+            if(covered[keys[k]] !== true) gain++;
+        }
+        if(gain === 0) continue;
+
+        allPlans.push(util.newPlan(tx, ty, 0, job.drill));
+        util.markOccupancy(occupied, job.drill, tx, ty, true);
+        selection.push(entry);
+        added++;
+        drills++;
+        for(k = 0; k < keys.length; k++){
+            if(covered[keys[k]] !== true){
+                covered[keys[k]] = true;
+                coveredCount++;
+            }
+        }
+    }
+
+    var count = coveredCount;
+
+    debugLog("power refill: removed=" + job.powerRemovedDrills + " refilled=" + added
+        + " covers=" + count);
+    return {added: added, covered: count, drills: drills};
 }
 
 /**

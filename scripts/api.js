@@ -277,13 +277,19 @@ function buildReal(){
      * two sources: standing water under its footprint (`validTiles`) and ground water
      * (`sumAttribute(water)`, which is what the block's own canPlaceOn checks). Dry land has
      * neither, so an extractor there is a dead block - the original placed one anyway.
+     *
+     * The water extractor is a `SolidPump`: its `canPump` is `!tile.floor().isLiquid`, so
+     * standing water tiles contribute *nothing* to it (verified against SolidPump.java), and
+     * its placement rule is the ground-water sum over the whole footprint. Only the liquid
+     * pumps (mechanical/impulse/rotary) pump from the standing-water loop below.
      */
     api.pumpsWaterAt = function(block, x, y, team){
         var tile = V.world.tile(x, y);
         if(tile == null) return false;
 
-        if(block.canPlaceOn(tile, team, 0)) return true;    // ground water
+        if(String(block.name) === "water-extractor") return block.canPlaceOn(tile, team, 0);
 
+        if(block.canPlaceOn(tile, team, 0)) return true;    // ground water
         var size = api.size(block);
         var offset = Math.floor((size - 1) / 2);
         for(var dx = 0; dx < size; dx++){
@@ -296,6 +302,27 @@ function buildReal(){
             }
         }
         return false;
+    };
+
+    /**
+     * The ground-water value of a pump's whole footprint: `SolidPump.canPlaceOn` summed over
+     * every non-liquid footprint tile (`baseEfficiency 1.0 + the tile's water attribute`).
+     * Scoring whole footprints is what picks the 2x2 square with the most water instead of
+     * whichever corner happens to sit on a single wet tile. Liquid tiles contribute nothing,
+     * exactly as they contribute nothing to the pump.
+     */
+    api.waterAtFootprint = function(block, x, y){
+        var size = api.size(block);
+        var offset = Math.floor((size - 1) / 2);
+        var sum = 0;
+        for(var dx = 0; dx < size; dx++){
+            for(var dy = 0; dy < size; dy++){
+                var t = V.world.tile(x - offset + dx, y - offset + dy);
+                if(t == null || t.floor().isLiquid === true) continue;
+                sum += 1.0 + api.waterAt(t);
+            }
+        }
+        return sum;
     };
 
     /** How far a power node reaches - links are wireless within this many tiles. */
