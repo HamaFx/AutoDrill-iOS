@@ -682,6 +682,30 @@ function testPerformance(){
     var bridgePlans = bridge.fill(center, Blocks.mechanicalDrill, dir.RIGHT, team);
     var bridgeMs = api.now() - start;
 
+    // the belt tool plans drills and belts; it has to cover the patch it was given
+    var beltDrills = tileCount(bridgePlans, Blocks.mechanicalDrill);
+    var beltCovered = {};
+    for(x = 0; x < bridgePlans.length; x++){
+        if(api.blockId(bridgePlans[x].block) !== api.blockId(Blocks.mechanicalDrill)) continue;
+        for(var bdx = -1; bdx <= 0; bdx++){
+            for(var bdy = -1; bdy <= 0; bdy++){
+                var bt = tiles.get(bridgePlans[x].x + bdx, bridgePlans[x].y + bdy);
+                if(bt != null && api.itemId(api.drop(bt)) >= 0) beltCovered[api.pos(bt)] = true;
+            }
+        }
+    }
+    var beltTiles = 0;
+    for(x = BIG.x0; x <= BIG.x1; x++){
+        for(y = BIG.y0; y <= BIG.y1; y++) beltTiles++;
+    }
+    var beltCount = 0;
+    for(x in beltCovered) beltCount++;
+    var beltFraction = beltCount / beltTiles;
+    report("bridge: drills=" + beltDrills + " coveredTiles=" + beltCount + "/" + beltTiles
+        + " (" + Math.round(beltFraction * 1000) / 10 + "%)");
+    check("bridge: the belt layout covers most of the patch", beltFraction >= 0.8,
+        Math.round(beltFraction * 1000) / 10 + "%");
+
     start = api.now();
     var laserFill = optimization.fillDetailed(center, Blocks.laserDrill, true, team);
     var laserPlans = laserFill.plans;

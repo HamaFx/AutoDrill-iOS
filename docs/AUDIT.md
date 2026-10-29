@@ -454,6 +454,24 @@ Two behaviour fixes came out of the same report:
 * Mixed-patch reporting counts the other ore where it is actually found: while walking the
   patch edge (the flood fill never enters the other ore, which is why the count was zero).
 
+### 1.7.4 — the belt tool (mechanical/pneumatic) reports its coverage too
+
+A screenshot from the device showed a **mechanical** fill (drills and belts, still as plans) with
+ore visible around it. Every explanation for that had just been added to the *optimiser* fills -
+the belt tool, which is a different code path (`bridge.js`), planned in silence.
+
+Measured, it covers 86.7 % of a 1,681-tile patch (392 drills + belts) and 88.9 % of a small one:
+the belt layout keeps one drill per belt line, so a strip of the patch edge is always left. It
+now prints the same plain result line as the optimiser fills, including the cut-short case:
+
+* *"mined 1,458 of 1,681 Copper tiles - the belt layout leaves the patch edge (the laser and
+  airblast drills fill a patch completely if you want every tile)"*
+* *"mined 111 of 120 Copper tiles - the patch is larger than Max Tiles (120) - the fill covers
+  the part nearest your tap, raise Max Tiles for the rest"*
+
+Both wordings are pinned by engine checks, and the in-engine suite now asserts that the belt
+layout covers at least 80 % of the patch it was given.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

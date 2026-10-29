@@ -13,6 +13,8 @@
 
 var api = require("api");
 var optimization = require("optimization");
+var bridge = require("bridge");
+var direction = require("direction");
 var liquid = require("liquid");
 var util = require("util");
 
@@ -615,6 +617,40 @@ check("a patch with no power nearby is not wired to anything",
     info("toast (truncated):  " + cut);
     info("toast (with power): " + power);
     info("toast (mixed ore):  " + mixed);
+})();
+
+// ---------------------------------------------------------------- 6g. the belt tool says what it did
+
+// The mechanical/pneumatic fill plans drills *and* belts, so its coverage is its own thing -
+// and it planned in silence, which made a cut-short patch look like a broken fill.
+(function(){
+    function lastToast(){
+        var log = AUTODRILL_API_FAKE.__info().log;
+        for(var i = log.length - 1; i >= 0; i--){
+            if(String(log[i]).indexOf("toast: ") === 0) return String(log[i]);
+        }
+        return "";
+    }
+
+    var plans = bridge.fill(centreOf(square), api.block("mechanicalDrill"), direction.RIGHT, "sharded");
+    var full = lastToast();
+    check("belt tool: reports its coverage", full.indexOf("of") > 0 && full.indexOf("Copper") > 0, full);
+
+    var drills = 0;
+    for(var i = 0; i < plans.length; i++){
+        if(api.blockId(plans[i].block) === api.blockId(api.block("mechanicalDrill"))) drills++;
+    }
+    check("belt tool: plans drills and belts", drills > 0 && plans.length > drills,
+        "drills=" + drills + " plans=" + plans.length);
+
+    // a patch cut short by Max Tiles has to be named as such
+    withSettings({"mechanical-drill-max-tiles": 120});
+    bridge.fill(centreOf(square), api.block("mechanicalDrill"), direction.RIGHT, "sharded");
+    var cut = lastToast();
+    check("belt tool: a cut-short patch names Max Tiles", cut.indexOf("Max Tiles") >= 0, cut);
+    info("toast (belt tool, full patch): " + full);
+    info("toast (belt tool, cut short): " + cut);
+    withSettings(null);
 })();
 
 // ---------------------------------------------------------------- 7. same patch, same layout

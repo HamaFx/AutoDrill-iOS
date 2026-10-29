@@ -69,9 +69,117 @@ function fill(tile, drill, direction, teamOverride){
     var prefix = mechanical ? "mechanical" : "pneumatic";
     var maxTiles = api.settingInt(prefix + "-drill-max-tiles", SETTING_DEFAULTS[prefix].tiles);
 
-    var tiles = util.getConnectedTiles(tile, maxTiles, teamOverride);
+    // one tile past the limit tells a patch that is exactly the limit apart from one that was cut
+    var reached = util.getConnectedTiles(tile, maxTiles + 1, teamOverride);
+    var truncated = reached.length > maxTiles;
+    if(truncated) reached.length = maxTiles;
+
+    var sourceDropId = api.itemId(api.drop(tile));
+    var targetCells = 0;
+    var targetSet = {};
+    for(var i = 0; i < reached.length; i++){
+        if(api.itemId(api.drop(reached[i])) === sourceDropId){
+            targetCells++;
+            targetSet[api.pos(reached[i])] = true;
+        }
+    }
+
+    var tiles = reached;
     util.expandArea(tiles, Math.floor(api.size(drill) / 2));
-    return placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride);
+    var plans = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride);
+
+    reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles);
+    return plans;
+}
+
+/**
+ * The belt tool used to plan in silence, so a patch that was cut short by Max Tiles - or one
+ * where a second ore is the only thing left - looked like the fill had stopped working. Same
+ * plain result line the optimiser fills print.
+ */
+function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles){
+    var size = api.size(drill);
+    var offset = Math.floor((size - 1) / 2);
+    var covered = {};
+    var others = {};
+    var built = 0;
+    var drills = 0;
+    var i = 0, dx = 0, dy = 0;
+
+    if(targetCells === 0) return;
+
+    for(i = 0; i < plans.length; i++){
+        if(api.blockId(plans[i].block) !== api.blockId(drill)) continue;
+        drills++;
+
+        for(dx = 0; dx < size; dx++){
+            for(dy = 0; dy < size; dy++){
+                var tile = api.tile(plans[i].x - offset + dx, plans[i].y - offset + dy);
+                if(tile == null) continue;
+
+                var key = api.pos(tile);
+                var item = api.itemId(api.drop(tile));
+
+                // only tiles of the patch this fill was asked for count towards its coverage;
+                // any other ore the drills happen to stand on is reported separately
+                if(targetSet[key] === true){
+                    covered[key] = true;
+                }else if(item >= 0 && item !== sourceDropId){
+                    others[item] = (others[item] === undefined ? 0 : others[item]) + 1;
+                }
+            }
+        }
+    }
+
+    // ore that already has something on it (a second tap on the same patch)
+    for(i in targetSet){
+        var target = api.tile(i % api.worldW(), Math.floor(i / api.worldW()));
+        if(target != null && api.hasBuilding(target)) built++;
+    }
+
+    var n = 0;
+    for(i in covered) n++;
+
+    var word = api.itemName(sourceDropId);
+    if(word == null) word = "ore";
+
+    if(drills === 0){
+        api.toast("[AutoDrill] nothing could be placed here - is this inside your build range?");
+        return;
+    }
+
+    if(n >= targetCells){
+        api.toast("[AutoDrill] mined all " + n + " " + word + " tiles here"
+            + (truncated ? " - but the patch is larger than Max Tiles (" + maxTiles
+                + "), so only the part nearest your tap was filled" : ""));
+    }else{
+        var why = null;
+        if(truncated){
+            why = "the patch is larger than Max Tiles (" + maxTiles
+                + ") - the fill covers the part nearest your tap, raise Max Tiles for the rest";
+        }else if(built > 0){
+            why = built + " tiles already have buildings on them";
+        }else{
+            // the belt layout keeps one drill per belt line, so a strip of the patch is always
+            // left; the optimiser drills fill a patch right to its edge
+            why = "the belt layout leaves the patch edge (the laser and airblast drills fill a"
+                + " patch completely if you want every tile)";
+        }
+        api.toast("[AutoDrill] mined " + n + " of " + targetCells + " " + word + " tiles - " + why);
+    }
+
+    var otherName = null, otherCount = 0;
+    for(var otherId in others){
+        if(others[otherId] > otherCount){
+            otherCount = others[otherId];
+            otherName = api.itemName(otherId | 0);
+        }
+    }
+    if(otherName != null && otherCount >= 5){
+        api.toast("[AutoDrill] note: this patch also has " + otherName + " (" + otherCount
+            + " tiles) - a fill only covers the ore you tap, so tap a " + otherName
+            + " tile for those");
+    }
 }
 
 exports.fill = fill;
