@@ -635,13 +635,15 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
         var bridgeTile = bridgeTiles[i];
 
         var plannedPartner = null;
-        for(var k = 0; k < bridgeTiles.length; k++){
+        // bridgeTiles is sorted ascending by distance to the outlet, so k < i is strictly
+        // closer to the outlet: a bridge can only ever link downhill, which makes A <-> B
+        // 2-cycles impossible by construction (the game forbids them, ItemBridge.checkDouble).
+        // The old full-range scan linked to whatever came first in the list - including a
+        // partner further out when no closer tile sat exactly three away.
+        for(var k = 0; k < i; k++){
             var candidate = bridgeTiles[k];
-            if(candidate === bridgeTile) continue;
             // Item bridges only link along an axis, so a diagonal "distance 3" partner (e.g.
-            // +1/+2) produces a dead bridge. The original only checked Manhattan distance and
-            // took whichever match came first in tile order, which is why chains were
-            // sometimes built and sometimes not.
+            // +1/+2) produces a dead bridge.
             var dx = api.tx(candidate) - api.tx(bridgeTile);
             var dy = api.ty(candidate) - api.ty(bridgeTile);
             if((dx === 0 && Math.abs(dy) === 3) || (dy === 0 && Math.abs(dx) === 3)){
@@ -751,9 +753,11 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
                 }
             }
             if(!targetExists){
-                // A bridge whose target is missing is still worth keeping when something feeds
-                // into it: dropping it used to cascade through the whole chain, which is why
-                // belts appeared for some patches and not others. Only dead ends go.
+                // The target was refused in the dry run (or never planned). A bridge that
+                // another bridge feeds is kept - dropping it used to cascade through the whole
+                // chain - but pointing at nothing is not a link: it becomes a terminal outlet
+                // that drops its items onto the tiles beside it. A bridge nobody feeds is a
+                // dead end and goes.
                 var fed = false;
                 for(var r = 0; r < bridgePlans.length && !fed; r++){
                     var feeder = bridgePlans[r];
@@ -761,7 +765,11 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
                         fed = true;
                     }
                 }
-                if(!fed){
+                if(fed){
+                    bp.configX = 0;
+                    bp.configY = 0;
+                    changed = true;
+                }else{
                     bridgePlans.splice(n, 1);
                     changed = true;
                 }

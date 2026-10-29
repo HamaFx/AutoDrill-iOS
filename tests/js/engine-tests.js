@@ -875,6 +875,49 @@ check("a patch with no power nearby is not wired to anything",
             + (refused === "" ? "" : " refused=[" + refused + "]"));
 })();
 
+// ---------------------------------------------------------------- 6h2. belt tool bridge chains
+
+// Item bridges link along an axis at distance 1..4, and the game forbids a pair pointing at
+// each other (ItemBridge.checkDouble). The chain links each belt tile to the first partner it
+// finds in the list, which used to be one *further* from the outlet when no closer tile sat
+// exactly three away: two such bridges point at each other (a 2-cycle), and a bridge whose
+// partner did not survive validation kept a config pointing at nothing. Both leave belts that
+// move items nowhere.
+(function(){
+    util.undoLastCommitted();
+    var plans = bridge.fill(centreOf(round), api.block("mechanicalDrill"), direction.RIGHT, "sharded");
+    // the fill's plans stay in the queue for the next tap; this check only inspects them
+    util.undoLastCommitted();
+
+    var itemBridgeId = api.blockId(api.block("itemBridge"));
+    var bridgeMap = {};
+    var bridgeCount = 0;
+    var bi = 0;
+    for(bi = 0; bi < plans.length; bi++){
+        if(api.blockId(plans[bi].block) === itemBridgeId){
+            bridgeMap[plans[bi].x + "," + plans[bi].y] = plans[bi];
+            bridgeCount++;
+        }
+    }
+
+    var cycles = 0, dangling = 0;
+    for(var bk in bridgeMap){
+        var b = bridgeMap[bk];
+        if(b.configX === 0 && b.configY === 0) continue;
+        var tx = b.x + b.configX, ty = b.y + b.configY;
+        var target = bridgeMap[tx + "," + ty];
+        if(target == null){
+            dangling++;
+        }else if(target.x + target.configX === b.x && target.y + target.configY === b.y){
+            cycles++;
+        }
+    }
+
+    check("belt tool: no 2-cycle or dangling itemBridge links",
+        cycles === 0 && dangling === 0,
+        "cycles=" + cycles + " dangling=" + dangling + " bridges=" + bridgeCount);
+})();
+
 // ---------------------------------------------------------------- 6i. belt lanes
 
 // The lane mode is a different support path: belts, power and water share the lane rows, and the
