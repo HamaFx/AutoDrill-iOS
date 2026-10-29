@@ -62,8 +62,9 @@ whether water extractors/power nodes are added to optimised drills. Two extras:
 - **Min Ores** — how many ore tiles a drill must cover to be built. Lower it to reach thin ore
   veins and the rim of a patch (1 mines everything); higher keeps only efficient drills.
 - **Output Routing Length** — when above 0, optimised drills also get a straight run of
-  conveyors (ducts on Erekir) leading out in the direction you pick, so you do not have to
-  place transport by hand. 0 keeps the original behaviour.
+  conveyors (ducts on Erekir) leading out in the direction you pick; the runs merge into one
+  network that leaves the patch, so you connect a single line instead of wiring every drill.
+  0 keeps the original behaviour.
 - A help paragraph and a "show the tutorial again" button at the bottom of the page.
 
 Large fills run with a progress bar and a cancel button instead of freezing the game: both the

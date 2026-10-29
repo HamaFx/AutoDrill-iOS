@@ -571,6 +571,32 @@ function cheapestSpot(job, info, cellCost, x, y, radius){
             }
         }
     }
+
+    // On a patch pinched by walls every tile within `radius` of the lattice point can be
+    // overhung by a drill; searching two rings further for a *free* spot keeps the layout's
+    // ore instead of reserving a full drill. Only a zero-cost spot is accepted this far out -
+    // a cheaper-but-still-overhung one would just move the problem - and the node pass (with
+    // the stitch + refill behind it) closes whatever gap the extra shift opens in the network.
+    if(bestCost > 0){
+        for(i = radius + 1; i <= radius + 2; i++){
+            if(bestCost === 0) break;
+            for(j = -i; j <= i && bestCost > 0; j++){
+                var farSpots = [
+                    {x: x + j, y: y - i}, {x: x + j, y: y + i},
+                    {x: x - i, y: y + j}, {x: x + i, y: y + j}
+                ];
+                for(var k2 = 0; k2 < 4; k2++){
+                    if(spotCost(job, info, cellCost, farSpots[k2].x, farSpots[k2].y) === 0){
+                        bestCost = 0;
+                        bestX = farSpots[k2].x;
+                        bestY = farSpots[k2].y;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     return {x: bestX, y: bestY, cost: bestCost};
 }
 
@@ -705,6 +731,7 @@ function reservePowerTiles(job){
     // yield (a full 3x3 drill much more than a rim drill covering two tiles); the non-ore rim of
     // a footprint costs a little, because reserving it still costs the overhanging drill.
     var cellCost = {};
+    var cellOre = {};       // cells any candidate actually mines (not just overhangs)
     var candidateAt = {};
     for(i = 0; i < job.candidates.length; i++){
         var cand = job.candidates[i];
@@ -717,6 +744,7 @@ function reservePowerTiles(job){
             if(mineCost === undefined || mineCost < cand.winnerCount){
                 cellCost[mineCostKeys[mk]] = cand.winnerCount;
             }
+            cellOre[mineCostKeys[mk]] = true;
         }
         var footKeys = cand.cellKeys;
         for(var fk = 0; fk < footKeys.length; fk++){
@@ -786,6 +814,24 @@ function reservePowerTiles(job){
             // find a tile beside it, but reserve nothing - holding tiles for a block that cannot
             // be built there would only cost drills.
             if(spot.cost >= 1e9) continue;
+
+            // A spot whose footprint holds no *mineable* cell of any candidate is overhung at
+            // the rim only: reserving it drops drills that mine their ore elsewhere, which is
+            // exactly the trade that costs sparse patches coverage. Keep the drills there and
+            // let the node pass shift the block (stitch + refill close any gap it opens). A
+            // spot over mineable ground is a different story - reserving it is what keeps a
+            // dense patch's nodes placeable at all - and is always held.
+            var spotOre = false;
+            var spotOffset = Math.floor((size - 1) / 2);
+            for(var sox = 0; sox < size && !spotOre; sox++){
+                for(var soy = 0; soy < size; soy++){
+                    if(cellOre[(spot.x - spotOffset + sox) + (spot.y - spotOffset + soy) * job.worldW] === true){
+                        spotOre = true;
+                        break;
+                    }
+                }
+            }
+            if(spot.cost > 0 && !spotOre) continue;
 
             // the whole footprint is held, not just the centre - and even a free spot is held,
             // so no later placement can overhang it and block the node
@@ -3113,8 +3159,11 @@ function refillAfterPowerBridge(job, selection, allPlans, occupied){
 }
 
 /**
- * Optional output routing: a straight run of conveyors (or ducts on Erekir) leading away
- * from every optimised drill, so the player does not have to place transport by hand.
+ * Optional output routing: conveyors (or ducts on Erekir) lead away from every optimised drill,
+ * and the drill runs are then merged - where the ground allows - into one network that leaves
+ * the patch in the chosen direction. `job.routeLength` is the length of each drill's run; a
+ * merged network gets one more run of the same length beyond its farthest tile, so the setting
+ * keeps meaning "how far the ore is carried", now from one exit instead of scattered stubs.
  * Length 0 disables it. The Java mod never placed transport for these drills at all.
  */
 function routeOutputs(job, allPlans, occupied){
@@ -3124,27 +3173,101 @@ function routeOutputs(job, allPlans, occupied){
     var half = Math.floor(api.size(job.drill) / 2);
     var placed = 0;
     var i = 0, step = 0;
+    var ends = [];
 
+    // 1. the per-drill runs, remembering where each one stopped
     for(i = 0; i < allPlans.length; i++){
         var drillPlan = allPlans[i];
         if(api.blockId(drillPlan.block) !== api.blockId(job.drill)) continue;
 
         var x = drillPlan.x + job.direction.x * (half + 1);
         var y = drillPlan.y + job.direction.y * (half + 1);
+        var end = null;
 
         for(step = 0; step < job.routeLength; step++){
             var plan = util.newPlan(x, y, job.direction.r, block);
-            if(!util.canPlacePlan(plan, job.team) || !util.freeInOccupancy(occupied, block, x, y)){
-                util.markRefused();
-                break;
-            }
+            if(!util.canPlacePlan(plan, job.team) || !util.freeInOccupancy(occupied, block, x, y)) break;
             allPlans.push(plan);
             util.markOccupancy(occupied, block, x, y, true);
             placed++;
+            end = plan;
             x += job.direction.x;
             y += job.direction.y;
         }
+        if(end != null) ends.push(end);
     }
+
+    if(ends.length < 2) return placed;
+
+    // 2. merge: the run that reaches farthest in the chosen direction is the network head;
+    // every other run tries to reach the head with a short conveyor path, so the patch's
+    // output leaves through one place instead of stopping at each drill.
+    var head = null, headScore = 0;
+    for(i = 0; i < ends.length; i++){
+        var score = ends[i].x * job.direction.x + ends[i].y * job.direction.y;
+        if(head == null || score > headScore){
+            head = ends[i];
+            headScore = score;
+        }
+    }
+
+    var headGoals = [];
+    var headOffsets = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for(i = 0; i < 4; i++){
+        var goalTile = api.tile(head.x + headOffsets[i][0], head.y + headOffsets[i][1]);
+        if(goalTile != null && util.freeInOccupancy(occupied, block, api.tx(goalTile), api.ty(goalTile))){
+            headGoals.push(goalTile);
+        }
+    }
+
+    var merged = 0;
+    for(i = 0; i < ends.length && headGoals.length > 0; i++){
+        var tail = ends[i];
+        if(tail === head) continue;
+
+        var path = util.findDuctPath(api.tile(tail.x, tail.y), headGoals, block, job.team, 160, occupied);
+        if(path == null || path.length === 0 || path.length > 32) continue;
+
+        var laid = [];
+        var lineOk = true;
+        for(step = 0; step < path.length && lineOk; step++){
+            var cur = path[step];
+            var next = step + 1 < path.length ? path[step + 1] : head;
+            var cdx = api.tx(next) - api.tx(cur);
+            var cdy = api.ty(next) - api.ty(cur);
+            var rot = cdx === 1 ? 0 : (cdy === 1 ? 1 : (cdx === -1 ? 2 : 3));
+            var linePlan = util.newPlan(api.tx(cur), api.ty(cur), rot, block);
+            if(!util.canPlacePlan(linePlan, job.team)
+                || !util.freeInOccupancy(occupied, block, api.tx(cur), api.ty(cur))){
+                lineOk = false;
+                break;
+            }
+            laid.push(linePlan);
+        }
+        if(!lineOk) continue;
+
+        for(step = 0; step < laid.length; step++){
+            allPlans.push(laid[step]);
+            util.markOccupancy(occupied, block, laid[step].x, laid[step].y, true);
+            placed++;
+        }
+        merged++;
+    }
+
+    // 3. the exit run: carry the merged network off the patch, one run of the set length
+    var ex = head.x + job.direction.x;
+    var ey = head.y + job.direction.y;
+    for(step = 0; step < job.routeLength; step++){
+        var exitPlan = util.newPlan(ex, ey, job.direction.r, block);
+        if(!util.canPlacePlan(exitPlan, job.team) || !util.freeInOccupancy(occupied, block, ex, ey)) break;
+        allPlans.push(exitPlan);
+        util.markOccupancy(occupied, block, ex, ey, true);
+        placed++;
+        ex += job.direction.x;
+        ey += job.direction.y;
+    }
+
+    debugLog("routing: drills=" + ends.length + " merged=" + merged + " tiles=" + placed);
     return placed;
 }
 

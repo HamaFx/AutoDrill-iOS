@@ -125,7 +125,6 @@ function transport(plans){
         for(var dx = -1; dx <= 2 && !ok; dx++){
             for(var dy = -1; dy <= 2; dy++){
                 if(dx >= 0 && dx <= 1 && dy >= 0 && dy <= 1) continue;   // the drill footprint
-                if(Math.abs(dx) + Math.abs(dy) > 2) continue;
                 var k3 = (d2.x + dx) + (d2.y + dy) * wW;
                 if(bridgeAt[k3] != null && flowStart(d2.x + dx, d2.y + dy) === 0){ ok = true; break; }
                 if(convUsable[k3] === true){ ok = true; break; }

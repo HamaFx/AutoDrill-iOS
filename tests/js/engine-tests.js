@@ -1034,6 +1034,55 @@ check("a patch with no power nearby is not wired to anything",
         "cycles=" + cycles + " dangling=" + dangling + " bridges=" + bridgeCount);
 })();
 
+// The belting audit found drills whose transport went nowhere: a conveyor pushed into a belt
+// tile whose bridge was never planned (an orphan, or a tile a drill ended up covering), so the
+// drill's ore never left it. Every planned conveyor must push into a planned bridge - or into
+// another conveyor - and every drill must sit beside something that carries.
+(function(){
+    util.undoLastCommitted();
+    var plans = bridge.fill(centreOf(round), api.block("mechanicalDrill"), direction.RIGHT, "sharded");
+    util.undoLastCommitted();
+
+    var beltAt = {};
+    var conveyors = [];
+    var drills = [];
+    for(var i = 0; i < plans.length; i++){
+        var name = api.blockName(plans[i].block);
+        if(name === "itemBridge") beltAt[plans[i].x + "," + plans[i].y] = "bridge";
+        if(name === "conveyor"){
+            beltAt[plans[i].x + "," + plans[i].y] = "conveyor";
+            conveyors.push(plans[i]);
+        }
+        if(name === "mechanicalDrill") drills.push(plans[i]);
+    }
+
+    var dead = 0;
+    for(i = 0; i < conveyors.length; i++){
+        var c = conveyors[i];
+        var dx = c.rot === 0 ? 1 : (c.rot === 2 ? -1 : 0);
+        var dy = c.rot === 1 ? 1 : (c.rot === 3 ? -1 : 0);
+        if(beltAt[(c.x + dx) + "," + (c.y + dy)] == null) dead++;
+    }
+
+    var unconnected = 0;
+    for(i = 0; i < drills.length; i++){
+        var d = drills[i];
+        var ok = false;
+        for(var bx = -1; bx <= 2 && !ok; bx++){
+            for(var by = -1; by <= 2; by++){
+                if(bx >= 0 && bx <= 1 && by >= 0 && by <= 1) continue;
+                if(beltAt[(d.x + bx) + "," + (d.y + by)] != null){ ok = true; break; }
+            }
+        }
+        if(!ok) unconnected++;
+    }
+
+    check("belt tool: no conveyor pushes into an empty tile (no dead belts)",
+        dead === 0, "dead conveyors=" + dead + "/" + conveyors.length);
+    check("belt tool: every drill sits beside a belt", unconnected === 0,
+        "drills without a belt=" + unconnected + "/" + drills.length);
+})();
+
 // ---------------------------------------------------------------- 6i. belt lanes
 
 // The lane mode is a different support path: belts, power and water share the lane rows, and the

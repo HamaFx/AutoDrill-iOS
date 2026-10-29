@@ -63,20 +63,40 @@ function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occu
     if(conveyor == null || bridgeTiles.length === 0) return 0;
 
     var worldW = api.worldW();
+
+    // Where a conveyor line may END: any free tile beside a belt (bridge-grid) tile that can
+    // host a conveyor. The old goal list was the belt tiles themselves, and the "last
+    // conveyor pushes into the belt beside it" check then looked for a belt tile *adjacent to
+    // a belt tile* - grid tiles are three apart, so the check never passed and this whole
+    // fallback never laid a single conveyor.
+    var goalTiles = [];
+    var goalSeen = {};
+    for(var g = 0; g < bridgeTiles.length; g++){
+        var bt = bridgeTiles[g];
+        var offs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        for(var o = 0; o < 4; o++){
+            var gt = api.tile(api.tx(bt) + offs[o][0], api.ty(bt) + offs[o][1]);
+            if(gt == null) continue;
+            var gkey = api.pos(gt);
+            if(goalSeen[gkey] === true) continue;
+            if(occupied[gkey] === true) continue;
+            if(!util.canPlaceBlock(conveyor, team, api.tx(gt), api.ty(gt), 0)) continue;
+            goalSeen[gkey] = true;
+            goalTiles.push(gt);
+        }
+    }
+    if(goalTiles.length === 0) return 0;
+
     for(var i = 0; i < neighbours.length; i++){
         var start = neighbours[i];
         var sx = api.tx(start), sy = api.ty(start);
         if(occupied[sx + sy * worldW] === true) continue;                 // a drill sits there
         if(!util.canPlaceBlock(conveyor, team, sx, sy, 0)) continue;      // wall or building
 
-        var path = util.findDuctPath(start, bridgeTiles, conveyor, team, 80, occupied);
+        var path = util.findDuctPath(start, goalTiles, conveyor, team, 80, occupied);
         if(path == null || path.length === 0 || path.length > 12) continue;
 
-        // lay it: every conveyor points at the next tile, the last one at the belt
-        var plans = [];
-        var ok = true;
-
-        // where the line ends: the belt tile the last conveyor pushes into
+        // where the line ends: the belt tile beside the last conveyor
         var last = path[path.length - 1];
         var goal = null;
         for(var b = 0; b < bridgeTiles.length && goal == null; b++){
@@ -85,6 +105,10 @@ function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occu
             if(Math.abs(bdx) + Math.abs(bdy) === 1) goal = bridgeTiles[b];
         }
         if(goal == null) continue;
+
+        // lay it: every conveyor points at the next tile, the last one at the belt
+        var plans = [];
+        var ok = true;
 
         for(var k = 0; k < path.length && ok; k++){
             var cur = path[k];
@@ -594,6 +618,55 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
     dbg("filter: kept=" + filtered.length + " skipped=" + skipped
         + " (no room for belts next to them)");
 
+    // --- Last pass: cover what the pattern and the gain-ordered leftovers still left behind.
+    // A tile can stay uncovered because every anchor that reaches it was occupied at its turn,
+    // or because its transport only fits once the packing is final: the first pass takes
+    // candidates by gain, this one walks the *remaining ore* in patch order and connects the
+    // first anchor that still works. Bounded and deterministic.
+    var leftoverAdded = 0;
+    var leftoverAttempts = 0;
+    var leftoverMaxDrills = 64;
+    var leftoverMaxAttempts = 400;
+    var remainingOre = [];
+    for(var ok2 in oreSet){
+        if(coveredOre[ok2] !== true) remainingOre.push(ok2 | 0);
+    }
+    if(remainingOre.length > 0 && bridgeTiles.length > 0){
+        remainingOre.sort(function(a, b){
+            return a - b;
+        });
+        var anchorOffsets = [[-1, -1], [-1, 0], [0, -1], [0, 0]];
+        for(var ro = 0; ro < remainingOre.length
+            && leftoverAdded < leftoverMaxDrills && leftoverAttempts < leftoverMaxAttempts; ro++){
+            if(coveredOre[remainingOre[ro]] === true) continue;
+
+            var rox = remainingOre[ro] % api.worldW();
+            var roy = Math.floor(remainingOre[ro] / api.worldW());
+            for(var ao = 0; ao < 4; ao++){
+                if(leftoverAttempts >= leftoverMaxAttempts) break;
+                var anchorTile = api.tile(rox + anchorOffsets[ao][0], roy + anchorOffsets[ao][1]);
+                if(anchorTile == null) continue;
+                leftoverAttempts++;
+
+                var takenThree = takeDrillCandidate(anchorTile, drill, sourceDropId, minOresPerDrill,
+                    team, bridgeTiles, beltPlans, occupied, phaseX, phaseY);
+                if(takenThree === 1){
+                    filtered.push(anchorTile);
+                    markCovered(anchorTile, drill, oreSet, coveredOre);
+                    leftoverAdded++;
+                    break;      // the ore tile is mined; next one
+                }else if(takenThree === 2){
+                    skipped++;
+                }
+            }
+        }
+    }
+    if(leftoverAdded > 0){
+        dbg("leftover pass: drills=" + leftoverAdded + " attempts=" + leftoverAttempts
+            + " remaining=" + remainingOre.length);
+    }
+    drillTiles = filtered;
+
     dbg("after filter: drills=" + drillTiles.length + " bridgeTiles=" + bridgeTiles.length + " sourceDrop=" + sourceDropId);
 
     // No drill means no job: the chain only exists to carry their output. Upstream planned a
@@ -783,6 +856,132 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
                 }
             }
         }
+    }
+
+    // A conveyor that pushes into a belt tile whose bridge did not survive - an orphan with no
+    // partner, a tile the dry run refused, or a tile a drill ended up covering - would carry
+    // the drill's ore into nothing: the drill sits there with transport that goes nowhere.
+    // First try to re-aim the conveyor at a bridge that *was* planned next to it (a conveyor
+    // takes on any face, so only its output side matters); if there is none, give the target
+    // tile a real bridge to push into - a plain outlet bridge (no config) dumps onto its
+    // neighbours and needs no partner. This is the fix for the "dead belt" drills the belting
+    // audit measured on every patch.
+    var conveyorBlockId = api.blockId(api.block("conveyor"));
+    var reAimed = 0, outletFixes = 0;
+    var outletSeen = {};
+    var rotOf = function(dx, dy){
+        return dx === 1 ? 0 : (dy === 1 ? 1 : (dx === -1 ? 2 : 3));
+    };
+    var bridgePlanAt = function(x, y){
+        for(var q3 = 0; q3 < bridgePlans.length; q3++){
+            if(bridgePlans[q3].x === x && bridgePlans[q3].y === y) return true;
+        }
+        return false;
+    };
+    var conveyorPlanAt = function(x, y){
+        for(var q4 = 0; q4 < beltPlans.length; q4++){
+            if(beltPlans[q4].x === x && beltPlans[q4].y === y) return true;
+        }
+        return false;
+    };
+
+    for(i = 0; i < beltPlans.length; i++){
+        var conveyorPlan = beltPlans[i];
+        if(api.blockId(conveyorPlan.block) !== conveyorBlockId) continue;
+
+        var rotX = conveyorPlan.rot === 0 ? 1 : (conveyorPlan.rot === 2 ? -1 : 0);
+        var rotY = conveyorPlan.rot === 1 ? 1 : (conveyorPlan.rot === 3 ? -1 : 0);
+        var convTargetX = conveyorPlan.x + rotX;
+        var convTargetY = conveyorPlan.y + rotY;
+        if(bridgePlanAt(convTargetX, convTargetY) || conveyorPlanAt(convTargetX, convTargetY)) continue;   // live
+
+        // re-aim at a planned bridge beside this conveyor (fixed order, deterministic)
+        var reAimedHere = false;
+        var reAimOffsets = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+        for(var ra = 0; ra < 4; ra++){
+            var rax = conveyorPlan.x + reAimOffsets[ra][0];
+            var ray = conveyorPlan.y + reAimOffsets[ra][1];
+            if(!bridgePlanAt(rax, ray)) continue;
+            conveyorPlan.rot = rotOf(reAimOffsets[ra][0], reAimOffsets[ra][1]);
+            reAimed++;
+            reAimedHere = true;
+            break;
+        }
+        if(reAimedHere) continue;
+
+        // otherwise the target needs its own dump bridge
+        var targetKey = convTargetX + "," + convTargetY;
+        if(outletSeen[targetKey] === true) continue;
+        outletSeen[targetKey] = true;
+        if(occupied[convTargetX + convTargetY * api.worldW()] === true) continue;
+        var outletFix = util.newPlan(convTargetX, convTargetY, 0, itemBridge, 0, 0);
+        if(util.canPlaceWithoutPlanCollision(outletFix, team, allPlans)
+            && util.canPlaceWithoutPlanCollision(outletFix, team, bridgePlans)){
+            bridgePlans.push(outletFix);
+            outletFixes++;
+        }
+    }
+    if(reAimed > 0 || outletFixes > 0){
+        dbg("belt repair: re-aimed=" + reAimed + " outlets=" + outletFixes);
+    }
+
+    // A drill taken because a belt *tile* sat beside it can still end up with no belt at all:
+    // the grid tile's bridge was pruned (or the drill's conveyor was refused in the dry run),
+    // so nothing ever carries its ore. Give every belt-less drill a conveyor line to the
+    // bridges that did get planned - the same machinery the filter uses, now that it works.
+    var repairedDrills = 0;
+    var plannedBridgeTiles = [];
+    for(i = 0; i < bridgePlans.length; i++){
+        var pbt = api.tile(bridgePlans[i].x, bridgePlans[i].y);
+        if(pbt != null) plannedBridgeTiles.push(pbt);
+    }
+    if(plannedBridgeTiles.length > 0){
+        for(i = 0; i < drillTiles.length; i++){
+            var repairTile = drillTiles[i];
+            var rtx = api.tx(repairTile), rty = api.ty(repairTile);
+
+            var hasBelt = false;
+            for(var bx = -1; bx <= 2 && !hasBelt; bx++){
+                for(var by = -1; by <= 2; by++){
+                    if(bx >= 0 && bx <= 1 && by >= 0 && by <= 1) continue;
+                    if(bridgePlanAt(rtx + bx, rty + by) || conveyorPlanAt(rtx + bx, rty + by)){
+                        hasBelt = true;
+                        break;
+                    }
+                }
+            }
+            if(hasBelt) continue;
+
+            var beforeLine = beltPlans.length;
+            var repairNeighbours = util.nearbyTilesOfBlock(rtx, rty, drill);
+            if(connectByConveyor(repairNeighbours, drill, team, plannedBridgeTiles, beltPlans, occupied) !== 1){
+                continue;
+            }
+
+            var lineOk = true;
+            for(var q5 = beforeLine; q5 < beltPlans.length; q5++){
+                var linePlan = beltPlans[q5];
+                if(!util.canPlaceWithoutPlanCollision(linePlan, team, allPlans)
+                    || !util.canPlaceWithoutPlanCollision(linePlan, team, bridgePlans)){
+                    lineOk = false;
+                    break;
+                }
+            }
+            if(lineOk){
+                for(q5 = beforeLine; q5 < beltPlans.length; q5++) allPlans.push(beltPlans[q5]);
+                repairedDrills++;
+            }else{
+                // roll the line back: its tiles were marked taken while pathing
+                for(q5 = beforeLine; q5 < beltPlans.length; q5++){
+                    delete occupied[beltPlans[q5].x + beltPlans[q5].y * api.worldW()];
+                }
+                beltPlans.length = beforeLine;
+                util.markRefused();
+            }
+        }
+    }
+    if(repairedDrills > 0){
+        dbg("belt repair: re-connected " + repairedDrills + " belt-less drills");
     }
 
     for(i = 0; i < bridgePlans.length; i++){

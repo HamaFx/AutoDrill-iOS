@@ -159,6 +159,46 @@ reproducible, the fixture pipeline above can take the exact save.
 Items 1–2 are the immediate "belting and routing" upgrade; 3–5 are the polish. A phase plan can
 be cut from this table on request.
 
+## 3a. Implemented (2026-10-29, same day)
+
+Items **2–5** are in; item **1 (route to the core) was explicitly excluded by the maintainer** —
+the network now leaves the patch in the chosen direction, and the player still makes the final
+hook-up. What shipped:
+
+- **F1 fixed, two ways**: `connectByConveyor` never worked at all (its goal check looked for a
+  belt tile adjacent to a belt tile — grid tiles are three apart), so it now targets the free
+  tiles beside the belt grid; and after the bridge pruning, every conveyor that would push into
+  a tile with no bridge plan is re-aimed at a planned bridge beside it, or that tile gets a
+  plain dump-outlet bridge. Drills whose transport was pruned away get a fresh conveyor line to
+  the planned bridges (`belt repair` in `bridge.js`).
+- **Leftover pass** (`bridge.js`, `fillLeftoverDrills`-style pass inside `placeDrillsAndBridges`):
+  after the pattern and the gain-ordered leftovers, the remaining ore is walked in patch order
+  and the first anchor that still fits (transport included) is taken. Bounded: 64 drills / 400
+  attempts per fill.
+- **Optimizer routing network** (`routeOutputs`): the per-drill runs are merged into one network
+  that exits the patch in the chosen direction; `Output Routing Length` is the per-drill run and
+  the merged network gets one more run of the same length beyond its farthest tile.
+- **Pinned-patch support tuning** (`cheapestSpot`/`reservePowerTiles`): spots whose footprint
+  holds no *mineable* cell of any candidate are no longer reserved (drills keep the ground, the
+  node pass shifts, stitch+refill closes gaps); spots over mineable ground are held as before.
+  A blanket "never reserve overhung spots" experiment was measured and rejected — it left 95 of
+  145 drills unpowered on the dense round patch.
+
+Measured (all gates re-run: engine checks 65→67, shape sweep, 124/512-shape vein batteries,
+iOS-mode and compiled-engine checks, in-game suites 95/0 in both modes):
+
+| metric | before | after |
+|---|---|---|
+| belt wiring on the committed Desolate Rift fixture, all 4 directions | 20–22 of 22 | **22/22** |
+| real-map belt coverage rows still unwired | 6 rows (1–4 drills each) | 3 rows (1 drill each, no path fits) |
+| real-map belt coverage (18 patches) | 65–95% | 65–95% + leftover gains (e.g. 170-comp2 31→33, 19-comp3 37→38) |
+| shape sweep, band + power | 90.8% | **94.3%** |
+| shape sweep, round + power | 86.9% | **87.6%** |
+| real-map optimizer rows (18 patches) | — | +1 tile on 0-comp1/165-comp3, +3 on 23-comp0, +2 on 23-comp1, 7-comp0 now 60/60 |
+| in-game second fill (laser, support ON) | 1 drill / 9 ore tiles | **9 drills / 81 ore tiles** |
+| 200-walk vein battery, full coverage | 300 of 512 | **302 of 512** |
+| optimizer routing tiles (Desolate Rift fixture) | 9–20 stubs | 16–31, one merged network + exit run per direction |
+
 ---
 
 ## 4. Reproduce
