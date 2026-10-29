@@ -739,6 +739,62 @@ fits at all now gets its own message instead of silence.
 **Combination fix.** Belt-lane fills placed a power network that was connected to itself but
 never to the player's grid; they now run the same grid chain as the lattice fills.
 
+### 1.11.0 — Phase 1: geometry ground truth and the belt tool on thin veins
+
+The first batch of the roadmap (`docs/ROADMAP.md`): mindustry v160.7's real geometry, the
+optimizer's view of an overhanging footprint, and the mechanical/pneumatic tool's behaviour on
+thin, walled and pocketed patches. Measured, not guessed:
+
+**Geometry.** `tests/js/fake-api.js` had the Airblast Drill as a 3x3 (`docs/MINDUSTRY.md` said
+so too); the game ships it as a 4x4 (`Blocks.blastDrill`, `size = 4`, `tier = 5`). Every offline
+test had been measuring a drill the game does not have. With the size fixed, the belt-lane grid
+(a lane every four rows) left a 4x4 drill no room at all: an airblast lane fill planned **0
+drills**. The pitch is now `job.size + 1`, and the same fill plans 73 drills covering 965 of
+1209 ore tiles (the lane grid's own price). A 4x4 rim tile whose only placement holds a single
+ore tile was lost to `Min Ores 2` for ever; the rim fallback (`fillRimGaps`) takes those
+placements last, so the round blob is mined **1209/1209** again (88 drills, 2 of them rim
+placements).
+
+**Full-footprint facts.** The flood fill walks the tapped ore, so the outer ring of an
+overhanging drill's footprint had no facts and `scanCandidates` ignored whatever ore sat there.
+A lead band three tiles beside a copper patch left **11 of 165** candidates "copper" to the
+optimizer where the game mines lead (the dominant-item vote ties on count and goes to the higher
+item id); the candidate pass now completes those cells on demand - **0 of 154**.
+
+**The belt tool on thin veins.** The 2x2 drill covers `[x, x+1] x [y, y+1]`, so a vein one tile
+wide with a wall on its +y side must be anchored on the non-ore row below it. `leftovers` kept
+ore tiles only and threw those anchors away. Now every tile the 6x6 pattern does not claim for a
+belt tile is a candidate, ordered by how much still-uncovered ore it would mine, and `pickPhase`
+only counts pattern drills the game would accept (the phases that anchored on the vein row, wall
+in the footprint, used to win the phase vote and produce the worst layout). A 40-tile walled
+vein: **13 -> 27 -> 40 of 40**, all 20 drills on the free side, each with a real conveyor or
+grid link. Transport is honest about it: a laid conveyor, a belt tile a drill takes, and the
+drill's own footprint all mark their ground as taken, and the belt grid no longer keeps tiles on
+walls (the walled pocket used to report "7 buildings could not be placed"). The grid also
+reaches one ring past the patch, so rim drills have a belt tile to push into instead of being
+stranded.
+
+**Bridge links.** A belt tile now only links to a tile closer to the outlet, which makes
+`A <-> B` 2-cycles impossible by construction (the game forbids them, `ItemBridge.checkDouble`),
+and a bridge whose target was refused in the dry run is no longer kept with a config pointing at
+nothing: a fed one becomes a terminal outlet, an unfed one is dropped. Round patch, mechanical
+drill: **0 cycle links, 0 dangling links** over 171 planned bridges.
+
+| battery (support off) | before | after |
+|---|---|---|
+| engine checks (`tools/engine-tests.sh`) | 51 | **57** |
+| 124 hand-built vein shapes, full coverage | 82 | **85** |
+| 512 shapes (200 random walks), full coverage | 289 | **300** |
+| shape sweep, band + power | 84.0 % | **90.3 %** |
+| shape sweep, 4x4 airblast with lanes | 0 drills | **73 drills, 79.8 %** |
+
+The remaining belt-tool ceiling is the pattern's own grid: it keeps a tile every three rows and
+columns inside the patch and those tiles are not mined (the walled pocket measures 84 of 100,
+the unwalled square 88.9 %, both unchanged by the fixes above). Covering them needs the
+"ore first, transport second" redesign the 1.9.0 note already names as the next opportunity.
+The 512-shape battery's 212 partial shapes are the optimizer's irregular-vein work, which is
+phase 2 of the roadmap.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |
