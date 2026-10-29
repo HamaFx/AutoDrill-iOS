@@ -167,7 +167,7 @@ check("round patch: every ore tile is mined when power is not asked for",
         + " drills=" + c1free.drills);
 
 check("round patch: with power, most of the patch is still mined",
-    c1.covered >= c1.total * 0.7,
+    c1.covered >= c1.total * 0.82,
     "covered=" + c1.covered + "/" + c1.total + " (" + Math.round(c1.covered * 1000 / c1.total) / 10
         + "%) drills=" + c1.drills);
 
@@ -231,9 +231,13 @@ check("no two plans claim the same tile (drills, extractors, nodes, routes)",
         }
     }
 
-    // the reserved power tiles count as taken: no drill may sit on one
+    // the reserved power tiles, and every power block actually placed (the fill bridges gaps
+    // in the network with extra blocks), count as taken: no drill may sit on one
     for(i = 0; i < job.reservedNodes.length; i++){
         occ[job.reservedNodes[i].x + job.reservedNodes[i].y * W] = true;
+    }
+    for(i = 0; i < plans.length; i++){
+        if(isPowerBlock(plans[i].block)) occ[plans[i].x + plans[i].y * W] = true;
     }
 
     var freeWithGain = 0;
@@ -304,11 +308,27 @@ check("the new Min Ores default mines the vein end to end",
 // link range of the grid), and a patch with no power anywhere near it is left alone.
 var linkRange = api.powerLinkRange();
 var target = S.powerTarget;
+// a beam tower or beam node reaches further than a power node; the checks use the block's own
+// range, exactly like the fill does
+function rangeOf(plans){
+    var best = linkRange;
+    for(var i = 0; i < plans.length; i++){
+        if(isPowerBlock(plans[i].block)) best = Math.max(best, api.powerRangeOf(plans[i].block));
+    }
+    return best;
+}
+
+function isPowerBlock(block){
+    // object identity: the fake world names blocks the way the scripts call them, the game
+    // uses its own names, but the block objects are the same ones either way
+    return block === api.block("powerNode") || block === api.block("beamNode")
+        || block === api.block("beamTower");
+}
 
 function plannedNodes(plans){
     var out = [];
     for(var i = 0; i < plans.length; i++){
-        if(api.blockId(plans[i].block) === api.blockId(api.block("powerNode"))) out.push(plans[i]);
+        if(isPowerBlock(plans[i].block)) out.push(plans[i]);
     }
     return out;
 }
@@ -319,6 +339,7 @@ function withinRange(a, b){
 }
 
 var nodes = plannedNodes(r1.plans);
+var linkRange = rangeOf(nodes);
 var touchedGrid = 0;
 for(var n = 0; n < nodes.length; n++){
     if(withinRange(nodes[n], target)) touchedGrid++;
@@ -394,9 +415,67 @@ check("a patch with no power nearby is not wired to anything",
     }
     var connected = 0;
     for(var key in seen) connected++;
+
+    // what the leftovers look like, so a failure says more than a count
+    var isolated = [];
+    for(var n2 = 0; n2 < squareNodes.length && isolated.length < 5; n2++){
+        if(seen[n2] === true) continue;
+        isolated.push(api.tx(squareNodes[n2]) + "," + api.ty(squareNodes[n2]));
+    }
+
     check("with no grid nearby the network is still one piece",
         connected === squareNodes.length,
-        "connected=" + connected + "/" + squareNodes.length);
+        "connected=" + connected + "/" + squareNodes.length + " isolated=" + isolated.join(" "));
+})();
+
+// the quality setting must change how many layouts are tried: it used to do nothing at all
+(function(){
+    var low = fillAt(round, laser, {"auto-drill-ios-optimization-quality": 1}, false);
+    var high = fillAt(round, laser, {"auto-drill-ios-optimization-quality": 10}, false);
+    var lowTried = low.stats.candidateScores.sweeps.length;
+    var highTried = high.stats.candidateScores.sweeps.length;
+    check("quality 10 tries more layouts than quality 1",
+        highTried > lowTried, "sweeps=" + lowTried + " vs " + highTried);
+})();
+
+// ---------------------------------------------------------------- 6c. Erekir support
+
+// On Erekir the drills need beam blocks (power nodes do not exist there), and the fill must
+// pick them without being told which planet it is on.
+(function(){
+    S.erekir = true;
+
+    var ere = optimization.fillDetailed(centreOf(round), laser, true, "sharded", null, 0);
+    var ereNodes = plannedNodes(ere.plans);
+    var serpuloNodes = 0;
+    for(var i = 0; i < ere.plans.length; i++){
+        if(ere.plans[i].block === api.block("powerNode")) serpuloNodes++;
+    }
+    var ereRange = rangeOf(ereNodes);
+
+    var drills = [];
+    for(i = 0; i < ere.plans.length; i++){
+        if(api.blockId(ere.plans[i].block) === api.blockId(laser)) drills.push(ere.plans[i]);
+    }
+    var unpowered = 0;
+    for(i = 0; i < drills.length; i++){
+        var covered = false;
+        for(var k = 0; k < ereNodes.length && !covered; k++){
+            var dx = api.tx(drills[i]) - api.tx(ereNodes[k]);
+            var dy = api.ty(drills[i]) - api.ty(ereNodes[k]);
+            if(dx * dx + dy * dy <= ereRange * ereRange) covered = true;
+        }
+        if(!covered) unpowered++;
+    }
+
+    check("Erekir: beam blocks are used instead of power nodes",
+        ereNodes.length > 0 && serpuloNodes === 0,
+        "beam blocks=" + ereNodes.length + " power nodes=" + serpuloNodes
+            + " first=" + (ereNodes.length === 0 ? "-" : api.blockName(ereNodes[0].block)));
+    check("Erekir: every drill is in reach of a beam block",
+        unpowered === 0, "unpowered=" + unpowered + "/" + drills.length + " range=" + ereRange);
+
+    S.erekir = false;
 })();
 
 // ---------------------------------------------------------------- 7. same patch, same layout

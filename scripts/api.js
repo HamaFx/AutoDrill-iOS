@@ -224,6 +224,29 @@ function buildReal(){
     };
 
     /**
+     * Erekir sectors are flagged `Env.scorching`; Serpulo's are not. The two planets use
+     * completely different blocks for the same jobs (power nodes vs beam nodes/towers,
+     * conduits vs reinforced conduits, water extractors vs vent condensers), so the support
+     * passes ask this instead of guessing.
+     */
+    api.isErekir = function(){
+        return (V.state.rules.env & Packages.mindustry.game.Env.scorching) !== 0;
+    };
+
+    /**
+     * Wireless link range of a power block: PowerNode exposes `laserRange`, BeamNode and
+     * BeamTower expose `range`. Read at runtime so a game update changing the numbers (v8 moved
+     * beam nodes from 5 to 10) needs no mod change.
+     */
+    api.powerRangeOf = function(block){
+        // PowerNode keeps its link range in `laserRange`, BeamNode and BeamTower in `range`.
+        // Reading the field the other kind does not have throws on the interpreted engine, so
+        // each read is guarded rather than checking the class (which Rhino here will not do).
+        if(String(block.name) === "power-node") return Math.floor(block.laserRange);
+        return Math.floor(block.range);
+    };
+
+    /**
      * Whether a pump placed here would actually produce water. Mindustry's SolidPump works from
      * two sources: standing water under its footprint (`validTiles`) and ground water
      * (`sumAttribute(water)`, which is what the block's own canPlaceOn checks). Dry land has

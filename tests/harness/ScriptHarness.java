@@ -31,7 +31,12 @@ public class ScriptHarness{
         int failures = 0;
 
         Context cx = Context.enter();
-        cx.setOptimizationLevel(-1); // IOSLauncher.getScriptContext()
+        // -1 is what the iOS build uses; 9 is a fully compiled class, which is what the desktop
+        // build uses. Compiling here catches the constructs Rhino's optimizer rejects (they
+        // load fine interpreted and then break the mod on desktop/Android), and the error names
+        // the function instead of just the file.
+        int level = Integer.getInteger("autodrill.opt", -1);
+        cx.setOptimizationLevel(level);
         try{
             Scriptable scope = new ImporterTopLevel(cx);
             // NOTE: no bootstrap 'print' - global.js declares its own consts and Rhino

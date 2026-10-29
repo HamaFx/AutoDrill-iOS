@@ -18,24 +18,40 @@ function makeApi(){
 
     // Blocks are keyed by the *field* names the mod uses (Blocks.mechanicalDrill, ...),
     // because scripts/api.js resolves them through the game's Blocks class.
-    function block(field, size){
-        var b = {name: field, id: nextBlockId++, size: size, environmentBuildable: true};
+    // env: "serpulo", "erekir" or "any" - the fake world is one planet or the other, so the
+    // engine's block choice (power nodes vs beam blocks, conduits vs reinforced conduits) can
+    // be tested without the game.
+    function block(field, size, env){
+        var b = {name: field, id: nextBlockId++, size: size, environmentBuildable: true, env: env == null ? "any" : env};
         blocks[field] = b;
         return b;
     }
 
-    var mechanicalDrill = block("mechanicalDrill", 2);
-    var pneumaticDrill = block("pneumaticDrill", 2);
-    var laserDrill = block("laserDrill", 3);
-    var blastDrill = block("blastDrill", 3);
-    var impactDrill = block("impactDrill", 4);
-    var eruptionDrill = block("eruptionDrill", 5);
-    var plasmaBore = block("plasmaBore", 2);
+    var mechanicalDrill = block("mechanicalDrill", 2, "serpulo");
+    var pneumaticDrill = block("pneumaticDrill", 2, "serpulo");
+    var laserDrill = block("laserDrill", 3, "serpulo");
+    var blastDrill = block("blastDrill", 3, "serpulo");
+    var impactDrill = block("impactDrill", 4, "erekir");
+    var eruptionDrill = block("eruptionDrill", 5, "erekir");
+    var plasmaBore = block("plasmaBore", 2, "erekir");
+    var largePlasmaBore = block("largePlasmaBore", 3, "erekir");
     var itemBridge = block("itemBridge", 1);
-    var duct = block("duct", 1);
-    var beamNode = block("beamNode", 1);
-    var waterExtractor = block("waterExtractor", 2);
-    var powerNode = block("powerNode", 1);
+    var duct = block("duct", 1, "erekir");
+    var conveyor = block("conveyor", 1, "serpulo");
+    var beamNode = block("beamNode", 1, "erekir");
+    var beamTower = block("beamTower", 3, "erekir");
+    var conduit = block("conduit", 1, "serpulo");
+    var reinforcedConduit = block("reinforcedConduit", 1, "erekir");
+    var waterExtractor = block("waterExtractor", 2, "serpulo");
+    var ventCondenser = block("ventCondenser", 3, "erekir");
+    var electrolyzer = block("electrolyzer", 3, "erekir");
+    var oilExtractor = block("oilExtractor", 3, "serpulo");
+    var powerNode = block("powerNode", 1, "serpulo");
+    // link ranges as the game exposes them (PowerNode: laserRange, BeamNode/BeamTower: range)
+    beamNode.range = 10;
+    beamTower.range = 23;
+    powerNode.laserRange = 6;
+
     var copperWall = block("copperWall", 1);
     var berylliumWall = block("berylliumWall", 1);
     var air = block("air", 1);
@@ -121,7 +137,13 @@ function makeApi(){
     api.blockId = function(b){ return b == null ? -1 : b.id; };
     api.blockName = function(b){ return b == null ? "null" : b.name; };
     api.size = function(b){ return b.size; };
-    api.environmentBuildable = function(b){ return b.environmentBuildable; };
+    api.environmentBuildable = function(b){
+        if(b == null || b.environmentBuildable !== true) return false;
+        if(b.env === "any") return true;
+        return (OPTS.erekir === true) ? b.env === "erekir" : b.env === "serpulo";
+    };
+    api.isErekir = function(){ return OPTS.erekir === true; };
+    api.powerRangeOf = function(b){ return Math.floor(b.laserRange != null ? b.laserRange : b.range); };
     api.itemId = function(item){ return item == null ? -1 : item.id; };
     api.itemLowPriority = function(item){ return item != null && item.lowPriority; };
     api.itemHardness = function(item){ return item == null ? -1 : item.hardness; };

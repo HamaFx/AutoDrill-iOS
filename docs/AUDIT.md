@@ -317,6 +317,43 @@ node, the network connected to the grid, the network in one piece with no grid i
 extractors only where they would pump) and by the in-engine suite, 75/75 in both script modes,
 which asserts the powered/unpowered layout on a 1,681-tile patch in the real game.
 
+### Coverage & quality pass 1.6.0 — "still leaves resources behind, Min Ores and Quality do nothing"
+
+Reported from the device while the Erekir work was in progress. Two of the three observations
+were right, and one of them was my own doing:
+
+1. **"Still leaves a lot of resources behind"** — true, and caused by the 1.5.0 power pass: the
+   tiles kept free for the power blocks cost coverage (60 holes on a round patch: 81.4 % mined
+   against 100 % with the support off). The reservation is now placed where it is cheapest
+   instead of on a rigid grid: each power block takes the free tile nearest its lattice spot
+   that costs the fewest ore tiles (a tile no drill can use costs nothing; a rim drill is
+   dropped before a full one), and the bound/entries/coverage all agree with what survived.
+   In-engine 1,681-tile patch: **80.7 % → 83.9 %** with power, 100 % without. Synthetic round
+   patch: 81.4 % → 85.4 %. The leftover tiles are still reported, with the setting to turn off.
+2. **"Min Ores is not working"** — it works, and the measurements say why it looks inert on a
+   dense patch: round patch, laser, one-tile minimum 98.7 % vs default 100 % (137 vs 145
+   drills). Where it really bites is thin ore: a one-tile-wide vein is mined end to end at the
+   default 2 and **not at all** at the old default 5. What looked like Min Ores failing was the
+   power reservation, which no Min Ores setting can recover.
+3. **"Optimization Quality does nothing"** — right, and it was a design fault: the lattice seed
+   usually beat the search outright, so the search's budget (and therefore the setting) never
+   changed the result. The families now all compete and the setting controls how many greedy
+   sweeps are tried (quality 1 → 1, quality 10 → 8), on top of the search budget. Measured
+   sweep scores rise with quality (1004 → 1021 on the round patch), and the engine checks
+   assert that quality 10 tries more layouts than quality 1.
+
+Two further bugs surfaced while fixing these:
+
+* **Drills could be planned on top of power blocks.** The reservation filtered `job.candidates`
+  but not `job.entries` (the list the layouts iterate), and releasing a reserved tile released
+  the occupancy flag a 4×4 drill also relied on (one flag per cell). Both fixed; the in-engine
+  suite checks plan overlap on real game data and caught it.
+* **The compiled script engine rejected the whole mod** ("Stack underflow: -1") because of one
+  expression: a counts array sized at runtime with `counts[labels[i]]++`. iOS's interpreted
+  engine ran it happily; desktop/Android would not load the mod at all. Rewritten with plain
+  comparisons, documented next to the two other Rhino landmines, and `tools/compile-check.sh`
+  (about 40 s, no game needed beyond loading) now guards the whole class of breakage.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

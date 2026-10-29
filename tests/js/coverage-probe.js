@@ -82,5 +82,8 @@ java.lang.System.out.println("COVERAGE drill=" + api.blockName(drill)
     + " outOfReach=" + stats.unreachable
     + " blocked=" + stats.blocked
     + " source=" + stats.source
+    + " families=" + (stats.candidateScores == null ? "?" :
+        ("search=" + stats.candidateScores.search + " lattice=" + stats.candidateScores.lattice
+         + " sweeps=" + stats.candidateScores.sweeps.join("/")))
     + " stopped=" + stats.stopped
     + " ms=" + elapsed);

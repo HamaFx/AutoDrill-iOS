@@ -279,12 +279,12 @@ function updateSelectTable(){
 
     if(api.environmentBuildable(impact) && api.canMine(impact, selectedTile)){
         addDrillButton("block-impact-drill-full",
-            function(){ startOptimization(impact, false); });
+            function(){ startOptimization(impact, true); });
     }
 
     if(api.environmentBuildable(eruption) && api.canMine(eruption, selectedTile)){
         addDrillButton("block-eruption-drill-full",
-            function(){ startOptimization(eruption, false); });
+            function(){ startOptimization(eruption, true); });
     }
 
     // Nothing here to mine: hide the empty box and say so instead of showing a blank pop-up.

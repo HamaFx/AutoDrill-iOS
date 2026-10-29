@@ -48,6 +48,8 @@ whether water extractors/power nodes are added to optimised drills. Two extras:
   lattice that puts every drill in link range, chained to your own grid when one is near. This
   costs a few ore tiles — the drills leave room for the nodes — so turning the setting off
   fills every tile but leaves the wiring (and the free tiles it needs) to you.
+- **Optimization Quality** — how many layout attempts the fill makes (plus the search budget).
+  Higher = fewer ore tiles left behind, slower fill.
 - **Max Tiles** — how many ore tiles the fill looks at, nearest the tap first. It is a safety
   limit, not a target: 2,500 ships by default, which covers any normal patch whole. If a patch
   is bigger the fill says so and fills the part it saw.
@@ -64,14 +66,17 @@ reports progress instead of freezing.
 
 ### How a fill decides what to build
 
-Three layouts compete and the best score wins:
+Four layouts compete and the best score wins:
 
-1. **Lattice seed** — drills placed on a grid translation of the patch. It is the layout that
-   closes a patch completely, and it costs one pass over the candidates.
-2. **Layout search** — explores alternative placements (canonical order, marginal-gain
+1. **Layout search** — explores alternative placements (canonical order, marginal-gain
    scoring, optimistic pruning) within the *Optimization Quality* budget and a 3-second
    wall-clock backstop.
-3. **Gap filler** — adds any drill that still mines an ore tile nothing else mines.
+2. **Lattice seed** — drills on a grid translation of the patch; the tidy alignment a regular
+   patch wants, and one pass over the candidates.
+3. **Greedy sweeps** — the same candidates in eight spatial orders (rows, columns, diagonals).
+   *Optimization Quality* says how many of them to try; they are what packs around holes, such
+   as an irregular rim or a tile kept free for a power block.
+4. **Gap filler** — adds any drill that still mines an ore tile nothing else mines.
 
 The promise that follows: **every ore tile a drill can reach is mined**, Ore is only counted
 once per drill, and nothing overlaps. A toast reports anything left over, naming the cause
@@ -105,6 +110,9 @@ Two differences from the Java version, both caused by iOS mod limits:
   no game needed. First stop when the engine misbehaves.
 - `tools/engine-tests.sh` — the engine's promises as checks (whole patch seen, every reachable
   tile mined, no free drill left with ore, nothing overlapping, same patch = same layout).
+- `tools/compile-check.sh` — loads the mod in the *compiled* script engine (desktop/Android).
+  The interpreted engine iOS uses runs code the compiler rejects, so this catches desktop
+  breakage in under a minute.
 - `tools/coverage-probe.sh` — reports what fraction of a patch a fill mines, for any drill,
   patch shape and setting (`WORLD=… ORE=… ROUND=1 MAXTILES=… SUPPORT=0 tools/coverage-probe.sh`).
   `SUPPORT=0` measures the layout with no power extraction, which is where the 100 % coverage

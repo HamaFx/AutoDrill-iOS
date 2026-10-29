@@ -132,6 +132,9 @@ function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
         path: [],
         frames: [],
         result: {score: 0, selection: null},
+        sweepOrders: [],
+        powerRemovedDrills: 0,
+        powerRemovedOre: 0,
         done: false,
         maxTries: 0,
         placements: 0,
@@ -286,6 +289,20 @@ function setupSearch(job){
     util.sortStable(entries, function(e){
         return -e.winnerCount;
     });
+    job.entries = entries;
+
+    // Power blocks need free tiles, and a dense fill leaves none: the drills tile the patch
+    // edge to edge, so a node cannot be placed anywhere inside it and the whole patch runs
+    // unpowered. Reserve the node lattice *before* the layout, so the drills leave room for
+    // it; the reserved tiles cost a drill each, which is why this only happens when the
+    // water-extractor/power-node support is on.
+    if(job.withSupport && api.settingBool(KEY_SUPPORT, true)){
+        reservePowerTiles(job);
+    }
+
+    // Everything below is built from the candidates that survived the reservation: the bound,
+    // the coverage, and the layouts all have to agree on what may be placed.
+    entries = job.entries;
 
     var suffix = new Array(entries.length + 1);
     suffix[entries.length] = 0;
@@ -293,7 +310,6 @@ function setupSearch(job){
         suffix[i] = suffix[i + 1] + entries[i].winnerCount;
     }
     job.suffix = suffix;
-    job.entries = entries;
 
     // how much ore is reachable at all: the rest is out of reach at the current Min Ores
     var reachable = {};
@@ -309,15 +325,6 @@ function setupSearch(job){
     }
     job.coverable = coverable;
 
-    // Power nodes need free tiles, and a dense fill leaves none: the drills tile the patch
-    // edge to edge, so a node cannot be placed anywhere inside it and the whole patch runs
-    // unpowered. Reserve the node lattice *before* the layout, so the drills leave room for
-    // it; the reserved tiles cost a drill each, which is why this only happens when the
-    // water-extractor/power-node support is on.
-    if(job.withSupport && api.settingBool(KEY_SUPPORT, true)){
-        reservePowerTiles(job);
-    }
-
     // The quality setting buys *exploration*. A complete greedy descent must always fit: with
     // candidates.length as the ceiling for a layout, a few multiples of that is enough to walk
     // down once per branch order and still have budget for alternatives.
@@ -327,6 +334,11 @@ function setupSearch(job){
     // seed the search's occupancy with the reserved tiles: no drill may sit on one
     for(var key in job.reserved) job.occ[key] = 1;
 
+    // Ordering passes: greedy runs over the same candidates in different spatial orders. They
+    // are what makes the quality setting mean something - each one is a different legal
+    // layout, the best wins, and how many are tried is what the setting buys.
+    job.sweepOrders = buildSweepOrders(entries);
+
     job.phase = PHASE_READY;
 
     debugLog("stage: candidates=" + entries.length + " coverable=" + coverable + "/" + job.targetCells
@@ -334,7 +346,89 @@ function setupSearch(job){
 }
 
 /**
- * Marks the tiles the power node lattice will need, and drops the candidates that would sit on
+ * The power block this environment uses, with the numbers the game actually gives it.
+ *
+ * Serpulo wires a patch with power nodes (1x1, link range 6), Erekir with beam nodes (1x1,
+ * range 5-10 depending on the version) or - far better - beam towers (3x3, range 23, storing
+ * 40000 power), which reach a whole patch from one or two spots. The link block is the small
+ * one, used to reach the player's grid when the big one cannot.
+ *
+ * Returns null when nothing power-related can be built here, in which case the fill leaves
+ * power to the player.
+ */
+function powerSupport(){
+    var tower = api.block("beamTower");
+    var beam = api.block("beamNode");
+    var node = api.block("powerNode");
+
+    if(api.isErekir()){
+        if(tower != null && api.environmentBuildable(tower)){
+            return {
+                block: tower, range: api.powerRangeOf(tower), size: api.size(tower),
+                linkBlock: beam != null && api.environmentBuildable(beam) ? beam : tower
+            };
+        }
+        if(beam != null && api.environmentBuildable(beam)){
+            return {block: beam, range: api.powerRangeOf(beam), size: api.size(beam), linkBlock: beam};
+        }
+    }
+
+    if(node != null && api.environmentBuildable(node)){
+        return {block: node, range: api.powerRangeOf(node), size: api.size(node), linkBlock: node};
+    }
+    return null;
+}
+
+function linkRange(info, block){
+    if(block === info.block) return info.range;
+    return api.powerRangeOf(block);
+}
+
+/** Friendly plural for the summary toast ("power nodes" / "beam towers"). */
+function powerName(info){
+    var name = api.blockName(info.block);
+    if(name === "power-node") return "power nodes";
+    if(name === "beam-node") return "beam nodes";
+    if(name === "beam-tower") return "beam towers";
+    return name.replace("-", " ") + "s";
+}
+
+/**
+ * The tile a power block should take: the one within `radius` that costs the fewest ore tiles
+ * to hold free. A tile no drill can use is free (cost 0); otherwise the cost is how much ore
+ * the drill sitting there would have mined, so a rim drill is dropped before a full one.
+ */
+function cheapestSpot(job, candidateAt, x, y, radius){
+    var bestX = x, bestY = y;
+    var bestCost = spotCost(job, candidateAt, x, y);
+    var i = 0, j = 0;
+
+    for(i = 1; i <= radius && bestCost > 0; i++){
+        for(j = -i; j <= i; j++){
+            var spots = [
+                {x: x + j, y: y - i}, {x: x + j, y: y + i},
+                {x: x - i, y: y + j}, {x: x + i, y: y + j}
+            ];
+            for(var k = 0; k < 4; k++){
+                var cost = spotCost(job, candidateAt, spots[k].x, spots[k].y);
+                if(cost < bestCost){
+                    bestCost = cost;
+                    bestX = spots[k].x;
+                    bestY = spots[k].y;
+                }
+            }
+        }
+    }
+    return {x: bestX, y: bestY, cost: bestCost};
+}
+
+function spotCost(job, candidateAt, x, y){
+    var entry = candidateAt[x + y * job.worldW];
+    return entry === undefined ? 0 : entry.winnerCount;
+}
+
+/**
+ * Marks the tiles the power lattice will need, and drops the candidates that would sit on
  * them.
  *
  * The spacing has to satisfy two things at once: every drill within link range of a node
@@ -344,10 +438,28 @@ function setupSearch(job){
  * packed patch. The search then packs the drills around the reserved tiles.
  */
 function reservePowerTiles(job){
-    var range = Math.floor(api.powerLinkRange());
+    var info = powerSupport();
+    if(info == null) return;
+
+    var range = info.range;
+    var size = info.size;
     if(range < 3) return;
 
-    var step = Math.max(3, range - 1);
+    // Close enough that every drill is inside link range and neighbouring blocks link to each
+    // other, and no denser than that: every held tile costs a drill.
+    var step = Math.max(2, range - size);
+    // the outermost blocks are pushed outside the drill area: those tiles are free
+    var pad = Math.ceil(range / 2);
+
+    // What each tile holds, so a block can be given the cheapest one nearby: a tile no drill
+    // wanted costs nothing, and a tile under a poor drill (a rim drill covering two ore tiles)
+    // costs far less than one under a full 3x3 drill.
+    var candidateAt = {};
+    for(i = 0; i < job.candidates.length; i++){
+        var candTile = job.candidates[i].tile;
+        candidateAt[api.tx(candTile) + api.ty(candTile) * job.worldW] = job.candidates[i];
+    }
+    job.candidateAt = candidateAt;
     var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
     var i = 0;
 
@@ -375,14 +487,24 @@ function reservePowerTiles(job){
     var reserved = {};
     var positions = [];
 
-    for(var gi = -kx; gi <= kx; gi++){
-        for(var gj = -ky; gj <= ky; gj++){
+    for(var gi = -kx - 1; gi <= kx + 1; gi++){
+        for(var gj = -ky - 1; gj <= ky + 1; gj++){
             var x = cx + gi * step, y = cy + gj * step;
-            if(x < minX || x > maxX || y < minY || y > maxY) continue;
-            if(job.cellFacts[x + y * job.worldW] === undefined) continue;
+            if(x < minX - pad || x > maxX + pad || y < minY - pad || y > maxY + pad) continue;
 
-            reserved[x + y * job.worldW] = true;
-            positions.push({x: x, y: y});
+            // give the block the cheapest tile within reach of where it belongs
+            var spot = cheapestSpot(job, candidateAt, x, y, 2);
+            positions.push(spot);
+
+            if(spot.cost === 0) continue;    // nothing wanted that tile: no drill loses its place
+
+            // the whole footprint is held, not just the centre
+            var offset = Math.floor((size - 1) / 2);
+            for(var hx = 0; hx < size; hx++){
+                for(var hy = 0; hy < size; hy++){
+                    reserved[(spot.x - offset + hx) + (spot.y - offset + hy) * job.worldW] = true;
+                }
+            }
         }
     }
     if(positions.length === 0) return;
@@ -405,6 +527,8 @@ function reservePowerTiles(job){
         else job.reservedCost++;
     }
     job.candidates = kept;
+    job.entries = kept;      // the layouts iterate entries: filtering one and not the other
+                             // let a drill sit on a reserved tile and overlap its power block
 
     // coverable is about the tiles a drill can still reach, so it is counted again here
     var reachable = {};
@@ -583,6 +707,65 @@ function unplace(job, entry){
 
 // ---------------------------------------------------------------------------- layout choice
 
+/**
+ * The same candidate list in eight spatial orders (rows and columns, both ways, and both
+ * diagonals). A greedy pass over one of these packs the patch in a different pattern, which is
+ * what recovers the holes an irregular patch or a reserved power tile leaves behind.
+ */
+function buildSweepOrders(entries){
+    var orders = [];
+    var keys = [
+        function(e){ return api.tx(e.tile) * 4096 + api.ty(e.tile); },
+        function(e){ return -api.tx(e.tile) * 4096 + api.ty(e.tile); },
+        function(e){ return api.ty(e.tile) * 4096 + api.tx(e.tile); },
+        function(e){ return -api.ty(e.tile) * 4096 + api.tx(e.tile); },
+        function(e){ return (api.tx(e.tile) + api.ty(e.tile)) * 4096 + api.tx(e.tile); },
+        function(e){ return -(api.tx(e.tile) + api.ty(e.tile)) * 4096 + api.tx(e.tile); },
+        function(e){ return (api.tx(e.tile) - api.ty(e.tile)) * 4096 + api.tx(e.tile); },
+        function(e){ return -(api.tx(e.tile) - api.ty(e.tile)) * 4096 + api.tx(e.tile); }
+    ];
+
+    for(var k = 0; k < keys.length; k++){
+        var order = [];
+        for(var i = 0; i < entries.length; i++) order.push(i);
+        var keyFn = keys[k];
+        order.sort(function(a, b){
+            return keyFn(entries[a]) - keyFn(entries[b]);
+        });
+        orders.push(order);
+    }
+    return orders;
+}
+
+/** Greedy pass over one sweep order: take every candidate that still fits. */
+function greedySweep(job, order){
+    var entries = job.entries;
+    var occ = {};
+    var selection = [];
+    var i = 0, k = 0, keys = null;
+
+    for(var r in job.reserved) occ[r] = true;
+
+    for(i = 0; i < order.length; i++){
+        var entry = entries[order[i]];
+
+        var blocked = false;
+        keys = entry.cellKeys;
+        for(k = 0; k < keys.length; k++){
+            if(occ[keys[k]] === true){
+                blocked = true;
+                break;
+            }
+        }
+        if(blocked) continue;
+
+        for(k = 0; k < keys.length; k++) occ[keys[k]] = true;
+        selection.push(entry);
+    }
+
+    return selection;
+}
+
 /** Ore cells of a selection that nothing else in it mines. */
 function selectionScore(selection){
     var covered = {};
@@ -687,18 +870,42 @@ function fillGaps(job, selection){
     return out;
 }
 
-/** The final layout: the better of the lattice seed and the search, both gap-filled. */
+/**
+ * The final layout: the best of the branch-and-bound search, the lattice translations and the
+ * quality-many greedy sweeps, each finished with the gap filler.
+ *
+ * The three families fail in different places. The search explores placements it would not
+ * greedily pick; the lattice has the tidy alignments a regular patch wants; the sweeps pack
+ * around holes - an irregular rim, a reserved power tile - where the other two leave ore.
+ */
 function chooseSelection(job){
-    var lattice = bestLattice(job);
-
     var searched = job.result.selection == null ? [] : job.result.selection;
-    var searchFilled = fillGaps(job, searched);
-    var searchScore = selectionScore(searchFilled);
+    var bestFilled = fillGaps(job, searched);
+    var best = {selection: bestFilled, score: selectionScore(bestFilled)};
+    var source = "search";
 
-    if(lattice.score > searchScore){
-        return {selection: lattice.selection, score: lattice.score, source: "lattice"};
+    job.candidateScores = {search: best.score};
+
+    var lattice = bestLattice(job);
+    job.candidateScores.lattice = lattice.score;
+    if(lattice.score > best.score){
+        best = lattice;
+        source = "lattice";
     }
-    return {selection: searchFilled, score: searchScore, source: "search"};
+
+    var sweeps = Math.max(1, Math.min(job.sweepOrders.length, job.quality));
+    job.candidateScores.sweeps = [];
+    for(var s = 0; s < sweeps; s++){
+        var swept = fillGaps(job, greedySweep(job, job.sweepOrders[s]));
+        var sweptScore = selectionScore(swept);
+        job.candidateScores.sweeps.push(sweptScore);
+        if(sweptScore > best.score){
+            best = {selection: swept, score: sweptScore};
+            source = "sweep" + s;
+        }
+    }
+
+    return {selection: best.selection, score: best.score, source: source};
 }
 
 // ---------------------------------------------------------------------------- finish
@@ -746,27 +953,38 @@ function finish(job){
         powerTarget = api.powerTargetNear(api.tx(centreTile), api.ty(centreTile), POWER_LINK_RADIUS);
     }
 
+    var info = support ? powerSupport() : null;
     var counts = support
         ? placeWaterExtractorsAndPowerNodes(job, selection, job.drill, team, allPlans, occupied, powerTarget)
         : null;
-    var linked = support ? linkPowerGrid(job, allPlans, occupied, selection, powerTarget) : 0;
+    var linked = 0;
+    if(support){
+        linked += stitchPowerNetwork(job, allPlans, occupied, info);
+        linked += linkPowerGrid(job, allPlans, occupied, selection, powerTarget, info);
+    }
 
     var routed = routeOutputs(job, allPlans, occupied);
 
     var extractorCount = counts == null ? 0 : counts.extractors;
     var nodeCount = counts == null ? 0 : counts.nodes;
 
+    // a drill dropped for a power bridge is no longer mined, so the coverage report is honest
+    covered = Math.max(0, covered - job.powerRemovedOre);
+    var drillCount = Math.max(0, selection.length - job.powerRemovedDrills);
+
     job.stats = {
         source: source,
+        candidateScores: job.candidateScores,
         extractors: extractorCount,
         nodes: nodeCount,
+        powerName: counts == null || counts.powerName == null ? "power nodes" : counts.powerName,
         linkNodes: linked,
         reserved: job.reservedNodes.length,
         covered: covered,
         target: job.targetCells,
         unreachable: unreachable,
         blocked: blocked,
-        drills: selection.length,
+        drills: drillCount,
         plans: allPlans.length,
         candidates: job.entries.length,
         truncated: job.truncated === true,
@@ -790,9 +1008,9 @@ function finish(job){
         if(selection.length > 0){
             // What was planned, in one line: the fill is otherwise only visible as build
             // ghosts, which is how "does the mod do water and power?" gets asked.
-            var summary = selection.length + (selection.length === 1 ? " drill" : " drills");
+            var summary = drillCount + (drillCount === 1 ? " drill" : " drills");
             if(extractorCount > 0) summary += " + " + extractorCount + " water extractors";
-            if(nodeCount > 0) summary += " + " + nodeCount + " power nodes";
+            if(nodeCount > 0) summary += " + " + nodeCount + " " + job.stats.powerName;
             if(linked > 0) summary += " (" + linked + " more wiring them to your grid)";
             api.toast("[AutoDrill] planned " + summary);
         }
@@ -802,7 +1020,7 @@ function finish(job){
         }else if(selection.length > 0 && covered < job.targetCells){
             var why = null;
             if(job.reservedNodes.length > 0){
-                why = "the rest is kept free for the power nodes (turn off Water Extractors & Power Nodes to fill every tile)";
+                why = "the rest is kept free for the power blocks (turn off Water & Power Support to fill every tile)";
             }else if(unreachable > 0){
                 why = unreachable + " out of reach (lower Min Ores)";
             }else{
@@ -836,18 +1054,32 @@ function finish(job){
  */
 function placeWaterExtractorsAndPowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget){
     var waterExtractor = api.block("waterExtractor");
-    var powerNode = api.block("powerNode");
     var drillSize = api.size(drill);
+    var info = powerSupport();
     var i = 0, j = 0;
     var extractors = 0;
 
-    // Hold the reserved tiles first: extractors must not take the spots the nodes need.
-    for(i = 0; i < job.reservedNodes.length; i++){
-        var spot = job.reservedNodes[i];
-        util.markOccupancy(occupied, powerNode, spot.x, spot.y, true);
+    // Hold the reserved tiles first: nothing else may take the spots the power blocks need.
+    // A separate map of where the drills are is kept too, because the occupancy map holds one
+    // flag per cell: releasing a reserved tile would release a drill's tile with it.
+    var drillCells = {};
+    for(i = 0; i < allPlans.length; i++){
+        var planBlock = allPlans[i].block;
+        if(planBlock === drill || api.size(planBlock) > 1){
+            util.markOccupancy(drillCells, planBlock, allPlans[i].x, allPlans[i].y, true);
+        }
     }
 
-    for(i = 0; i < selection.length; i++){
+    if(info != null){
+        for(i = 0; i < job.reservedNodes.length; i++){
+            var spot = job.reservedNodes[i];
+            util.markOccupancy(occupied, info.block, spot.x, spot.y, true);
+        }
+    }
+
+    // Water extractors are Serpulo's liquid boost; Erekir's liquids are handled by their own
+    // pass (vent condensers and conduits).
+    if(!api.isErekir()) for(i = 0; i < selection.length; i++){
         var tile = selection[i].tile;
         var nearby = util.nearbyTiles(api.tx(tile), api.ty(tile), drillSize, api.size(waterExtractor));
 
@@ -877,9 +1109,9 @@ function placeWaterExtractorsAndPowerNodes(job, selection, drill, team, allPlans
         }
     }
 
-    var nodes = placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget);
+    var nodes = placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget, info, drillCells);
 
-    return {extractors: extractors, nodes: nodes};
+    return {extractors: extractors, nodes: nodes, powerName: info == null ? null : powerName(info)};
 }
 
 /**
@@ -899,28 +1131,43 @@ function placeWaterExtractorsAndPowerNodes(job, selection, drill, team, allPlans
  * A drill the lattice still misses - a shifted node that moved away, say - gets a node next to
  * it, preferring a spot that is already inside the network.
  */
-function placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget){
-    var powerNode = api.block("powerNode");
-    var range = Math.floor(api.powerLinkRange());
+function placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget, info, drillCells){
+    var powerNode = info == null ? null : info.block;
+    var range = info == null ? 0 : info.range;
     var drillSize = api.size(drill);
     var i = 0, j = 0;
     var placed = [];
 
-    if(range < 2 || selection.length === 0) return 0;
+    if(powerNode == null || range < 2 || selection.length === 0) return 0;
 
+    var held = 0;
     for(i = 0; i < job.reservedNodes.length; i++){
         var want = job.reservedNodes[i];
 
-        // the tile is held for this node; release it so the node itself can take it
+        // the tile is held for this block; release it so the block itself can take it, unless a
+        // drill ended up covering it (then the mark is the drill's, not the reservation's)
+        if(drillCells != null && drillCells[want.x + want.y * job.worldW] === true){
+            held++;
+            continue;
+        }
         util.markOccupancy(occupied, powerNode, want.x, want.y, false);
         var spot = findNodeSpot(want.x, want.y, team, powerNode, occupied);
-        if(spot == null) continue;
+
+        // the spot found may be a tile another reservation holds: leave it alone
+        if(spot != null && job.reserved[spot.x + spot.y * job.worldW] === true
+            && (spot.x !== want.x || spot.y !== want.y)) spot = null;
+        if(spot == null){
+            held++;
+            continue;
+        }
 
         var plan = util.newPlan(spot.x, spot.y, 0, powerNode);
         allPlans.push(plan);
         util.markOccupancy(occupied, powerNode, spot.x, spot.y, true);
         placed.push({x: spot.x, y: spot.y});
     }
+
+    if(held > 0) debugLog("power: " + held + " reserved tiles could not take a block");
 
     // repair: a drill out of reach of every node gets one on its ring
     for(i = 0; i < selection.length; i++){
@@ -1001,7 +1248,257 @@ function inRange(ax, ay, bx, by, range){
 }
 
 var POWER_LINK_RADIUS = 90;      // how far away something on a power grid is still worth wiring to
-var POWER_LINK_BUDGET = 2500;    // tiles the connecting search may explore
+
+/**
+ * Places a chain of link blocks from (fromX, fromY) to (toX, toY) over tiles a block can
+ * actually sit on, spaced so every hop stays inside link range. Returns how many were placed.
+ */
+function chainBetween(job, allPlans, occupied, fromX, fromY, toX, toY, info, centrePlans){
+    var block = info.linkBlock;
+    var range = Math.floor(linkRange(info, block));
+    if(range < 2) return 0;
+
+    var step = Math.max(2, range - 2);
+    var distance = Math.abs(toX - fromX) + Math.abs(toY - fromY);
+    var budget = 400 + distance * 8;
+
+    // First look for a route that avoids our own plans; if there is none (the drill field can
+    // be solid), look again ignoring them, because the placer below may clear a drill or two.
+    var path = util.findDuctPath(api.tile(fromX, fromY), [api.tile(toX, toY)], block, job.team,
+        budget, occupied);
+    if(path == null){
+        path = util.findDuctPath(api.tile(fromX, fromY), [api.tile(toX, toY)], block, job.team,
+            budget, null);
+    }
+    if(path == null) return 0;
+
+    var placed = 0;
+    var lastX = fromX, lastY = fromY;
+    var i = 0;
+
+    for(i = 0; i < path.length; i++){
+        var t = path[i];
+
+        var toTargetX = toX - lastX, toTargetY = toY - lastY;
+        if(toTargetX * toTargetX + toTargetY * toTargetY <= range * range) break;
+
+        var fromLastX = t.x - lastX, fromLastY = t.y - lastY;
+        if(fromLastX * fromLastX + fromLastY * fromLastY < step * step && i < path.length - 1) continue;
+
+        var plan = util.newPlan(t.x, t.y, 0, block);
+        if(!util.canPlacePlan(plan, job.team)) continue;
+
+        if(!util.freeInOccupancy(occupied, block, t.x, t.y)){
+            // The only way through can run across our own drills, because the tile that has to
+            // carry the link block is exactly where a drill would have gone. A bridge through
+            // the power network is worth one drill there; anything else is not touched.
+            if(centrePlans == null) continue;
+            var blocker = centrePlans[t.x + t.y * job.worldW];
+            if(blocker == null) continue;
+
+            removePlan(allPlans, occupied, blocker);
+            centrePlans[t.x + t.y * job.worldW] = null;
+            job.powerRemovedDrills++;
+            if(job.candidateAt != null){
+                var dropped = job.candidateAt[t.x + t.y * job.worldW];
+                if(dropped != null) job.powerRemovedOre += dropped.mineableKeys.length;
+            }
+        }
+
+        allPlans.push(plan);
+        util.markOccupancy(occupied, block, t.x, t.y, true);
+        lastX = t.x;
+        lastY = t.y;
+        placed++;
+    }
+
+    return placed;
+}
+
+/** Drops a planned block again (used when the power network has to cross it). */
+function removePlan(allPlans, occupied, plan){
+    for(var i = 0; i < allPlans.length; i++){
+        if(allPlans[i] === plan){
+            allPlans.splice(i, 1);
+            break;
+        }
+    }
+    util.markOccupancy(occupied, plan.block, plan.x, plan.y, false);
+}
+
+/** True when a plan is one of the power blocks this fill uses. */
+function isPowerPlan(plan, info){
+    return plan.block === info.block || plan.block === info.linkBlock;
+}
+
+/** Every power block the fill planned, as plain {x, y} pairs. */
+function powerBlocks(allPlans, info){
+    var blocks = [];
+    for(var i = 0; i < allPlans.length; i++){
+        if(isPowerPlan(allPlans[i], info)) blocks.push({x: allPlans[i].x, y: allPlans[i].y});
+    }
+    return blocks;
+}
+
+/** Groups blocks into networks: two are in the same network when one links to the other. */
+function powerNetworks(blocks, range){
+    var label = new Array(blocks.length);
+    var count = 0;
+    var i = 0, k = 0;
+
+    for(i = 0; i < blocks.length; i++){
+        if(label[i] !== undefined) continue;
+
+        var queue = [i];
+        label[i] = count;
+        while(queue.length > 0){
+            var current = queue.pop();
+            for(k = 0; k < blocks.length; k++){
+                if(label[k] !== undefined) continue;
+                if(inRange(blocks[current].x, blocks[current].y, blocks[k].x, blocks[k].y, range)){
+                    label[k] = count;
+                    queue.push(k);
+                }
+            }
+        }
+        count++;
+    }
+    return {labels: label, count: count};
+}
+
+/**
+ * The biggest network, which everything else gets bridged to.
+ *
+ * NOTE: counted with plain comparisons rather than a counts array. `counts[labels[i]]++` over
+ * an array sized at runtime makes Rhino's optimizer emit invalid bytecode for the whole module
+ * ("Stack underflow: -1"), which breaks the mod on desktop/Android while running fine on iOS.
+ * tools/compile-check.sh catches that class of breakage.
+ */
+function largestNetwork(labels, count){
+    var trunk = 0;
+    var i = 0, k = 0;
+
+    for(i = 0; i < count; i++){
+        var mine = 0;
+        var other = 0;
+        for(k = 0; k < labels.length; k++){
+            if(labels[k] === i) mine++;
+            if(labels[k] === trunk) other++;
+        }
+        if(mine > other) trunk = i;
+    }
+    return trunk;
+}
+
+/** The closest pair of blocks between the trunk network and anything outside it. */
+function closestNetworkPair(blocks, labels, trunk){
+    var from = -1, to = -1, best = 0;
+    var i = 0, k = 0;
+
+    for(i = 0; i < blocks.length; i++){
+        if(labels[i] === trunk) continue;
+        for(k = 0; k < blocks.length; k++){
+            if(labels[k] !== trunk) continue;
+
+            var dx = blocks[i].x - blocks[k].x, dy = blocks[i].y - blocks[k].y;
+            var d = dx * dx + dy * dy;
+            if(from < 0 || d < best){
+                best = d;
+                from = i;
+                to = k;
+            }
+        }
+    }
+    return {from: from, to: to};
+}
+
+/** tile key -> the plan whose centre is on it, for finding what a bridge has to cross. */
+function centrePlansOf(allPlans, worldW){
+    var centrePlans = {};
+    for(var i = 0; i < allPlans.length; i++){
+        centrePlans[allPlans[i].x + allPlans[i].y * worldW] = allPlans[i];
+    }
+    return centrePlans;
+}
+
+/**
+ * Makes the power blocks one network. Shifting a block a tile or two to take a cheaper tile -
+ * and skipping the ones whose tile became unavailable - can leave groups of blocks further
+ * apart than link range, which would silently split the patch into separate grids.
+ *
+ * Groups are merged by placing one block between the two closest blocks of the two groups,
+ * which is inside link range of both. If the tile that has to carry it is one of our own
+ * drills, the drill goes: a bridge through the power network is worth a drill, and the report
+ * counts what that cost.
+ */
+function stitchPowerNetwork(job, allPlans, occupied, info){
+    var range = info.range;
+    var block = info.linkBlock;
+    var bridged = 0;
+
+    for(var pass = 0; pass < 8; pass++){
+        var blocks = powerBlocks(allPlans, info);
+        if(blocks.length < 2) break;
+
+        var networks = powerNetworks(blocks, range);
+        if(networks.count < 2) break;
+
+        var trunk = largestNetwork(networks.labels, networks.count);
+        var pair = closestNetworkPair(blocks, networks.labels, trunk);
+        if(pair.from < 0) break;
+
+        var midX = Math.round((blocks[pair.from].x + blocks[pair.to].x) / 2);
+        var midY = Math.round((blocks[pair.from].y + blocks[pair.to].y) / 2);
+
+        if(!placeBridge(job, allPlans, occupied, centrePlansOf(allPlans, job.worldW), block, range,
+            midX, midY, blocks[pair.from], blocks[pair.to])){
+            break;      // nowhere to put it: leave the rest to the player rather than loop
+        }
+        bridged++;
+    }
+
+    if(bridged > 0){
+        debugLog("power: bridged " + bridged + " gaps, removed " + job.powerRemovedDrills + " drills");
+    }
+    return bridged;
+}
+
+/** Places a link block near (x, y) - searching rings, clearing a drill if needed. */
+function placeBridge(job, allPlans, occupied, centrePlans, block, range, x, y, from, to){
+    for(var r = 0; r <= 3; r++){
+        for(var dx = -r; dx <= r; dx++){
+            for(var dy = -r; dy <= r; dy++){
+                if(Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+
+                var px = x + dx, py = y + dy;
+                var plan = util.newPlan(px, py, 0, block);
+                if(!util.canPlacePlan(plan, job.team)) continue;
+
+                // keep the bridge in range of both ends it is joining
+                if(!inRange(px, py, from.x, from.y, range)) continue;
+                if(to != null && !inRange(px, py, to.x, to.y, range)) continue;
+
+                if(!util.freeInOccupancy(occupied, block, px, py)){
+                    var blocker = centrePlans[px + py * job.worldW];
+                    if(blocker == null) continue;
+                    removePlan(allPlans, occupied, blocker);
+                    centrePlans[px + py * job.worldW] = null;
+                    job.powerRemovedDrills++;
+                    if(job.candidateAt != null){
+                        var dropped = job.candidateAt[px + py * job.worldW];
+                        if(dropped != null) job.powerRemovedOre += dropped.mineableKeys.length;
+                    }
+                }
+
+                allPlans.push(plan);
+                util.markOccupancy(occupied, block, px, py, true);
+                centrePlans[px + py * job.worldW] = plan;
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 /**
  * Wires the fill into the player's power grid: a chain of power nodes from the nodes the fill
@@ -1014,22 +1511,23 @@ var POWER_LINK_BUDGET = 2500;    // tiles the connecting search may explore
  *
  * Returns the number of extra nodes placed.
  */
-function linkPowerGrid(job, allPlans, occupied, selection, target){
-    if(selection.length === 0 || target == null) return 0;
+function linkPowerGrid(job, allPlans, occupied, selection, target, info){
+    if(selection.length === 0 || target == null || info == null) return 0;
 
-    var powerNode = api.block("powerNode");
-    var nodeId = api.blockId(powerNode);
     var i = 0;
 
     var own = [];
+    var powerIds = {};
+    powerIds[api.blockId(info.block)] = true;
+    powerIds[api.blockId(info.linkBlock)] = true;
+
     for(i = 0; i < allPlans.length; i++){
-        if(api.blockId(allPlans[i].block) === nodeId) own.push(allPlans[i]);
+        if(powerIds[api.blockId(allPlans[i].block)] === true) own.push(allPlans[i]);
     }
     if(own.length === 0) return 0;
 
-    var range = Math.floor(api.powerLinkRange());
+    var range = Math.floor(linkRange(info, info.linkBlock));
     if(range < 2) return 0;
-    var step = Math.max(2, range - 2);
 
     var targetX = api.tx(target), targetY = api.ty(target);
 
@@ -1046,35 +1544,7 @@ function linkPowerGrid(job, allPlans, occupied, selection, target){
     if(start == null) return 0;
     if(startDist <= range * range) return 0;    // already inside the grid's reach
 
-    var path = util.findDuctPath(api.tile(start.x, start.y), [target], powerNode, job.team,
-        POWER_LINK_BUDGET, occupied);
-    if(path == null) return 0;
-
-    var placed = 0;
-    var lastX = start.x, lastY = start.y;
-
-    for(i = 0; i < path.length; i++){
-        var t = path[i];
-
-        // the chain reaches the grid as soon as the last node is in link range of it
-        var toTargetX = targetX - lastX, toTargetY = targetY - lastY;
-        if(toTargetX * toTargetX + toTargetY * toTargetY <= range * range) break;
-
-        var fromLastX = t.x - lastX, fromLastY = t.y - lastY;
-        if(fromLastX * fromLastX + fromLastY * fromLastY < step * step && i < path.length - 1) continue;
-
-        var plan = util.newPlan(t.x, t.y, 0, powerNode);
-        if(!util.canPlacePlan(plan, job.team)) continue;
-        if(!util.freeInOccupancy(occupied, powerNode, t.x, t.y)) continue;
-
-        allPlans.push(plan);
-        util.markOccupancy(occupied, powerNode, t.x, t.y, true);
-        lastX = t.x;
-        lastY = t.y;
-        placed++;
-    }
-
-    return placed;
+    return chainBetween(job, allPlans, occupied, start.x, start.y, targetX, targetY, info);
 }
 
 /**

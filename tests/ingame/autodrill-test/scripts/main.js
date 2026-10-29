@@ -148,7 +148,12 @@ function noOverlaps(plans){
         for(var j = i + 1; j < plans.length; j++){
             var a = util.blockRect(plans[i].x, plans[i].y, plans[i].block);
             var b = util.blockRect(plans[j].x, plans[j].y, plans[j].block);
-            if(util.rectsOverlap(a, b)) return false;
+            if(util.rectsOverlap(a, b)){
+                // name the pair: a bare false sent the last bug hunt down the wrong path
+                report("overlap: " + api.blockName(plans[i].block) + "@" + plans[i].x + "," + plans[i].y
+                    + " with " + api.blockName(plans[j].block) + "@" + plans[j].x + "," + plans[j].y);
+                return false;
+            }
         }
     }
     return true;
