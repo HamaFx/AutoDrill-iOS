@@ -3,6 +3,39 @@
 Offline tooling only (Python 3). Nothing here ships with the mod and nothing here runs on iOS:
 the engine reads the *output* (`tests/js/fixtures/corpus/`), never these scripts.
 
+## Scoreboard, teacher, gap miner
+
+Three levels of measurement on the same corpus (see the phase 4 plan for the full story):
+
+1. **Scoreboard** — `./tools/corpus-probe.sh` (or `--quick` for the 12-patch gate). Every patch
+   gets the belt tool (all four directions), the optimizer (support ON/OFF) and the output
+   routing; the output is one fixed-format line per patch, a summary, and an FNV-1a hash.
+   `tests/js/fixtures/corpus/baseline.txt` is the committed result - regenerate it in the same
+   commit as any engine change that moves it.
+2. **Teacher** — labels what a slow solver proves achievable per patch:
+
+   ```bash
+   ./tools/corpus-probe.sh --dump-candidates > /tmp/corpus-cands.txt
+   uv run --with 'pulp==2.9.0' tools/vein-solve.py /tmp/corpus-cands.txt > /tmp/corpus-opt.txt
+   ./tools/corpus-probe.sh --teacher > /tmp/corpus-beltref.txt
+   python3 tools/mapdata/teacher_merge.py /tmp/corpus-opt.txt \
+       tests/js/fixtures/corpus/teacher.json --classes /tmp/corpus-cands.txt --belt /tmp/corpus-beltref.txt
+   ```
+
+   Patches over the ILP candidate cap (300) get an upper-bound `reference` label from the
+   shared restarts packer instead of an exact optimum. `teacher.json` records, per patch, the
+   solver, status, optimum/reference, the engine at label time, and the honest gap.
+3. **Gap miner** — classifies every left tile by cause, inside the probe (it needs the
+   engine's own rules), and aggregates them:
+
+   ```bash
+   ./tools/corpus-probe.sh --json /tmp/corpus.json
+   python3 tools/mapdata/corpus_gaps.py /tmp/corpus.json \
+       tests/js/fixtures/corpus/teacher.json > docs/AUDIT-CORPUS-GAPS.md
+   ```
+
+   `freeAnchor > 0` is an engine bug by definition and makes the tool exit non-zero.
+
 ## What the pipeline does
 
 ```

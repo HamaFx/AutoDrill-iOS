@@ -14,6 +14,7 @@ var api = require("api");
 var optimization = require("optimization");
 var bridge = require("bridge");
 var direction = require("direction");
+var refpack = require("reference-pack");
 
 var S = AUTODRILL_FAKE_SCENARIO;
 var W = S.world;
@@ -24,34 +25,8 @@ function info(text){
 
 // ---------------------------------------------------------------- world helpers
 
-function oreCells(shape){
-    var set = {};
-    var i = 0, j = 0;
-
-    for(i = shape.oreX0; i <= shape.x1; i++){
-        for(j = shape.oreY0; j <= shape.y1; j++){
-            var key = i + j * W;
-            if(shape.round === true){
-                var cx = (shape.oreX0 + shape.x1) / 2, cy = (shape.oreY0 + shape.y1) / 2;
-                var d = (i - cx) * (i - cx) + (j - cy) * (j - cy);
-                if(d > Math.min(shape.x1 - shape.oreX0, shape.y1 - shape.oreY0) * Math.min(shape.x1 - shape.oreX0, shape.y1 - shape.oreY0) / 4 * 0.8) continue;
-            }
-            if(shape.band === true){
-                // 2-wide diagonal stripes with period 9, held together by the left column:
-                // without the spine the stripes are separate patches and only the tapped one
-                // could ever be filled (the sweep used to measure all of them anyway)
-                var t = i - shape.oreX0;
-                if(((j - shape.oreY0) - t) % 9 > 1 && ((j - shape.oreY0) - t) % 9 < 9 && i !== shape.oreX0) continue;
-            }
-            if(shape.hole === true){
-                var hx = (shape.oreX0 + shape.x1) / 2, hy = (shape.oreY0 + shape.y1) / 2;
-                if(Math.abs(i - hx) < 3 && Math.abs(j - hy) < 3) continue;
-            }
-            set[key] = true;
-        }
-    }
-    return set;
-}
+// the patch shape and the reference packer share one ore-cell model (reference-pack.js)
+var oreCells = refpack.oreCells;
 
 function centreOf(shape){
     var cx = Math.floor((shape.oreX0 + shape.x1) / 2), cy = Math.floor((shape.oreY0 + shape.y1) / 2);
@@ -112,126 +87,6 @@ function measure(shape, plans, drill){
     return {covered: n, total: total, drills: drills, holes: holes};
 }
 
-/**
- * Reference: randomised greedy packing over the same patch, many restarts, best kept. It uses
- * the plain rules (a drill fits when its footprint has enough of the ore and does not overlap),
- * so it says how much of the patch *can* be covered rather than how much the engine does cover.
- */
-function reference(shape, drill, minOres, restarts){
-    var ore = oreCells(shape);
-    var size = api.size(drill);
-    var offset = Math.floor((size - 1) / 2);
-
-    var candidates = [];
-    var i = 0, x = 0, y = 0;
-    for(var key in ore){
-        x = key % W;
-        y = Math.floor(key / W);
-        // centre the drill anywhere its footprint touches the patch (the ring included)
-        for(var cx = x - offset; cx <= x + offset; cx++){
-            for(var cy = y - offset; cy <= y + offset; cy++){
-                candidates.push({x: cx, y: cy});
-            }
-        }
-    }
-    // de-duplicate
-    var seen = {};
-    var uniq = [];
-    for(i = 0; i < candidates.length; i++){
-        var ck = candidates[i].x + candidates[i].y * W;
-        if(seen[ck] === true) continue;
-        seen[ck] = true;
-        uniq.push(candidates[i]);
-    }
-
-    // a lattice pass first: the engine's own strongest family, so the reference never
-    // "under-performs" it and the headroom stays honest
-    var best = 0;
-    for(var ax = 0; ax < size; ax++){
-        for(var ay = 0; ay < size; ay++){
-            var occupied2 = {};
-            var covered2 = {};
-            var count2 = 0;
-
-            for(i = 0; i < uniq.length; i++){
-                var lc = uniq[i];
-                if(((lc.x - ax) % size + size) % size !== 0) continue;
-                if(((lc.y - ay) % size + size) % size !== 0) continue;
-
-                var fits3 = true;
-                var mined3 = [];
-                for(var dx3 = 0; dx3 < size && fits3; dx3++){
-                    for(var dy3 = 0; dy3 < size; dy3++){
-                        var cell3 = (lc.x - offset + dx3) + (lc.y - offset + dy3) * W;
-                        if(occupied2[cell3] === true){
-                            fits3 = false;
-                            break;
-                        }
-                        occupied2[cell3] = true;
-                        if(ore[cell3] === true) mined3.push(cell3);
-                    }
-                }
-                if(!fits3 || mined3.length < minOres) continue;
-                for(var m3 = 0; m3 < mined3.length; m3++){
-                    if(covered2[mined3[m3]] !== true){
-                        covered2[mined3[m3]] = true;
-                        count2++;
-                    }
-                }
-            }
-            if(count2 > best) best = count2;
-        }
-    }
-
-    for(var r = 0; r < restarts; r++){
-        var occupied = {};
-        var covered = {};
-        var count = 0;
-
-        // a different order every restart: this is the whole point of the reference
-        var order = uniq.slice();
-        var seed = r * 2654435761 % 2147483647;
-        for(i = order.length - 1; i > 0; i--){
-            seed = (seed * 1103515245 + 12345) % 2147483648;
-            var j = seed % (i + 1);
-            var tmp = order[i];
-            order[i] = order[j];
-            order[j] = tmp;
-        }
-
-        for(i = 0; i < order.length; i++){
-            var cand = order[i];
-            var fits = true;
-            var gain = 0;
-            var cells = [];
-            var mined = [];
-
-            for(var dx = 0; dx < size && fits; dx++){
-                for(var dy = 0; dy < size; dy++){
-                    var cell = (cand.x - offset + dx) + (cand.y - offset + dy) * W;
-                    if(occupied[cell] === true){
-                        fits = false;
-                        break;
-                    }
-                    cells.push(cell);
-                    if(ore[cell] === true) mined.push(cell);
-                }
-            }
-            if(!fits || mined.length < minOres) continue;
-
-            for(var k = 0; k < cells.length; k++) occupied[cells[k]] = true;
-            for(k = 0; k < mined.length; k++){
-                if(covered[mined[k]] !== true){
-                    covered[mined[k]] = true;
-                    count++;
-                }
-            }
-        }
-        if(count > best) best = count;
-    }
-    return best;
-}
-
 // ---------------------------------------------------------------- the sweep
 
 var failures = 0;
@@ -276,7 +131,7 @@ for(var c = 0; c < cases.length; c++){
     var ms = Date.now() - started;
 
     var got = measure(test.shape, plans, test.drill);
-    var ref = reference(test.shape, test.drill, test.minOres, 60);
+    var ref = refpack.packReference(test.shape, test.drill, test.minOres, 60);
     var pct = got.total === 0 ? 0 : Math.round(got.covered * 1000 / got.total) / 10;
     var refPct = got.total === 0 ? 0 : Math.round(ref * 1000 / got.total) / 10;
 

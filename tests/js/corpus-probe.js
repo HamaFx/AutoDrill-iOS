@@ -243,8 +243,10 @@ var CAND_CAP = 300;   // ILP input cap: bigger patches get an upper-bound refere
 /**
  * --dump-candidates: the exact VEIN-INSTANCE/VEIN-CELL/VEIN-CAND/VEIN-ENGINE dump
  * (tests/js/vein-probe.js format) for tools/vein-solve.py, laser drill, support OFF, so the
- * solver works on the engine's own candidate set. Patches over CAND_CAP get VEIN-SKIP plus a
- * VEIN-REF upper bound from the restarts packer (never called "the optimum").
+ * solver works on the engine's own candidate set. The set is entries + rim candidates: the rim
+ * fallback is part of the engine's rules (a ridge placement holding one ore tile), and without
+ * it the "optimum" can sit below the engine's own coverage. Patches over CAND_CAP get VEIN-SKIP
+ * plus a VEIN-REF reference from the restarts packer (never called "the optimum").
  */
 function dumpCandidates(){
     var laser = api.block("laserDrill");
@@ -266,9 +268,13 @@ function dumpCandidates(){
         var res = engineResult(plans, laser, ps.set);
         util.undoLastCommitted();
 
-        if(job.entries.length > CAND_CAP){
+        var cands = [];
+        for(var ce = 0; ce < job.entries.length; ce++) cands.push(job.entries[ce]);
+        for(var cr = 0; cr < job.rimCandidates.length; cr++) cands.push(job.rimCandidates[cr]);
+
+        if(cands.length > CAND_CAP){
             var ref = refPack().packReference({cells: cellsOf(ps)}, laser, job.minOres, 60, true);
-            java.lang.System.out.println("VEIN-SKIP " + patch.name + " cands=" + job.entries.length);
+            java.lang.System.out.println("VEIN-SKIP " + patch.name + " cands=" + cands.length);
             java.lang.System.out.println("VEIN-REF " + patch.name + " ref=" + ref
                 + " engine=" + res.covered + " total=" + ps.total + " drill=laser");
             continue;
@@ -277,15 +283,15 @@ function dumpCandidates(){
         // vein-probe's summary line: tools/vein-solve.py attaches the engine coverage to the
         // instance from it (the SOLVE line reports engine= from here)
         java.lang.System.out.println("VEIN shape=" + patch.name + " drill=laser cells=" + ps.total
-            + " covered=" + res.covered + " drills=" + res.drills + " cands=" + job.entries.length);
+            + " covered=" + res.covered + " drills=" + res.drills + " cands=" + cands.length);
         java.lang.System.out.println("VEIN-INSTANCE " + patch.name + " drill=laser minOres=" + job.minOres
             + " world=" + wW + " total=" + ps.total);
         for(var ck in ps.set){
             var key = ck | 0;
             java.lang.System.out.println("VEIN-CELL " + (key % wW) + " " + Math.floor(key / wW));
         }
-        for(var e = 0; e < job.entries.length; e++){
-            var ent = job.entries[e];
+        for(var e = 0; e < cands.length; e++){
+            var ent = cands[e];
             var foot = [];
             for(var f = 0; f < ent.cellKeys.length; f++) foot.push(ent.cellKeys[f]);
             var mine = [];

@@ -40,6 +40,7 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp -r scripts "$STAGE/scripts"
 cp tests/js/corpus-probe.js "$STAGE/scripts/main.js"
+cp tests/js/reference-pack.js "$STAGE/scripts/reference-pack.js"
 
 LOG=$(mktemp)
 set +e

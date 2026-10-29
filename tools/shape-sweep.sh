@@ -32,6 +32,7 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp -r scripts "$STAGE/scripts"
 cp tests/js/shape-sweep.js "$STAGE/scripts/main.js"
+cp tests/js/reference-pack.js "$STAGE/scripts/reference-pack.js"
 
 LOG=$(mktemp)
 java -Xmx1g -cp "$MINDUSTRY_JAR:$RHINO_JAR:tests/build" ScriptHarness "$STAGE" tests/js/prescript.js tests/harness/global.js | tee "$LOG"

@@ -23,7 +23,8 @@ Every patch gets:
   laser drill) - `opt >= engine` always, and `unreachable` is the solver's count of cells no
   candidate can mine.
 * patches over the ILP candidate cap get a `reference` row instead: the randomised restarts
-  packer's best - an upper bound on what packing can reach, never called "the optimum".
+  packer's best - a reference for what slow packing reaches, not a proven bound (greedy, and
+  it can land below the engine on huge patches; `status` says `Reference`, never "Optimal").
 * `beltRef` is the same packer for the belt tool (mechanical, min ores 1); `beltEngine` is the
   belt tool's own best-of-four-directions coverage. The packer ignores transport, so
   `beltRef >= beltEngine` is expected but both are reported as measured.
@@ -128,7 +129,10 @@ def main():
             continue
         entry = {
             "solver": "reference",
-            "status": "UpperBound",
+            # the restarts packer is a greedy heuristic: it is a reference for "what slow
+            # packing reaches", not a proven bound (on a few huge patches it landed *below*
+            # the engine). Only pulp rows are exact.
+            "status": "Reference",
             "opt": row["ref"],
             "engine": row["engine"],
             "gap": row["ref"] - row["engine"],
