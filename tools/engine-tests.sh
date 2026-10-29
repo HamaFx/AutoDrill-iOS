@@ -19,7 +19,9 @@ AUTODRILL_FAKE_SCENARIO = {
         {oreX0: 10, oreY0: 60, x1: 59, y1: 85, round: true},
         {oreX0: 70, oreY0: 70, x1: 79, y1: 79},
         {oreX0: 70, oreY0: 100, x1: 109, y1: 100}
-    ]
+    ],
+    powerTarget: {x: 112, y: 20}
+
 };
 EOF
 

@@ -168,6 +168,16 @@ function makeApi(){
 
     // ---- pieces the optimiser/reporting paths touch ----
     api.waterAt = function(tile){ return ((tile.x * 7 + tile.y * 13) % 5) / 10; };
+    api.waterTile = function(){ return false; };   // the fake world has no water
+    api.pumpsWaterAt = function(block, x, y){ return api.waterAt({x: x, y: y}) > 0; };
+    api.powerLinkRange = function(){ return 6; };
+    api.powerTargetNear = function(x, y, radius){
+        var target = OPTS.powerTarget;
+        if(target == null) return null;
+        var dx = target.x - x, dy = target.y - y;
+        if(dx * dx + dy * dy > radius * radius) return null;
+        return {x: target.x, y: target.y};
+    };
     api.bridgeRange = function(){ return 4; };
     api.pointPacked = function(x, y){ return ((x & 0xffff) << 16) | (y & 0xffff); };
     api.bridgeLinkPacked = function(){ return -1; };

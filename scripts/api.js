@@ -218,6 +218,82 @@ function buildReal(){
         return tile.floor().attributes.get(Packages.mindustry.world.meta.Attribute.water);
     };
 
+    /** True when the tile's floor is water (what a player means by "water here"). */
+    api.waterTile = function(tile){
+        return tile != null && tile.floor().isLiquid === true;
+    };
+
+    /**
+     * Whether a pump placed here would actually produce water. Mindustry's SolidPump works from
+     * two sources: standing water under its footprint (`validTiles`) and ground water
+     * (`sumAttribute(water)`, which is what the block's own canPlaceOn checks). Dry land has
+     * neither, so an extractor there is a dead block - the original placed one anyway.
+     */
+    api.pumpsWaterAt = function(block, x, y, team){
+        var tile = V.world.tile(x, y);
+        if(tile == null) return false;
+
+        if(block.canPlaceOn(tile, team, 0)) return true;    // ground water
+
+        var size = api.size(block);
+        var offset = Math.floor((size - 1) / 2);
+        for(var dx = 0; dx < size; dx++){
+            for(var dy = 0; dy < size; dy++){
+                var t = V.world.tile(x - offset + dx, y - offset + dy);
+                if(t != null && t.floor().isLiquid === true
+                    && t.floor().liquidDrop === Packages.mindustry.content.Liquids.water){
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    /** How far a power node reaches - links are wireless within this many tiles. */
+    api.powerLinkRange = function(){
+        return Blocks.powerNode.laserRange;
+    };
+
+    /**
+     * Nearest existing building that is part of a power grid (a node, battery, generator or
+     * consumer - anything whose block carries power), searched outwards from (x, y). Returns
+     * null when there is nothing within `radius`, so a fill can leave wiring to the player
+     * rather than guessing.
+     */
+    api.powerTargetNear = function(x, y, radius){
+        var best = null, bestDist = 0;
+
+        for(var r = 1; r <= radius; r++){
+            for(var dx = -r; dx <= r; dx++){
+                for(var dy = -r; dy <= r; dy++){
+                    // ring only: the first ring that holds a candidate wins
+                    if(Math.max(dx < 0 ? -dx : dx, dy < 0 ? -dy : dy) !== r) continue;
+
+                    var t = V.world.tile(x + dx, y + dy);
+                    if(t == null || t.build == null) continue;
+                    if(!isPowerBlock(t.block())) continue;
+
+                    var d = dx * dx + dy * dy;
+                    if(best == null || d < bestDist){
+                        best = t;
+                        bestDist = d;
+                    }
+                }
+            }
+            if(best != null) return best;
+        }
+        return null;
+    };
+
+    /**
+     * Whether a block belongs to the power system. `hasPower` alone is not enough: a bare
+     * PowerNode does not set it, so the conduit/output/consumer flags are checked too.
+     */
+    function isPowerBlock(block){
+        return block != null && (block.hasPower === true || block.conductivePower === true
+            || block.consumesPower === true || block.outputsPower === true);
+    }
+
     api.itemHardness = function(item){
         return item == null ? -1 : item.hardness;
     };

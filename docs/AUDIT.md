@@ -276,6 +276,47 @@ irregular/vein patches for 2×2/3×3 drills, no overlap, no free candidate with 
 repeat fills) and by the in-engine suite in both script modes (69/69), which now asserts the
 coverage guarantee on a 1,681-tile patch in the real game.
 
+### Water & power pass 1.5.0 — "does it do water and electricity?"
+
+Reported from the device: *"I think this mod also has water and liquids support too but when I
+touch water nothing happens. Also I think it supports electricity too but how can I build it?"*
+
+Both exist, but only as a by-product of an optimised fill — and neither worked as advertised:
+
+1. **Water extractors were planned on dry ground.** The support pass took a free ring tile next
+   to every drill, whatever the floor was. Mindustry's `SolidPump` gets its output from
+   `validTiles` (standing water under the footprint) plus `sumAttribute(Attribute.water)` — on
+   stone both are zero, so the extractor was a dead block. `api.pumpsWaterAt` now asks the game
+   (footprint over liquid water, or the block's own `canPlaceOn` for ground water); the in-engine
+   map gets 37 extractors, none on dry ground.
+2. **The power nodes were decoration, not a network.** One node per drill "if a free ring tile
+   was left over": in a dense fill the rings are shared, so most drills got nothing and the ones
+   that did were isolated — `connected=10/36` on a measured patch.
+3. **A packed patch has no room for nodes at all.** The drills tile the patch edge to edge, so
+   none of their tiles can hold a node: 80 of 145 drills sat outside node range. Power is now
+   part of the layout — one reserved tile per `(laserRange - 1)²` of patch, chosen *before* the
+   search, which then packs the drills around them (`reservePowerTiles`). Every drill ends up in
+   link range of a node, and the node lattice is spaced so the nodes also chain to each other.
+   The price is real and reported: **81 % of the patch mined against 100 % with the setting off**
+   (120 drills + 60 nodes vs 145 drills and no power), which is why it stays a setting and the
+   toast says where the tiles went.
+4. **Nothing connected the patch to the player's grid** — the drills were wired to each other and
+   to nothing else. A chain of nodes (bounded BFS over placeable tiles, a node every
+   `laserRange - 2`) now runs from the patch to the nearest building that carries power, and when
+   there is none nothing is placed and the network stays one piece, so attaching it later takes a
+   single node. A reserved tile that something else took is shifted a tile or two rather than
+   dropped, because a hole wider than link range splits the grid.
+
+Tapping water now also says what is going on ("water is not ore - water extractors and power nodes
+come with optimised drill fills") instead of looking ignored, and every fill ends with a summary
+toast ("planned 172 drills + 37 water extractors + 83 power nodes (2 more wiring them to your
+grid)"), which is how the water/power question came up in the first place.
+
+Verified by `tools/engine-tests.sh` (22 checks, including every drill in node range of a planned
+node, the network connected to the grid, the network in one piece with no grid in sight, and
+extractors only where they would pump) and by the in-engine suite, 75/75 in both script modes,
+which asserts the powered/unpowered layout on a 1,681-tile patch in the real game.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

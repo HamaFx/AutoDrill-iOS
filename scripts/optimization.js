@@ -120,6 +120,9 @@ function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
         lowPriority: {},        // dropId -> boolean
         candidates: [],
         coverable: 0,           // ore tiles at least one candidate could mine
+        reserved: {},           // tiles kept free for the power node lattice
+        reservedNodes: [],
+        reservedCost: 0,        // candidates dropped to keep them free
 
         // ---- search ----
         entries: [],
@@ -306,16 +309,118 @@ function setupSearch(job){
     }
     job.coverable = coverable;
 
+    // Power nodes need free tiles, and a dense fill leaves none: the drills tile the patch
+    // edge to edge, so a node cannot be placed anywhere inside it and the whole patch runs
+    // unpowered. Reserve the node lattice *before* the layout, so the drills leave room for
+    // it; the reserved tiles cost a drill each, which is why this only happens when the
+    // water-extractor/power-node support is on.
+    if(job.withSupport && api.settingBool(KEY_SUPPORT, true)){
+        reservePowerTiles(job);
+    }
+
     // The quality setting buys *exploration*. A complete greedy descent must always fit: with
     // candidates.length as the ceiling for a layout, a few multiples of that is enough to walk
     // down once per branch order and still have budget for alternatives.
     job.maxTries = Math.max(job.quality * 1000, entries.length * 3);
     job.deadline = api.now() + SEARCH_BUDGET_MS;
 
+    // seed the search's occupancy with the reserved tiles: no drill may sit on one
+    for(var key in job.reserved) job.occ[key] = 1;
+
     job.phase = PHASE_READY;
 
     debugLog("stage: candidates=" + entries.length + " coverable=" + coverable + "/" + job.targetCells
         + " budget=" + job.maxTries + " truncated=" + job.truncated);
+}
+
+/**
+ * Marks the tiles the power node lattice will need, and drops the candidates that would sit on
+ * them.
+ *
+ * The spacing has to satisfy two things at once: every drill within link range of a node
+ * (<= range * sqrt(2)) and every node within link range of its neighbours (<= range), so the
+ * network is one piece the player only has to attach once. That means one node per (range - 1)²
+ * tiles - about one reserved tile per four 3x3 drills - which is the real price of powering a
+ * packed patch. The search then packs the drills around the reserved tiles.
+ */
+function reservePowerTiles(job){
+    var range = Math.floor(api.powerLinkRange());
+    if(range < 3) return;
+
+    var step = Math.max(3, range - 1);
+    var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    var i = 0;
+
+    for(i = 0; i < job.candidates.length; i++){
+        var t = job.candidates[i].tile;
+        var tx = api.tx(t), ty = api.ty(t);
+        if(tx < minX) minX = tx;
+        if(ty < minY) minY = ty;
+        if(tx > maxX) maxX = tx;
+        if(ty > maxY) maxY = ty;
+    }
+    if(job.candidates.length === 0) return;
+
+    minX -= job.half;
+    minY -= job.half;
+    maxX += job.half;
+    maxY += job.half;
+
+    // Centred on the patch, so a small patch needs one node rather than a corner of a grid,
+    // and only inside the scanned area - a tile outside it would cost nothing but reserve nothing.
+    var cx = Math.round((minX + maxX) / 2);
+    var cy = Math.round((minY + maxY) / 2);
+    var kx = Math.ceil((maxX - minX) / 2 / step);
+    var ky = Math.ceil((maxY - minY) / 2 / step);
+    var reserved = {};
+    var positions = [];
+
+    for(var gi = -kx; gi <= kx; gi++){
+        for(var gj = -ky; gj <= ky; gj++){
+            var x = cx + gi * step, y = cy + gj * step;
+            if(x < minX || x > maxX || y < minY || y > maxY) continue;
+            if(job.cellFacts[x + y * job.worldW] === undefined) continue;
+
+            reserved[x + y * job.worldW] = true;
+            positions.push({x: x, y: y});
+        }
+    }
+    if(positions.length === 0) return;
+
+    job.reserved = reserved;
+    job.reservedNodes = positions;
+
+    // candidates may not cover a reserved tile
+    var kept = [];
+    for(i = 0; i < job.candidates.length; i++){
+        var entry = job.candidates[i];
+        var blocked = false;
+        for(var k = 0; k < entry.cellKeys.length; k++){
+            if(reserved[entry.cellKeys[k]] === true){
+                blocked = true;
+                break;
+            }
+        }
+        if(!blocked) kept.push(entry);
+        else job.reservedCost++;
+    }
+    job.candidates = kept;
+
+    // coverable is about the tiles a drill can still reach, so it is counted again here
+    var reachable = {};
+    var coverable = 0;
+    for(i = 0; i < kept.length; i++){
+        var keys = kept[i].mineableKeys;
+        for(var m = 0; m < keys.length; m++){
+            if(reachable[keys[m]] !== true){
+                reachable[keys[m]] = true;
+                coverable++;
+            }
+        }
+    }
+    job.coverable = coverable;
+
+    debugLog("stage: reserved " + positions.length + " power tiles (step=" + step + ")");
 }
 
 /** Advances the patch scan. `work` bounds the api-heavy loops per call. */
@@ -517,6 +622,7 @@ function bestLattice(job){
                 var entry = entries[i];
                 if((api.tx(entry.tile) - ax) % size !== 0) continue;
                 if((api.ty(entry.tile) - ay) % size !== 0) continue;
+                if(!free(job.reserved, entry)) continue;    // never sit on a power node
                 selection.push(entry);
             }
 
@@ -538,6 +644,8 @@ function fillGaps(job, selection){
     var occ = {};
     var covered = {};
     var i = 0, k = 0, keys = null;
+
+    for(var r in job.reserved) occ[r] = true;
 
     for(i = 0; i < selection.length; i++){
         keys = selection[i].cellKeys;
@@ -628,14 +736,32 @@ function finish(job){
         }
     }
 
-    if(job.withSupport && api.settingBool(KEY_SUPPORT, true)){
-        placeWaterExtractorsAndPowerNodes(selection, job.drill, team, allPlans, occupied);
+    var support = job.withSupport && api.settingBool(KEY_SUPPORT, true);
+
+    // The player's grid is looked up first: the node network is aligned to it, so the two
+    // link up instead of needing a chain bolted on afterwards.
+    var powerTarget = null;
+    if(support && selection.length > 0){
+        var centreTile = selection[Math.floor(selection.length / 2)].tile;
+        powerTarget = api.powerTargetNear(api.tx(centreTile), api.ty(centreTile), POWER_LINK_RADIUS);
     }
+
+    var counts = support
+        ? placeWaterExtractorsAndPowerNodes(job, selection, job.drill, team, allPlans, occupied, powerTarget)
+        : null;
+    var linked = support ? linkPowerGrid(job, allPlans, occupied, selection, powerTarget) : 0;
 
     var routed = routeOutputs(job, allPlans, occupied);
 
+    var extractorCount = counts == null ? 0 : counts.extractors;
+    var nodeCount = counts == null ? 0 : counts.nodes;
+
     job.stats = {
         source: source,
+        extractors: extractorCount,
+        nodes: nodeCount,
+        linkNodes: linked,
+        reserved: job.reservedNodes.length,
         covered: covered,
         target: job.targetCells,
         unreachable: unreachable,
@@ -661,12 +787,28 @@ function finish(job){
             api.toast("[AutoDrill] search stopped after " + SEARCH_BUDGET_MS + " ms - lower Optimization Quality for faster results");
         }
 
+        if(selection.length > 0){
+            // What was planned, in one line: the fill is otherwise only visible as build
+            // ghosts, which is how "does the mod do water and power?" gets asked.
+            var summary = selection.length + (selection.length === 1 ? " drill" : " drills");
+            if(extractorCount > 0) summary += " + " + extractorCount + " water extractors";
+            if(nodeCount > 0) summary += " + " + nodeCount + " power nodes";
+            if(linked > 0) summary += " (" + linked + " more wiring them to your grid)";
+            api.toast("[AutoDrill] planned " + summary);
+        }
+
         if(allPlans.length === 0 && job.entries.length > 0){
             api.toast("[AutoDrill] nothing could be placed here - is this inside your build range?");
         }else if(selection.length > 0 && covered < job.targetCells){
-            var why = unreachable > 0
-                ? unreachable + " out of reach (lower Min Ores)"
-                : blocked + " blocked (raise Optimization Quality)";
+            var why = null;
+            if(job.reservedNodes.length > 0){
+                why = "the rest is kept free for the power nodes (turn off Water Extractors & Power Nodes to fill every tile)";
+            }else if(unreachable > 0){
+                why = unreachable + " out of reach (lower Min Ores)";
+            }else{
+                why = blocked + " blocked (raise Optimization Quality)";
+            }
+
             api.toast("[AutoDrill] mined " + covered + " of " + job.targetCells + " ore tiles - " + why
                 + (routed > 0 ? ", incl. " + routed + " routing tiles" : ""));
         }
@@ -687,15 +829,23 @@ function finish(job){
 /**
  * Java: OptimizationDrill.placeWaterExtractorsAndPowerNodes
  *
- * One water extractor (for the drill's liquid boost) and one power node per drill. Uses the
- * occupancy map built from the drill plans instead of rescanning every plan, which is what
- * keeps a several-hundred-drill fill quick.
+ * A water extractor for the liquid boost of every optimised drill that can have one - on water
+ * or ground water, never on dry land where it would do nothing - and the power network the
+ * patch needs. Everything is placed through the occupancy map, so nothing overlaps and the pass
+ * stays linear in the number of drills.
  */
-function placeWaterExtractorsAndPowerNodes(selection, drill, team, allPlans, occupied){
+function placeWaterExtractorsAndPowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget){
     var waterExtractor = api.block("waterExtractor");
     var powerNode = api.block("powerNode");
     var drillSize = api.size(drill);
     var i = 0, j = 0;
+    var extractors = 0;
+
+    // Hold the reserved tiles first: extractors must not take the spots the nodes need.
+    for(i = 0; i < job.reservedNodes.length; i++){
+        var spot = job.reservedNodes[i];
+        util.markOccupancy(occupied, powerNode, spot.x, spot.y, true);
+    }
 
     for(i = 0; i < selection.length; i++){
         var tile = selection[i].tile;
@@ -708,6 +858,12 @@ function placeWaterExtractorsAndPowerNodes(selection, drill, team, allPlans, occ
             var plan = util.newPlan(api.tx(nearby[j]), api.ty(nearby[j]), 0, waterExtractor);
             if(!util.canPlacePlan(plan, team)) continue;
             if(!util.freeInOccupancy(occupied, waterExtractor, plan.x, plan.y)) continue;
+
+            // Only where it would actually pump: standing water under it, or ground water.
+            // (The original placed one next to every drill whenever the tile was free, dry or
+            // not, which is why filled patches ended up with useless extractors on stone.)
+            if(!api.pumpsWaterAt(waterExtractor, plan.x, plan.y, team)) continue;
+
             var water = api.waterAt(nearby[j]);
             if(water > bestWater){
                 bestWater = water;
@@ -717,21 +873,208 @@ function placeWaterExtractorsAndPowerNodes(selection, drill, team, allPlans, occ
         if(best != null){
             allPlans.push(best);
             util.markOccupancy(occupied, waterExtractor, best.x, best.y, true);
+            extractors++;
         }
     }
 
+    var nodes = placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget);
+
+    return {extractors: extractors, nodes: nodes};
+}
+
+/**
+ * The power network over the fill: nodes on the lattice reserved before the layout, so the
+ * drills left room for them.
+ *
+ * Nodes link wirelessly within `powerNode.laserRange`, and the lattice is spaced `range/sqrt(2)`
+ * apart, so every tile of the patch - and therefore every drill on it - is within reach of a
+ * node, and every node is within reach of its neighbours. A reserved tile that something else
+ * ended up on is shifted a tile or two, because dropping it would leave a hole wider than link
+ * range and split the network.
+ *
+ * The original placed one node per drill whenever a free ring tile was left over. In a dense
+ * fill those rings are shared, so most drills got no node at all and the few that did ended up
+ * isolated - the patch looked wired but nothing was powered.
+ *
+ * A drill the lattice still misses - a shifted node that moved away, say - gets a node next to
+ * it, preferring a spot that is already inside the network.
+ */
+function placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget){
+    var powerNode = api.block("powerNode");
+    var range = Math.floor(api.powerLinkRange());
+    var drillSize = api.size(drill);
+    var i = 0, j = 0;
+    var placed = [];
+
+    if(range < 2 || selection.length === 0) return 0;
+
+    for(i = 0; i < job.reservedNodes.length; i++){
+        var want = job.reservedNodes[i];
+
+        // the tile is held for this node; release it so the node itself can take it
+        util.markOccupancy(occupied, powerNode, want.x, want.y, false);
+        var spot = findNodeSpot(want.x, want.y, team, powerNode, occupied);
+        if(spot == null) continue;
+
+        var plan = util.newPlan(spot.x, spot.y, 0, powerNode);
+        allPlans.push(plan);
+        util.markOccupancy(occupied, powerNode, spot.x, spot.y, true);
+        placed.push({x: spot.x, y: spot.y});
+    }
+
+    // repair: a drill out of reach of every node gets one on its ring
     for(i = 0; i < selection.length; i++){
-        var tile2 = selection[i].tile;
-        var nearby2 = util.nearbyTiles(api.tx(tile2), api.ty(tile2), drillSize, api.size(powerNode));
-        for(j = 0; j < nearby2.length; j++){
-            var plan2 = util.newPlan(api.tx(nearby2[j]), api.ty(nearby2[j]), 0, powerNode);
-            if(util.canPlacePlan(plan2, team) && util.freeInOccupancy(occupied, powerNode, plan2.x, plan2.y)){
-                allPlans.push(plan2);
-                util.markOccupancy(occupied, powerNode, plan2.x, plan2.y, true);
+        var drillTile = selection[i].tile;
+        var dx = api.tx(drillTile), dy = api.ty(drillTile);
+        var covered = false;
+
+        if(powerTarget != null && inRange(dx, dy, api.tx(powerTarget), api.ty(powerTarget), range)) covered = true;
+
+        for(j = 0; j < placed.length && !covered; j++){
+            if(inRange(dx, dy, placed[j].x, placed[j].y, range)) covered = true;
+        }
+        if(covered) continue;
+
+        // Prefer a ring tile that is already inside the network: a repair node placed out of
+        // reach would power its drill but dangle off the grid.
+        var nearby = util.nearbyTiles(dx, dy, drillSize, api.size(powerNode));
+        var chosen = null;
+
+        for(j = 0; j < nearby.length && chosen == null; j++){
+            var fixX = api.tx(nearby[j]), fixY = api.ty(nearby[j]);
+            var fix = util.newPlan(fixX, fixY, 0, powerNode);
+            if(!util.canPlacePlan(fix, team)) continue;
+            if(!util.freeInOccupancy(occupied, powerNode, fixX, fixY)) continue;
+
+            var joined = powerTarget != null && inRange(fixX, fixY, api.tx(powerTarget), api.ty(powerTarget), range);
+            for(var k = 0; k < placed.length && !joined; k++){
+                if(inRange(fixX, fixY, placed[k].x, placed[k].y, range)) joined = true;
+            }
+            if(joined) chosen = {x: fixX, y: fixY};
+        }
+
+        if(chosen == null){
+            // nothing that could join the network: power the drill anyway
+            for(j = 0; j < nearby.length; j++){
+                var fallback = util.newPlan(api.tx(nearby[j]), api.ty(nearby[j]), 0, powerNode);
+                if(!util.canPlacePlan(fallback, team)) continue;
+                if(!util.freeInOccupancy(occupied, powerNode, fallback.x, fallback.y)) continue;
+                chosen = {x: fallback.x, y: fallback.y};
                 break;
             }
         }
+
+        if(chosen != null){
+            allPlans.push(util.newPlan(chosen.x, chosen.y, 0, powerNode));
+            util.markOccupancy(occupied, powerNode, chosen.x, chosen.y, true);
+            placed.push({x: chosen.x, y: chosen.y});
+        }
     }
+
+    return placed.length;
+}
+
+/** Nearest free, placeable tile to (x, y), searched in rings. Null when there is none nearby. */
+function findNodeSpot(x, y, team, powerNode, occupied){
+    var direct = util.newPlan(x, y, 0, powerNode);
+    if(util.canPlacePlan(direct, team) && util.freeInOccupancy(occupied, powerNode, x, y)) return {x: x, y: y};
+
+    for(var r = 1; r <= 2; r++){
+        for(var dx = -r; dx <= r; dx++){
+            for(var dy = -r; dy <= r; dy++){
+                if(Math.max(dx < 0 ? -dx : dx, dy < 0 ? -dy : dy) !== r) continue;
+                var plan = util.newPlan(x + dx, y + dy, 0, powerNode);
+                if(util.canPlacePlan(plan, team)
+                    && util.freeInOccupancy(occupied, powerNode, x + dx, y + dy)){
+                    return {x: x + dx, y: y + dy};
+                }
+            }
+        }
+    }
+    return null;
+}
+
+/** Tile-centre distance test - power links are wireless and measured between block centres. */
+function inRange(ax, ay, bx, by, range){
+    var dx = ax - bx, dy = ay - by;
+    return dx * dx + dy * dy <= range * range;
+}
+
+var POWER_LINK_RADIUS = 90;      // how far away something on a power grid is still worth wiring to
+var POWER_LINK_BUDGET = 2500;    // tiles the connecting search may explore
+
+/**
+ * Wires the fill into the player's power grid: a chain of power nodes from the nodes the fill
+ * already placed to the nearest building that carries power. Links are wireless within
+ * `powerNode.laserRange`, so the chain only needs a node every few tiles.
+ *
+ * Without this the drills are powered from each other and from nothing else - which is why a
+ * freshly filled patch sat dead until it was wired by hand. Stops silently when there is no
+ * power anywhere near the patch (an early-game base has none), leaving that to the player.
+ *
+ * Returns the number of extra nodes placed.
+ */
+function linkPowerGrid(job, allPlans, occupied, selection, target){
+    if(selection.length === 0 || target == null) return 0;
+
+    var powerNode = api.block("powerNode");
+    var nodeId = api.blockId(powerNode);
+    var i = 0;
+
+    var own = [];
+    for(i = 0; i < allPlans.length; i++){
+        if(api.blockId(allPlans[i].block) === nodeId) own.push(allPlans[i]);
+    }
+    if(own.length === 0) return 0;
+
+    var range = Math.floor(api.powerLinkRange());
+    if(range < 2) return 0;
+    var step = Math.max(2, range - 2);
+
+    var targetX = api.tx(target), targetY = api.ty(target);
+
+    // start from the fill's own node closest to the grid
+    var start = null, startDist = 0;
+    for(i = 0; i < own.length; i++){
+        var dx = own[i].x - targetX, dy = own[i].y - targetY;
+        var d = dx * dx + dy * dy;
+        if(start == null || d < startDist){
+            start = own[i];
+            startDist = d;
+        }
+    }
+    if(start == null) return 0;
+    if(startDist <= range * range) return 0;    // already inside the grid's reach
+
+    var path = util.findDuctPath(api.tile(start.x, start.y), [target], powerNode, job.team,
+        POWER_LINK_BUDGET, occupied);
+    if(path == null) return 0;
+
+    var placed = 0;
+    var lastX = start.x, lastY = start.y;
+
+    for(i = 0; i < path.length; i++){
+        var t = path[i];
+
+        // the chain reaches the grid as soon as the last node is in link range of it
+        var toTargetX = targetX - lastX, toTargetY = targetY - lastY;
+        if(toTargetX * toTargetX + toTargetY * toTargetY <= range * range) break;
+
+        var fromLastX = t.x - lastX, fromLastY = t.y - lastY;
+        if(fromLastX * fromLastX + fromLastY * fromLastY < step * step && i < path.length - 1) continue;
+
+        var plan = util.newPlan(t.x, t.y, 0, powerNode);
+        if(!util.canPlacePlan(plan, job.team)) continue;
+        if(!util.freeInOccupancy(occupied, powerNode, t.x, t.y)) continue;
+
+        allPlans.push(plan);
+        util.markOccupancy(occupied, powerNode, t.x, t.y, true);
+        lastX = t.x;
+        lastY = t.y;
+        placed++;
+    }
+
+    return placed;
 }
 
 /**

@@ -81,6 +81,7 @@ var COPPER = {x0: 20, x1: 30, y0: 20, y1: 30};
 // A solid wall blob whose LEFT face carries the ore crust - exactly like Erekir's
 // surface wall-ore generation (ore only on tiles adjacent to open air).
 var WALL = {x0: 10, x1: 24, y0: 40, y1: 54};
+var POOL = {x0: 32, x1: 40, y0: 20, y1: 30};
 
 function buildMap(){
     Vars.world.loadGenerator(MAP, MAP, function(tiles){
@@ -98,6 +99,13 @@ function buildMap(){
         for(x = COPPER.x0; x <= COPPER.x1; x++){
             for(y = COPPER.y0; y <= COPPER.y1; y++){
                 tiles.get(x, y).setOverlay(Blocks.oreCopper);
+            }
+        }
+
+        // a pool beside the copper patch: water extractors may only go on ground that has water
+        for(x = POOL.x0; x <= POOL.x1; x++){
+            for(y = POOL.y0; y <= POOL.y1; y++){
+                tiles.get(x, y).setFloor(Blocks.water);
             }
         }
 
@@ -287,6 +295,20 @@ function testOptimization(){
     var nodes = tileCount(laser, Blocks.powerNode);
     check("optimization: laser has drills", laserDrills > 0, "drills=" + laserDrills);
     check("optimization: water extractors for laser", extractors > 0, "extractors=" + extractors);
+
+    var dryExtractors = 0;
+    for(i = 0; i < laser.length; i++){
+        if(api.blockId(laser[i].block) !== api.blockId(Blocks.waterExtractor)) continue;
+        if(!api.pumpsWaterAt(Blocks.waterExtractor, laser[i].x, laser[i].y, team)) dryExtractors++;
+    }
+    check("optimization: water extractors only where they would pump",
+        dryExtractors === 0, "dry extractors=" + dryExtractors + "/" + extractors);
+
+    check("ui: a water tile is recognised as water and stone is not",
+        api.waterTile(api.tile((POOL.x0 + POOL.x1) / 2 | 0, (POOL.y0 + POOL.y1) / 2 | 0)) === true
+            && api.waterTile(api.tile(5, 5)) === false,
+        "pool=" + api.waterTile(api.tile((POOL.x0 + POOL.x1) / 2 | 0, (POOL.y0 + POOL.y1) / 2 | 0))
+            + " stone=" + api.waterTile(api.tile(5, 5)));
     check("optimization: power nodes for laser", nodes > 0, "nodes=" + nodes);
     report("optimization: laser drills=" + laserDrills + " extractors=" + extractors + " nodes=" + nodes);
 
@@ -474,6 +496,10 @@ function testPerformance(){
         }
     }
 
+    // something on a power grid near the patch, so the fill has a grid to wire into
+    var gridTile = tiles.get(BIG.x1 + 12, (BIG.y0 + BIG.y1) / 2 | 0);
+    gridTile.setBlock(Blocks.powerNode);
+
     var center = api.tile((BIG.x0 + BIG.x1) / 2 | 0, (BIG.y0 + BIG.y1) / 2 | 0);
 
     var start = api.now();
@@ -504,10 +530,50 @@ function testPerformance(){
         + " stopped=" + laserFill.stats.stopped);
     check("optimization: big patch is seen whole", laserFill.stats.target >= patchTiles,
         "seen=" + laserFill.stats.target + "/" + patchTiles);
-    check("optimization: big patch coverage >= 90%", coveredFrac >= 0.90,
+    // Power nodes need free tiles, so a powered fill covers less than every tile; without them
+    // the drills would sit dead. The engine checks pin the exact trade-off.
+    check("optimization: big patch coverage >= 70%", coveredFrac >= 0.70,
         "covered=" + Math.round(coveredFrac * 1000) / 10 + "%");
-    check("optimization: big patch leaves nothing out of reach", laserFill.stats.unreachable === 0,
-        "outOfReach=" + laserFill.stats.unreachable);
+
+    // every drill must be within node link range of a planned power node
+    var powerRange = Blocks.powerNode.laserRange;
+    var nodeXs = [], nodeYs = [];
+    for(x = 0; x < laserPlans.length; x++){
+        if(api.blockId(laserPlans[x].block) === api.blockId(Blocks.powerNode)){
+            nodeXs.push(laserPlans[x].x);
+            nodeYs.push(laserPlans[x].y);
+        }
+    }
+    var unpowered = 0, drillPlans = 0;
+    for(x = 0; x < laserPlans.length; x++){
+        if(api.blockId(laserPlans[x].block) !== api.blockId(Blocks.laserDrill)) continue;
+        drillPlans++;
+        var ok = false;
+        for(y = 0; y < nodeXs.length && !ok; y++){
+            var ddx = laserPlans[x].x - nodeXs[y], ddy = laserPlans[x].y - nodeYs[y];
+            if(ddx * ddx + ddy * ddy <= powerRange * powerRange) ok = true;
+        }
+        if(!ok) unpowered++;
+    }
+    report("optimization: big patch power nodes=" + nodeXs.length + " drills=" + drillPlans
+        + " outOfReach=" + unpowered + " linkNodes=" + laserFill.stats.linkNodes);
+    check("optimization: every drill is within power node range", unpowered === 0,
+        "unpowered=" + unpowered + "/" + drillPlans);
+    check("optimization: big patch has power nodes", nodeXs.length > 0, "nodes=" + nodeXs.length);
+    // With the support off nothing is reserved for power, so every tile must be reachable and
+    // nearly all of them mined - that is the coverage promise on real game data.
+    var noSupport = optimization.fillDetailed(center, Blocks.laserDrill, false, team);
+    var noSupportFrac = noSupport.stats.target === 0 ? 0
+        : noSupport.stats.covered / noSupport.stats.target;
+    report("performance: big patch without power support covered=" + noSupport.stats.covered
+        + "/" + noSupport.stats.target + " (" + Math.round(noSupportFrac * 1000) / 10 + "%)"
+        + " drills=" + noSupport.stats.drills);
+    check("optimization: without power support nothing is out of reach", noSupport.stats.unreachable === 0,
+        "outOfReach=" + noSupport.stats.unreachable);
+    check("optimization: without power support coverage >= 90%", noSupportFrac >= 0.90,
+        "covered=" + Math.round(noSupportFrac * 1000) / 10 + "%");
+    check("optimization: the fill wires itself into a nearby power grid", laserFill.stats.linkNodes > 0,
+        "linkNodes=" + laserFill.stats.linkNodes + " (grid node at " + gridTile.x + "," + gridTile.y + ")");
 
     for(x = BIG.x0; x <= BIG.x1; x++){
         for(y = BIG.y0; y <= BIG.y1; y++){

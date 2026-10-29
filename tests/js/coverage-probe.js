@@ -45,7 +45,8 @@ for(var key in isOre) total++;
 var start = {x: Math.floor((rect.oreX0 + rect.x1) / 2), y: Math.floor((rect.oreY0 + rect.y1) / 2)};
 
 var t0 = Date.now();
-var result = optimization.fillDetailed(start, drill, true, "sharded", null, 0);
+var support = S.support !== false;
+var result = optimization.fillDetailed(start, drill, support, "sharded", null, 0);
 var elapsed = Date.now() - t0;
 
 // coverage straight off the plans: union of the drill footprints that hold ore

@@ -42,6 +42,12 @@ Settings → Auto Drill. Everything the Java mod offers is there: activation key
 button visibility, per-drill maximum tiles and minimum ores, optimization quality, and
 whether water extractors/power nodes are added to optimised drills. Two extras:
 
+- **Water Extractors & Power Nodes** — optimised fills (laser, airblast, impact, eruption) plan
+  a water extractor next to every drill that can have one (on water or ground water — never on
+  dry land, where it would pump nothing) and build the power network the patch needs: a node
+  lattice that puts every drill in link range, chained to your own grid when one is near. This
+  costs a few ore tiles — the drills leave room for the nodes — so turning the setting off
+  fills every tile but leaves the wiring (and the free tiles it needs) to you.
 - **Max Tiles** — how many ore tiles the fill looks at, nearest the tap first. It is a safety
   limit, not a target: 2,500 ships by default, which covers any normal patch whole. If a patch
   is bigger the fill says so and fills the part it saw.
@@ -100,7 +106,9 @@ Two differences from the Java version, both caused by iOS mod limits:
 - `tools/engine-tests.sh` — the engine's promises as checks (whole patch seen, every reachable
   tile mined, no free drill left with ore, nothing overlapping, same patch = same layout).
 - `tools/coverage-probe.sh` — reports what fraction of a patch a fill mines, for any drill,
-  patch shape and setting (`WORLD=… ORE=… ROUND=1 MAXTILES=… tools/coverage-probe.sh`).
+  patch shape and setting (`WORLD=… ORE=… ROUND=1 MAXTILES=… SUPPORT=0 tools/coverage-probe.sh`).
+  `SUPPORT=0` measures the layout with no power extraction, which is where the 100 % coverage
+  number lives.
 - `tools/run-tests.sh <normal|ios>` — the in-engine suite in both script modes;
   `tools/guard-check.sh` — the "another AutoDrill is installed" check.
 - `tools/pack.sh` — builds the release zip.

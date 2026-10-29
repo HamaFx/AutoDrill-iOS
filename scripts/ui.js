@@ -290,7 +290,11 @@ function updateSelectTable(){
     // Nothing here to mine: hide the empty box and say so instead of showing a blank pop-up.
     if(drillButtons.length === 0){
         api.elementSetVisible(selectTable, false);
-        api.toast(api.bundle("auto-drill-ios-nothing-to-mine"));
+        // Water is not ore: the extractors the mod builds come as part of an optimised fill,
+        // so say that instead of leaving the tap looking ignored.
+        api.toast(api.waterTile(selectedTile)
+            ? api.bundle("auto-drill-ios-water-here")
+            : api.bundle("auto-drill-ios-nothing-to-mine"));
     }
 }
 

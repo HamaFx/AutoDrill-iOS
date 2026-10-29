@@ -16,9 +16,10 @@ DRILL="${DRILL:-laserDrill}"
 MAXTILES="${MAXTILES:-}"
 MINORES="${MINORES:-}"
 QUALITY="${QUALITY:-}"
+SUPPORT="${SUPPORT:-}"
 
 WORLD="$WORLD" ORE="$ORE" ROUND="$ROUND" DRILL="$DRILL" MAXTILES="$MAXTILES" MINORES="$MINORES" \
-QUALITY="$QUALITY" python3 - <<'PYEOF'
+QUALITY="$QUALITY" SUPPORT="$SUPPORT" python3 - <<'PYEOF'
 import os
 
 def s(name):
@@ -45,9 +46,11 @@ AUTODRILL_FAKE_SCENARIO = {
     ore: {oreX0: %d, oreY0: %d, x1: %d, y1: %d},
     round: %s,
     drill: "%s",
+    support: %s,
     settings: {%s}
 };
 """ % (s("WORLD"), x0, y0, x1, y1, "true" if s("ROUND") == "1" else "false", drill,
+       "true" if s("SUPPORT") != "0" else "false",
        ", ".join(settings))
 
 open("tests/js/scenario.js", "w").write(body)

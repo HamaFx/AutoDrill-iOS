@@ -362,7 +362,7 @@ exports.getConnectedTiles = getConnectedTiles;
  * Returns the path *excluding* the goal tile, or null when none is reachable.
  * Bounded by `budget` explored tiles; used for Erekir duct routing.
  */
-function findDuctPath(from, goals, block, team, budget){
+function findDuctPath(from, goals, block, team, budget, blocked){
     var goalSet = {};
     var i = 0;
     for(i = 0; i < goals.length; i++){
@@ -403,7 +403,10 @@ function findDuctPath(from, goals, block, team, budget){
 
             var nkey = api.pos(neighbour);
             if(visited[nkey] === true) continue;
-            if(goalSet[nkey] !== true && !canPlaceBlock(block, team, api.tx(neighbour), api.ty(neighbour), 0)) continue;
+            if(goalSet[nkey] !== true){
+                if(blocked != null && blocked[nkey] === true) continue;
+                if(!canPlaceBlock(block, team, api.tx(neighbour), api.ty(neighbour), 0)) continue;
+            }
 
             visited[nkey] = true;
             cameFrom[nkey] = api.pos(current);
