@@ -30,7 +30,7 @@ function makeApi(){
     var mechanicalDrill = block("mechanicalDrill", 2, "serpulo");
     var pneumaticDrill = block("pneumaticDrill", 2, "serpulo");
     var laserDrill = block("laserDrill", 3, "serpulo");
-    var blastDrill = block("blastDrill", 3, "serpulo");
+    var blastDrill = block("blastDrill", 4, "serpulo");
     var impactDrill = block("impactDrill", 4, "erekir");
     var eruptionDrill = block("eruptionDrill", 5, "erekir");
     var plasmaBore = block("plasmaBore", 2, "erekir");

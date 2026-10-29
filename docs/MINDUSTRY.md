@@ -38,10 +38,10 @@ game updates.
 
 | Drill | Kind | Size | Tier | Notes |
 |---|---|---|---|---|
-| mechanical | Drill (rotary) | 2 | 0 | 2x2 footprint |
-| pneumatic | Drill | 2 | 1 | |
-| laser | Drill | 3 | 2 | optional water boost (`liquidBoostIntensity 1.6`) |
-| airblast | Drill | 3 | 2 | optional water boost |
+| mechanical | Drill (rotary) | 2 | 2 | 2x2 footprint |
+| pneumatic | Drill | 2 | 3 | |
+| laser | Drill | 3 | 4 | optional water boost (`liquidBoostIntensity 1.6`) |
+| airblast | Drill | 4 | 5 | 4x4 footprint, optional water boost |
 | plasma bore | BeamDrill | 2 | 3 | range 5, optional hydrogen boost |
 | large plasma bore | BeamDrill | 3 | 5 | range 6, `itemCapacity 20` |
 | impact | BurstDrill | 4 | 6 | **requires water** (10/60), ozone optional boost, blockedItem = thorium |

@@ -65,7 +65,8 @@ var KEY_ROUTE = "auto-drill-ios-output-routing-length";
 var KEY_LANES = "auto-drill-ios-build-belt-lanes";
 // One lane row (3x3 drills need three rows of their own, so the lane takes the fourth). Every
 // fifth row was measured: the drill rows cannot fit in the four rows left, and coverage fell to
-// 62%. Four is the tightest that still leaves a full row of drills between two lanes.
+// 62%. Four is the tightest that still leaves a full row of drills between two lanes - and it is
+// the *minimum*: reserveLaneTiles widens the pitch to size + 1 for any larger drill.
 var LANE_PITCH = 4;
 var LANE_HOP = 3;        // item bridges link exactly three tiles along an axis
 
@@ -127,6 +128,7 @@ function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
         cellFacts: {},          // key(x,y) -> {canMine, dropId, mineable}
         lowPriority: {},        // dropId -> boolean
         candidates: [],
+        rimCandidates: [],       // placements whose footprint holds only one ore tile
         coverable: 0,           // ore tiles at least one candidate could mine
         lanes: false,           // belt lanes: tiles kept free for belts, power and water
         reserved: {},           // tiles kept free for the lanes or the power lattice
@@ -279,7 +281,24 @@ function scanCandidates(job, work){
         });
 
         var winner = ids[ids.length - 1];
-        if(winner !== sourceDropId || counts[winner].count < minOres) continue;
+        if(winner !== sourceDropId) continue;
+        if(counts[winner].count < minOres){
+            // A rim tip pinched between the patch edge and a wall can leave a footprint that
+            // physically holds only one ore tile of this patch: at Min Ores 2 every placement
+            // that mines it is filtered out and the tile is lost for good, even though the
+            // drill would fit once the layout is final. Keep those aside for finish()'s rim
+            // gap-fill instead of dropping the tile.
+            if(minOres <= 2 && counts[winner].count >= 1
+                && util.canPlaceBlock(job.drill, job.team, api.tx(cand), api.ty(cand), 0)){
+                job.rimCandidates.push({
+                    tile: cand,
+                    cellKeys: cellKeys,
+                    mineableKeys: mineableKeys,
+                    winnerCount: counts[winner].count
+                });
+            }
+            continue;
+        }
         if(!util.canPlaceBlock(job.drill, job.team, api.tx(cand), api.ty(cand), 0)) continue;
 
         candidates.push({
@@ -316,6 +335,25 @@ function setupSearch(job){
     }
 
     if(entries.length > 0) filterPlanned(job);
+
+    // The rim candidates go through the same filter: a rim placement sitting on a reserved
+    // lane/power tile or on a plan from the last fill is not worth keeping either.
+    if(entries.length > 0 && job.rimCandidates.length > 0){
+        var keptRim = [];
+        for(var rc = 0; rc < job.rimCandidates.length; rc++){
+            var rimEntry = job.rimCandidates[rc];
+            var rimBlocked = false;
+            for(var rk = 0; rk < rimEntry.cellKeys.length; rk++){
+                var rimCell = rimEntry.cellKeys[rk];
+                if(job.reserved[rimCell] === true || job.plannedBlocked[rimCell] === true){
+                    rimBlocked = true;
+                    break;
+                }
+            }
+            if(!rimBlocked) keptRim.push(rimEntry);
+        }
+        job.rimCandidates = keptRim;
+    }
 
     // Everything below is built from the candidates that survived the reservation: the bound,
     // the coverage, and the layouts all have to agree on what may be placed.
@@ -538,18 +576,24 @@ function reserveLaneTiles(job){
     var half = job.half;
     minX -= half; minY -= half; maxX += half; maxY += half;
 
+    // The lane row takes one row of the patch; the drills need job.size rows of their own, so
+    // the pitch is size + 1. With the fixed four-row pitch a 4x4 drill (airblast) has no room
+    // between two lanes: every 4x4 footprint spans four consecutive rows and four consecutive
+    // columns, so it always contains a reserved lane tile and none can be placed at all.
+    var lanePitch = Math.max(LANE_PITCH, job.size + 1);
+
     // lanes along the longer side, and the chain pushes ore towards the far end of it
     var alongX = (maxX - minX) >= (maxY - minY);
 
     if(alongX){
-        for(var y = minY; y <= maxY; y += LANE_PITCH){
+        for(var y = minY; y <= maxY; y += lanePitch){
             for(var x = minX; x <= maxX; x += LANE_HOP){
                 if(job.cellFacts[x + y * job.worldW] === undefined) continue;
                 lanes.push({x: x, y: y});
             }
         }
     }else{
-        for(var x2 = minX; x2 <= maxX; x2 += LANE_PITCH){
+        for(var x2 = minX; x2 <= maxX; x2 += lanePitch){
             for(var y2 = minY; y2 <= maxY; y2 += LANE_HOP){
                 if(job.cellFacts[x2 + y2 * job.worldW] === undefined) continue;
                 lanes.push({x: x2, y: y2});
@@ -572,7 +616,8 @@ function reserveLaneTiles(job){
         job.reserved[lanes[i].x + lanes[i].y * job.worldW] = true;
     }
 
-    debugLog("stage: lanes=" + lanes.length + " (" + (alongX ? "along x" : "along y") + ")");
+    debugLog("stage: lanes=" + lanes.length + " (" + (alongX ? "along x" : "along y")
+        + ", pitch=" + lanePitch + ")");
 }
 
 /**
@@ -1370,6 +1415,64 @@ function swapRepair(job, selection, trialCap){
 }
 
 /**
+ * The very last layout pass: placements the Min Ores filter rejected because their footprint
+ * can only hold a single ore tile of this patch. A 4x4 (or 3x3) drill at the rim - a tile at
+ * the patch edge with the surrounding ground cut off - has no other placement, so at Min Ores 2
+ * those tiles are lost even though a drill would physically fit once the layout is final.
+ *
+ * Nothing else wants the space at this point (the layout is complete), so the candidates are
+ * taken greedily: any that still fits the final occupancy and mines at least one ore tile that
+ * nothing mines. Strictly add-only and deterministic.
+ */
+function fillRimGaps(job, selection){
+    var occ = {};
+    var covered = {};
+    var i = 0, k = 0;
+
+    for(var key in job.reserved) occ[key] = true;
+    for(key in job.plannedBlocked) occ[key] = true;
+    for(i = 0; i < selection.length; i++){
+        var cells = selection[i].cellKeys;
+        for(k = 0; k < cells.length; k++) occ[cells[k]] = true;
+        var mine = selection[i].mineableKeys;
+        for(k = 0; k < mine.length; k++) covered[mine[k]] = true;
+    }
+
+    var added = [];
+    var addedOre = 0;
+    for(i = 0; i < job.rimCandidates.length; i++){
+        var entry = job.rimCandidates[i];
+        var blocked = false;
+        var rimCells = entry.cellKeys;
+        for(k = 0; k < rimCells.length; k++){
+            if(occ[rimCells[k]] === true){
+                blocked = true;
+                break;
+            }
+        }
+        if(blocked) continue;
+
+        var gain = 0;
+        var rimMine = entry.mineableKeys;
+        for(k = 0; k < rimMine.length; k++){
+            if(covered[rimMine[k]] !== true) gain++;
+        }
+        if(gain === 0) continue;
+
+        added.push(entry);
+        addedOre += gain;
+        for(k = 0; k < rimCells.length; k++) occ[rimCells[k]] = true;
+        for(k = 0; k < rimMine.length; k++) covered[rimMine[k]] = true;
+    }
+
+    if(added.length === 0) return null;
+
+    var out = selection.slice();
+    for(i = 0; i < added.length; i++) out.push(added[i]);
+    return {selection: out, score: selectionScore(out), drills: added.length, ore: addedOre};
+}
+
+/**
  * The full repair: the 1-swap pass, then the deep phase for the shapes that need their whole
  * neighbourhood rebuilt. Deterministic, bounded, strictly improving only.
  */
@@ -1491,6 +1594,21 @@ function finish(job){
             chosen = {selection: repaired.selection, score: repaired.score, source: chosen.source + "+repair"};
         }
 
+        // Rim fallback: a rim tile whose only placement holds a single ore tile was dropped by
+        // the Min Ores filter, so no layout family can ever cover it (see fillRimGaps). Take
+        // those placements now that the layout is final - the drill fits, nothing else wants
+        // the space, and the tile would otherwise never be mined.
+        if(chosen.score < job.targetCells && job.rimCandidates.length > 0){
+            var rimmed = fillRimGaps(job, chosen.selection);
+            if(rimmed != null && rimmed.score > chosen.score){
+                job.rimGain = rimmed.score - chosen.score;
+                job.rimDrills = rimmed.drills;
+                // those tiles were reachable after all - through a placement Min Ores hides
+                job.coverable += job.rimGain;
+                chosen = {selection: rimmed.selection, score: rimmed.score, source: chosen.source + "+rim"};
+            }
+        }
+
         selection = chosen.selection;
         score = chosen.score;
         source = chosen.source;
@@ -1574,6 +1692,7 @@ function finish(job){
         source: source,
         candidateScores: job.candidateScores,
         repairGain: job.repairGain == null ? 0 : job.repairGain,
+        rimGain: job.rimGain == null ? 0 : job.rimGain,
         repairTrials: job.repairTrials == null ? 0 : job.repairTrials,
         repairDeep: job.repairDeep == null ? 0 : job.repairDeep,
         extractors: extractorCount,

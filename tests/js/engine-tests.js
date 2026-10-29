@@ -205,7 +205,7 @@ check("2x2 drills: fully mined", c5.covered === c5.total,
 
 var r6 = fillAt(round, blast, null, false);
 var c6 = coverageOf(round, r6.plans, blast);
-check("3x3 airblast: fully mined", c6.covered === c6.total,
+check("4x4 airblast: fully mined", c6.covered === c6.total,
     "covered=" + c6.covered + "/" + c6.total + " drills=" + c6.drills);
 
 // ---------------------------------------------------------------- 2b. vein shapes
@@ -813,6 +813,24 @@ check("a patch with no power nearby is not wired to anything",
     }
     check("lanes: every drill is in reach of a lane power block", unpowered === 0,
         "unpowered=" + unpowered + "/" + drills + " blocks=" + power);
+})();
+
+// The Airblast Drill is 4x4 in the game (Blocks.blastDrill, v160.7): the lane grid has to open
+// a lane every job.size + 1 rows, or every 4x4 placement collides with a reserved lane tile
+// (the four-row pitch of the 3x3 drills leaves no room for a 4x4 drill between two lanes).
+(function(){
+    check("fake-api: blastDrill is 4x4 like Mindustry Blocks.blastDrill",
+        api.size(blast) === 4, "size=" + api.size(blast));
+
+    S.settings = {"auto-drill-ios-build-belt-lanes": true};
+    util.undoLastCommitted();
+    var blastLaneFill = optimization.fillDetailed(centreOf(round), blast, true, "sharded", null, 0);
+    S.settings = null;
+    check("lanes: 4x4 airblast drill places drills and lanes without being blocked by 4-row pitch",
+        blastLaneFill.stats.drills >= 25 && blastLaneFill.stats.covered >= blastLaneFill.stats.target * 0.60
+            && overlapCells(blastLaneFill.plans) === 0,
+        "drills=" + blastLaneFill.stats.drills + " covered=" + blastLaneFill.stats.covered
+            + "/" + blastLaneFill.stats.target + " overlap=" + overlapCells(blastLaneFill.plans));
 })();
 
 // ---------------------------------------------------------------- 7. same patch, same layout
