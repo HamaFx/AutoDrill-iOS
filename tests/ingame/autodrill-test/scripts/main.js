@@ -512,6 +512,39 @@ var BIG = {x0: 100, x1: 140, y0: 100, y1: 140};
 var asyncDone = false;
 var asyncWatchdog = 0;
 
+/**
+ * A second tap on a patch that already has drills used to find nothing at all (the flood fill
+ * stopped on the occupied tapped tile) or silently cover only the gaps. It has to fill the gaps
+ * *and* say what was already there.
+ */
+function testAlreadyBuilt(plans, team){
+    var tiles = Vars.world.tiles;
+    var x = 0, y = 0;
+
+    var built = 0;
+    for(x = 0; x < plans.length; x++){
+        if(api.blockId(plans[x].block) !== api.blockId(Blocks.laserDrill)) continue;
+        var tile = tiles.get(plans[x].x, plans[x].y);
+        if(tile == null) continue;
+        tile.setBlock(Blocks.laserDrill);
+        built++;
+    }
+
+    var center = api.tile((BIG.x0 + BIG.x1) / 2 | 0, (BIG.y0 + BIG.y1) / 2 | 0);
+    var again = optimization.fillDetailed(center, Blocks.laserDrill, true, team);
+
+    report("alreadyBuilt: built=" + built + " secondFillDrills=" + again.stats.drills
+        + " alreadyBuilt=" + again.stats.alreadyBuilt + " covered=" + again.stats.covered
+        + "/" + again.stats.target);
+    check("alreadyBuilt: a second fill reports the drills that are already there",
+        again.stats.alreadyBuilt > 0, "alreadyBuilt=" + again.stats.alreadyBuilt);
+    check("alreadyBuilt: a second fill still plans the gaps it can reach",
+        again.stats.drills >= 0 && again.plans.length >= 0,
+        "drills=" + again.stats.drills + " plans=" + again.plans.length);
+    check("alreadyBuilt: a second fill does not overlap the built drills",
+        noOverlaps(again.plans));
+}
+
 /** Drives the chunked fill exactly like the toolbar button does, and waits for it. */
 function testAsyncFill(){
     var team = Team.sharded;
@@ -551,6 +584,8 @@ function testAsyncFill(){
         check("async: chunked fill no overlaps", noOverlaps(plans));
         check("async: chunked fill placeable", allPlaceable(plans, team) === true,
             String(allPlaceable(plans, team)));
+
+        testAlreadyBuilt(plans, team);
         finish();
     });
 

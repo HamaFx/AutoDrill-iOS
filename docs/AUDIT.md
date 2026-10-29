@@ -403,6 +403,30 @@ passes after it. The fake world's `setProgress` is now deliberately strict (numb
 the same mistake fails the fast engine checks too. The chunked fill takes 1.9 s on the
 interpreted (iOS-mode) build for 1,681 ore tiles, spread across frames.
 
+### Hotfix 1.7.2 — "it covered everything, then only a few"
+
+Reported: the first fill covered the whole patch, a later one only a few ores. Two causes, one
+of them a real bug:
+
+1. **A second fill on the same patch only has the gaps left to fill** - the first fill's drills
+   are built by then, and the game refuses placements on occupied tiles. That is correct
+   behaviour, but it *looked* like the fill had stopped working, because nothing said so.
+2. **Tapping a tile that already has a building on it found nothing at all.** The flood fill
+   used the buildability probe as a "keep walking" condition: an occupied tapped tile aborted
+   the walk immediately, so the fill reported "nothing could be placed here" on a patch that was
+   merely busy. The probe now only decides whether a tile can host a drill - the walk continues
+   past built blocks, around them, and covers what is left.
+
+The fill now always says what happened: *"mined 81 of 884 free ore tiles - 1411 tiles already
+have drills or buildings on them"*, or *"mined all 1,411 copper tiles here"* when the patch is
+clear. Mixed patches are called out too: *"this patch also has lead (40 tiles) - tap a lead tile
+to fill those too"* - the fill only ever covers the ore you tapped, and a patch that looks half
+filled is usually a patch with a second ore in it.
+
+Verified by the engine checks (a second fill after standing the drills up reports what was
+there; a second ore under the patch is counted) and in the real game (build the 180 planned
+drills, fill again: 9 further drills, 1411 tiles reported as already taken, no overlaps).
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

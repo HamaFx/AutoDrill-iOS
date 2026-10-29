@@ -219,6 +219,17 @@ function buildReal(){
         return tile.floor().attributes.get(Packages.mindustry.world.meta.Attribute.water);
     };
 
+    /** True when something (drill, node, wall) already stands on the tile. */
+    api.hasBuilding = function(tile){
+        return tile != null && tile.build != null;
+    };
+
+    /** Localised name of an item by id, or null when there is no such item. */
+    api.itemName = function(id){
+        var item = id < 0 ? null : V.content.item(id);
+        return item == null ? null : item.localizedName;
+    };
+
     /** True when the tile's floor is water (what a player means by "water here"). */
     api.waterTile = function(tile){
         return tile != null && tile.floor().isLiquid === true;

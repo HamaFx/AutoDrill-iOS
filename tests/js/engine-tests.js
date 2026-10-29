@@ -521,6 +521,44 @@ check("a patch with no power nearby is not wired to anything",
     check("oil: nothing overlaps", overlapCells(oilPlans) === 0, "overlap=" + overlapCells(oilPlans));
 })();
 
+// ---------------------------------------------------------------- 6e. patches that are already busy
+
+// A second tap on a patch that already has drills covers only the gaps. That looked like the
+// fill "not covering the ores", so the engine has to count what was already there.
+(function(){
+    var fresh = fillAt(small, laser, null, false);
+    check("a fresh patch is covered whole", coverageOf(small, fresh.plans, laser).covered === 100,
+        "covered=" + coverageOf(small, fresh.plans, laser).covered);
+
+    // stand the drills up, then fill again
+    for(var i = 0; i < fresh.plans.length; i++){
+        var plan = fresh.plans[i];
+        var size = api.size(plan.block), offset = Math.floor((size - 1) / 2);
+        for(var dx = 0; dx < size; dx++){
+            for(var dy = 0; dy < size; dy++){
+                api.__build(plan.x - offset + dx, plan.y - offset + dy);
+            }
+        }
+    }
+
+    var again = fillAt(small, laser, null, false);
+    check("a second fill reports what is already built", again.stats.alreadyBuilt > 0,
+        "alreadyBuilt=" + again.stats.alreadyBuilt + " drills=" + again.stats.drills);
+    check("a second fill only plans the gaps", again.stats.drills < fresh.stats.drills,
+        "first=" + fresh.stats.drills + " second=" + again.stats.drills);
+})();
+
+// A patch with a second ore in it only gets the tapped ore, which is worth saying outright.
+(function(){
+    S.leadRect = {x0: 70, y0: 25, x1: 80, y1: 35};      // a lead blob inside the round patch
+    var mixed = fillAt(round, laser, null, false);
+    S.leadRect = null;
+
+    var leadTiles = 0;
+    for(var id in mixed.stats.otherOres) leadTiles += mixed.stats.otherOres[id];
+    check("other ore under the patch is counted", leadTiles > 0, "other ore tiles=" + leadTiles);
+})();
+
 // ---------------------------------------------------------------- 7. same patch, same layout
 
 var first = fillAt(round, laser, null);

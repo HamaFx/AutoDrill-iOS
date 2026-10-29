@@ -59,9 +59,12 @@ function makeApi(){
     var air = block("air", 1);
 
     var copper = {id: nextItemId++, name: "copper", lowPriority: false, hardness: 1};
+    var lead = {id: nextItemId++, name: "lead", lowPriority: false, hardness: 1};
 
     // ---- world: floor tiles with a rectangular ore patch ----
     var ore = {};         // pos -> true
+    var ORE_LEAD = {};    // pos -> true (a second ore, for mixed-patch tests)
+    var BUILT = {};       // pos -> true (something already stands here)
     var walls = {};       // pos -> true (solid)
     var batch = {oreX0: 20, oreX1: 40, oreY0: 20, oreY1: 40};
 
@@ -72,6 +75,16 @@ function makeApi(){
     var shapes = OPTS.patches == null
         ? [{oreX0: rect.oreX0, oreY0: rect.oreY0, x1: rect.x1, y1: rect.y1, round: OPTS.round === true}]
         : OPTS.patches;
+
+    // a second ore area, for mixed-patch tests
+    if(OPTS.leadRect != null){
+        var lr = OPTS.leadRect;
+        for(var lx = lr.x0; lx <= lr.x1; lx++){
+            for(var ly = lr.y0; ly <= lr.y1; ly++){
+                ORE_LEAD[pos(lx, ly)] = true;
+            }
+        }
+    }
 
     var i = 0, j = 0, si = 0;
     for(si = 0; si < shapes.length; si++){
@@ -114,7 +127,17 @@ function makeApi(){
     api.worldW = function(){ return WORLD; };
     api.worldH = function(){ return WORLD_H; };
 
-    api.drop = function(tile){ return ore[pos(tile.x, tile.y)] === true ? copper : null; };
+    api.drop = function(tile){
+        var lr = OPTS.leadRect;
+        if(lr != null && tile.x >= lr.x0 && tile.x <= lr.x1 && tile.y >= lr.y0 && tile.y <= lr.y1) return lead;
+        return ore[pos(tile.x, tile.y)] === true ? copper : null;
+    };
+    api.itemName = function(id){ return id === lead.id ? "Lead" : (id === copper.id ? "Copper" : null); };
+    api.hasBuilding = function(tile){
+        return tile != null && BUILT[pos(tile.x, tile.y)] === true;
+    };
+    /** Test hook: mark a tile as already built, so a second fill sees it as taken. */
+    api.__build = function(x, y){ BUILT[pos(x, y)] = true; };
     api.wallDrop = function(){ return null; };
     api.solid = function(tile){ return walls[pos(tile.x, tile.y)] === true; };
     api.blockOf = function(){ return air; };
@@ -162,6 +185,7 @@ function makeApi(){
             for(var cy = y - half; cy < y - half + size; cy++){
                 if(!inWorld(cx, cy)) return false;
                 if(walls[pos(cx, cy)] === true) return false;
+                if(BUILT[pos(cx, cy)] === true) return false;    // occupied by a building
             }
         }
         return true;

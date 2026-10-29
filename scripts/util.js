@@ -298,7 +298,7 @@ exports.expandArea = expandArea;
  * (used as a buildability probe) and drop the same item as the source tile.
  * The frontier extends one tile past the patch edge.
  */
-function getConnectedTiles(tile, maxTiles, teamOverride){
+function getConnectedTiles(tile, maxTiles, teamOverride, otherOres, oreUnderBuilding){
     api.trace("[util] flood fill start tile=" + api.tx(tile) + "," + api.ty(tile) + " max=" + maxTiles);
 
     var queue = [tile];
@@ -327,24 +327,44 @@ function getConnectedTiles(tile, maxTiles, teamOverride){
 
         var current = queue[queueIndex++];
 
-        if(!api.validPlace(wall, team, api.tx(current), api.ty(current), 0)){
-            continue;
+        // The buildability probe decides whether a tile can host a drill, NOT whether the walk
+        // continues: a patch that already has buildings on it (a second fill) still has to be
+        // walked around them, and the tapped tile itself is often one of them.
+        var buildable = api.validPlace(wall, team, api.tx(current), api.ty(current), 0);
+        var currentItem = api.itemId(api.drop(current));
+
+        // ore that already has something standing on it: the reason a second fill on the same
+        // patch only fills the gaps, and worth reporting as such
+        if(!buildable && oreUnderBuilding != null && currentItem === sourceId && api.hasBuilding(current)){
+            oreUnderBuilding[api.pos(current)] = true;
         }
 
-        if(api.itemId(api.drop(current)) === sourceId){
+        if(currentItem === sourceId){
             for(var x = -1; x <= 1; x++){
                 for(var y = -1; y <= 1; y++){
                     if(x === 0 && y === 0) continue;
                     var neighbour = api.nearby(current, x, y);
                     if(neighbour == null) continue;
                     var neighbourPos = api.pos(neighbour);
-                    if(seen[neighbourPos] !== true){
-                        seen[neighbourPos] = true;
-                        queue.push(neighbour);
+                    if(seen[neighbourPos] === true) continue;
+
+                    // the fill only walks its own ore, so this is where the *other* ore of a
+                    // mixed patch is noticed - it is exactly the frontier the fill refuses
+                    if(otherOres != null){
+                        var neighbourItem = api.itemId(api.drop(neighbour));
+                        if(neighbourItem >= 0 && neighbourItem !== sourceId && otherOres[neighbourItem] === undefined){
+                            otherOres[neighbourItem] = 0;
+                        }
+                        if(neighbourItem >= 0 && neighbourItem !== sourceId){
+                            otherOres[neighbourItem]++;
+                        }
                     }
+
+                    seen[neighbourPos] = true;
+                    queue.push(neighbour);
                 }
             }
-            tiles.push(current);
+            if(buildable) tiles.push(current);
         }
     }
 
