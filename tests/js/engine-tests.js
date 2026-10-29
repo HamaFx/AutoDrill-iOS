@@ -815,7 +815,30 @@ check("a patch with no power nearby is not wired to anything",
     withSettings(null);
 })();
 
-// ---------------------------------------------------------------- 6h. belt lanes
+// ---------------------------------------------------------------- 6h. belt tool on thin and walled veins
+
+// The 2x2 belt-tool drill covers [x, x+1] x [y, y+1]. A vein one tile wide with a wall on its
+// +y side can only be mined by anchoring on the non-ore tile below it (y - 1) - anchoring on
+// the vein row itself puts the wall in the footprint. `leftovers` used to keep ore tiles only
+// and discarded those anchors, which left up to two thirds of a walled vein unmined.
+(function(){
+    var wallRow = [];
+    for(var wx = 70; wx <= 109; wx++) wallRow.push([wx, 101]);
+    S.wallCells = wallRow;
+    resetWorld();
+
+    util.undoLastCommitted();
+    var plans = bridge.fill({x: 85, y: 100}, api.block("mechanicalDrill"), direction.DOWN, "sharded");
+    var cov = coverageOf(vein, plans, api.block("mechanicalDrill"));
+
+    S.wallCells = null;
+    resetWorld();
+
+    check("belt tool: 1-wide vein with wall on +y is mined via y-1 overhang anchors",
+        cov.covered >= 36, "covered=" + cov.covered + "/" + cov.total + " drills=" + cov.drills);
+})();
+
+// ---------------------------------------------------------------- 6i. belt lanes
 
 // The lane mode is a different support path: belts, power and water share the lane rows, and the
 // drills beside a lane have to end up in reach of a power block.

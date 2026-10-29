@@ -133,9 +133,41 @@ function addConveyorToGrid(tile, team, bridgeTiles, beltPlans){
     return 0;
 }
 
-/** True when the tile carries the ore this fill is about. */
-function isOreTile(tile, sourceDropId){
-    return api.itemId(api.drop(tile)) === sourceDropId;
+/**
+ * Ore cells of `oreSet` a drill anchored at `tile` would cover that nothing covers yet.
+ *
+ * NOTE: returns a number, never an object - object-returning helpers inside a candidate loop
+ * are the Rhino trap documented in docs/AUDIT.md.
+ */
+function uncoveredGain(tile, drill, oreSet, covered){
+    var size = api.size(drill);
+    var offset = Math.floor((size - 1) / 2);
+    var worldW = api.worldW();
+    var x = api.tx(tile), y = api.ty(tile);
+    var gain = 0;
+
+    for(var dx = 0; dx < size; dx++){
+        for(var dy = 0; dy < size; dy++){
+            var key = (x - offset + dx) + (y - offset + dy) * worldW;
+            if(oreSet[key] === true && covered[key] !== true) gain++;
+        }
+    }
+    return gain;
+}
+
+/** Marks the ore cells of `oreSet` a drill anchored at `tile` covers. */
+function markCovered(tile, drill, oreSet, covered){
+    var size = api.size(drill);
+    var offset = Math.floor((size - 1) / 2);
+    var worldW = api.worldW();
+    var x = api.tx(tile), y = api.ty(tile);
+
+    for(var dx = 0; dx < size; dx++){
+        for(var dy = 0; dy < size; dy++){
+            var key = (x - offset + dx) + (y - offset + dy) * worldW;
+            if(oreSet[key] === true) covered[key] = true;
+        }
+    }
 }
 
 /**
@@ -242,8 +274,13 @@ function isBridgeTile(tile, phaseX, phaseY){
  * touched purely by where it happened to sit on the map - the same tap, twice, on two patches,
  * looked like a broken mod. Both the drill pattern and the belt grid are shifted together here,
  * and the offset that puts the most drills on ore wins.
+ *
+ * Only pattern drills the game would accept count: on a one-tile vein with a wall behind it,
+ * the phases that anchor the drills on the vein row (wall in the footprint, refused) used to
+ * score highest and produce the worst layouts - 27 of 40 vein tiles where the phases that
+ * anchor on the free side reach 40 of 40.
  */
-function pickPhase(tiles, drill, targetSet){
+function pickPhase(tiles, drill, targetSet, team){
     var size = api.size(drill);
     var offset = Math.floor((size - 1) / 2);
     var worldW = api.worldW();
@@ -256,6 +293,7 @@ function pickPhase(tiles, drill, targetSet){
 
             for(i = 0; i < tiles.length; i++){
                 if(!isDrillTile(tiles[i], px, py)) continue;
+                if(!util.canPlaceBlock(drill, team, api.tx(tiles[i]), api.ty(tiles[i]), 0)) continue;
 
                 var x = api.tx(tiles[i]) - offset, y = api.ty(tiles[i]) - offset;
                 for(dx = 0; dx < size; dx++){
@@ -301,7 +339,8 @@ function fill(tile, drill, direction, teamOverride){
     var tiles = reached;
     util.expandArea(tiles, Math.floor(api.size(drill) / 2));
 
-    var phase = pickPhase(tiles, drill, targetSet);
+    var phaseTeam = teamOverride != null ? teamOverride : api.team();
+    var phase = pickPhase(tiles, drill, targetSet, phaseTeam);
     dbg("phase=" + phase.x + "," + phase.y + " patternOre=" + phase.score + " of " + targetCells);
 
     var outcome = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride, phase.x, phase.y);
@@ -415,16 +454,26 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
     var drillTiles = [];
     var bridgeTiles = [];
     var beltPlans = [];       // conveyors added so a drill can reach the belt grid
-    var leftovers = [];       // ore the pattern does not cover; picked up below
+    var leftovers = [];       // what the pattern missed; picked up below
     var sourceDropId = api.itemId(api.drop(source));
     var i = null;
 
+    // The pattern keeps the tiles its belts run on. Everything else is a candidate: the ore the
+    // pattern misses *and* the non-ore tiles a 2x2 drill has to anchor on to reach a patch
+    // edge, a one-tile vein, or a vein with a wall beside it (a drill at (x, y) covers
+    // [x, x+1] x [y, y+1], so a wall on the vein's +y side forces the anchor to y - 1).
     for(i = 0; i < tiles.length; i++){
         if(isDrillTile(tiles[i], phaseX, phaseY)) drillTiles.push(tiles[i]);
-        else if(isOreTile(tiles[i], sourceDropId)) leftovers.push(tiles[i]);
+        else if(!isBridgeTile(tiles[i], phaseX, phaseY)) leftovers.push(tiles[i]);
     }
     for(i = 0; i < tiles.length; i++){
         if(isBridgeTile(tiles[i], phaseX, phaseY)) bridgeTiles.push(tiles[i]);
+    }
+
+    // every ore cell this fill could cover at all (the leftovers rule above)
+    var oreSet = {};
+    for(i = 0; i < tiles.length; i++){
+        if(api.itemId(api.drop(tiles[i])) === sourceDropId) oreSet[api.pos(tiles[i])] = true;
     }
 
     var prefix = null;
@@ -447,23 +496,43 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
 
     // --- Pre-filter: correct resource, enough ores, placeable, and with something to carry the
     // --- ore away. The pattern's own tiles go first - its belts are laid out around them - then
-    // --- whatever ore the pattern missed is picked up with the same rules.
+    // --- what the pattern missed, in order of how much still-uncovered ore each drill would
+    // --- cover: an anchor that reaches two untouched vein tiles is worth more than one whose
+    // --- tiles something already mines.
     var occupied = {};
     var filtered = [];
+    var coveredOre = {};      // ore cells the drills taken so far already mine
     var skipped = 0;
 
     for(i = 0; i < drillTiles.length; i++){
         var takenOne = takeDrillCandidate(drillTiles[i], drill, sourceDropId, minOresPerDrill, team,
             bridgeTiles, beltPlans, occupied, phaseX, phaseY);
-        if(takenOne === 1) filtered.push(drillTiles[i]);
-        else if(takenOne === 2) skipped++;
+        if(takenOne === 1){
+            filtered.push(drillTiles[i]);
+            markCovered(drillTiles[i], drill, oreSet, coveredOre);
+        }else if(takenOne === 2) skipped++;
     }
 
+    var scored = [];
     for(i = 0; i < leftovers.length; i++){
-        var takenTwo = takeDrillCandidate(leftovers[i], drill, sourceDropId, minOresPerDrill, team,
+        scored.push({tile: leftovers[i], gain: uncoveredGain(leftovers[i], drill, oreSet, coveredOre)});
+    }
+    util.sortStable(scored, function(s){
+        return -s.gain;
+    });
+
+    for(i = 0; i < scored.length; i++){
+        var leftover = scored[i].tile;
+        // the gain was measured before the loop; another candidate may have covered the ore
+        // since, and a candidate that now mines nothing is not worth a drill
+        if(uncoveredGain(leftover, drill, oreSet, coveredOre) === 0) continue;
+
+        var takenTwo = takeDrillCandidate(leftover, drill, sourceDropId, minOresPerDrill, team,
             bridgeTiles, beltPlans, occupied, phaseX, phaseY);
-        if(takenTwo === 1) filtered.push(leftovers[i]);
-        else if(takenTwo === 2) skipped++;
+        if(takenTwo === 1){
+            filtered.push(leftover);
+            markCovered(leftover, drill, oreSet, coveredOre);
+        }else if(takenTwo === 2) skipped++;
     }
     drillTiles = filtered;
     dbg("filter: kept=" + filtered.length + " skipped=" + skipped
