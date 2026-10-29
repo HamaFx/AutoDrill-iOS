@@ -486,6 +486,64 @@ function testWall(){
     check("wall: has beam nodes", nodes > 0, "nodes=" + nodes);
     report("wall: bores=" + bores + " ducts=" + ducts + " nodes=" + nodes);
 
+    // Coverage with the game's own BeamDrill rule: a lane mines the first solid tile within
+    // range and stops there (wall ore stays solid), so every ore tile of the face must be some
+    // bore's first solid tile. Mirrors Block.nearbySide + BeamDrill.updateFacing; planned bores
+    // are solid and block beams.
+    (function(){
+        var size = api.size(Blocks.plasmaBore);
+        var range = api.beamRange(Blocks.plasmaBore);
+        var half = Math.floor((size - 1) / 2);
+        var boreList = [];
+        var solidAt = {};
+        var i = 0, j = 0;
+        for(i = 0; i < plans.length; i++){
+            if(api.blockId(plans[i].block) !== api.blockId(Blocks.plasmaBore)) continue;
+            boreList.push(plans[i]);
+            solidAt[plans[i].x + plans[i].y * MAP] = true;
+        }
+
+        var oreSet = {};
+        var oreTotal = 0;
+        for(var y = WALL.y0; y <= WALL.y1; y++){
+            var ot = api.tile(WALL.x0, y);
+            if(ot == null || api.wallDrop(ot) == null) continue;
+            oreSet[api.pos(ot)] = true;
+            oreTotal++;
+        }
+
+        var mined = {};
+        for(i = 0; i < boreList.length; i++){
+            var cornerX = boreList[i].x - half, cornerY = boreList[i].y - half;
+            var dx = boreList[i].rot === 0 ? 1 : (boreList[i].rot === 2 ? -1 : 0);
+            var dy = boreList[i].rot === 1 ? 1 : (boreList[i].rot === 3 ? -1 : 0);
+
+            for(j = 0; j < size; j++){
+                var lx = 0, ly = 0;
+                if(boreList[i].rot === 0){ lx = cornerX + size; ly = cornerY + j; }
+                else if(boreList[i].rot === 1){ lx = cornerX + j; ly = cornerY + size; }
+                else if(boreList[i].rot === 2){ lx = cornerX - 1; ly = cornerY + j; }
+                else { lx = cornerX + j; ly = cornerY - 1; }
+
+                for(var k = 0; k < range; k++){
+                    var t = api.tile(lx + dx * k, ly + dy * k);
+                    if(t == null) break;
+                    var key = api.pos(t);
+                    if(solidAt[key] === true) break;
+                    if(api.solid(t)){
+                        if(oreSet[key] === true) mined[key] = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        var n = 0;
+        for(var mk in mined) n++;
+        check("wall: the ore face is bored whole", n === oreTotal,
+            "mined=" + n + "/" + oreTotal + " bores=" + boreList.length);
+    })();
+
     // every direction must at least not throw
     var dirs = [dir.RIGHT, dir.UP, dir.LEFT, dir.DOWN];
     for(var i = 0; i < dirs.length; i++){

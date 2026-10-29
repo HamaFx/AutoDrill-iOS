@@ -43,8 +43,10 @@ AUTODRILL_VEIN_DEFS = (function(){
         return out;
     }
 
-    function shape(name, cells, drill){
-        shapes.push({name: name, cells: dedupe(cells), drill: drill == null ? "laserDrill" : drill});
+    function shape(name, cells, drill, extra){
+        var def = {name: name, cells: dedupe(cells), drill: drill == null ? "laserDrill" : drill};
+        if(extra != null && extra.walls != null) def.walls = dedupe(extra.walls);
+        shapes.push(def);
     }
 
     function zigzag(rx, ry, turns){
@@ -174,6 +176,39 @@ AUTODRILL_VEIN_DEFS = (function(){
         return o;
     })());
 
+    // ---- veins beside and around walls (cliffs): the drill footprint cannot include solid
+    // ---- ground, so the layout has to overhang away from the wall
+
+    shape("wall-below", line(0, 1, 24, 1, 0), "laserDrill", {walls: rect(0, 0, 24, 1)});
+    shape("wall-above", line(0, 0, 24, 1, 0), "laserDrill", {walls: rect(0, 1, 24, 1)});
+    shape("wall-both", line(0, 2, 24, 1, 0), "laserDrill",
+        {walls: addCells(rect(0, 0, 24, 1), rect(0, 1, 24, 1))});
+    shape("wall-channel-1row", line(0, 1, 24, 1, 0), "laserDrill",
+        {walls: addCells(rect(0, 0, 24, 1), rect(0, 2, 24, 1))});
+    shape("wall-pocket", (function(){
+        var o = rect(1, 1, 8, 8);
+        return o;
+    })(), "laserDrill", {walls: addCells(addCells(rect(0, 0, 1, 10), rect(0, 0, 10, 1)), rect(0, 9, 10, 1))});
+    shape("wall-spur", (function(){
+        var o = rect(0, 0, 12, 12);
+        return o;
+    })(), "laserDrill", {walls: rect(5, 6, 1, 6)});
+    shape("wall-diagonal", (function(){
+        var o = [];
+        for(var i = 0; i < 20; i++) o.push([i, i + 1]);
+        return o;
+    })(), "laserDrill", {walls: (function(){
+        var o = [];
+        for(var i = 0; i < 19; i++) o.push([i, i]);
+        return o;
+    })()});
+    shape("wall-slots", line(0, 1, 24, 1, 0), "laserDrill",
+        {walls: addCells(rect(5, 0, 1, 1), rect(12, 2, 1, 1))});
+    shape("wall-corner", (function(){
+        var o = addCells(line(0, 1, 12, 1, 0), line(11, 1, 10, 0, 1));
+        return o;
+    })(), "laserDrill", {walls: addCells(rect(0, 0, 12, 1), rect(12, 0, 1, 11))});
+
     // ---- pockets, holes and parallel veins ----
 
     shape("stripe-band", (function(){
@@ -281,6 +316,7 @@ AUTODRILL_VEIN_DEFS = (function(){
     var x = MARGIN;
     var patches = [];
     var placed = [];
+    var wallCells = [];
 
     for(var i = 0; i < defs.shapes.length; i++){
         var s = defs.shapes[i];
@@ -290,6 +326,15 @@ AUTODRILL_VEIN_DEFS = (function(){
             minY = Math.min(minY, s.cells[c][1]);
             maxX = Math.max(maxX, s.cells[c][0]);
             maxY = Math.max(maxY, s.cells[c][1]);
+        }
+        // the walls belong to the slot, so the bounding box has to include them
+        if(s.walls != null){
+            for(c = 0; c < s.walls.length; c++){
+                minX = Math.min(minX, s.walls[c][0]);
+                minY = Math.min(minY, s.walls[c][1]);
+                maxX = Math.max(maxX, s.walls[c][0]);
+                maxY = Math.max(maxY, s.walls[c][1]);
+            }
         }
         var w = maxX - minX + 1, h = maxY - minY + 1;
 
@@ -301,12 +346,20 @@ AUTODRILL_VEIN_DEFS = (function(){
 
         var ox = x - minX, oy = rowY - minY;
         var abs = [];
+        var absWalls = [];
         var tapsumX = 0, tapsumY = 0;
         for(c = 0; c < s.cells.length; c++){
             var ax = s.cells[c][0] + ox, ay = s.cells[c][1] + oy;
             abs.push([ax, ay]);
             patches.push({oreX0: ax, oreY0: ay, x1: ax, y1: ay});
             tapsumX += ax; tapsumY += ay;
+        }
+        if(s.walls != null){
+            for(c = 0; c < s.walls.length; c++){
+                var wx = s.walls[c][0] + ox, wy = s.walls[c][1] + oy;
+                absWalls.push([wx, wy]);
+                wallCells.push([wx, wy]);
+            }
         }
 
         // tap the ore cell nearest the shape's centroid (always a real ore tile)
@@ -317,7 +370,7 @@ AUTODRILL_VEIN_DEFS = (function(){
             if(d < tapD){ tapD = d; tap = abs[c]; }
         }
 
-        placed.push({name: s.name, drill: s.drill, cells: abs, tap: [tap[0], tap[1]]});
+        placed.push({name: s.name, drill: s.drill, cells: abs, tap: [tap[0], tap[1]], walls: absWalls});
         x += w + MARGIN;
         rowH = Math.max(rowH, h);
     }
@@ -325,7 +378,8 @@ AUTODRILL_VEIN_DEFS = (function(){
     AUTODRILL_FAKE_SCENARIO = {
         world: WORLD,
         patches: patches,
-        wallRect: defs.wallRect
+        wallRect: defs.wallRect,
+        wallCells: wallCells
     };
-    AUTODRILL_VEINS = {world: WORLD, shapes: placed, built: defs.built};
+    AUTODRILL_VEINS = {world: WORLD, shapes: placed, built: defs.built, wallCells: wallCells};
 })();

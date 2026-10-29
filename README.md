@@ -79,12 +79,16 @@ Four layouts compete and the best score wins:
 3. **Greedy sweeps** — the same candidates in eight spatial orders (rows, columns, diagonals).
    *Optimization Quality* says how many of them to try; they are what packs around holes, such
    as an irregular rim or a tile kept free for a power block.
-4. **Gap filler** — adds any drill that still mines an ore tile nothing else mines.
+4. **Restarts** — the same candidates in shuffled orders (a fixed seed, so the result is the
+   same on every device and patch): a different packing style that closes shapes the axis
+   orders miss.
+5. **Gap filler** — adds any drill that still mines an ore tile nothing else mines.
 
 A small **repair pass** then closes the last tile: on awkward vein shapes the layouts above can
 settle one tile short (a candidate could mine the leftover, but its footprint is blocked by one
-placed drill), so the fill drops that drill, takes the candidate and refills. It only ever
-improves a layout, and it is what makes thin, irregular veins fill completely.
+placed drill), so the fill drops that drill, takes the candidate and refills — and if that does
+not help, it rebuilds the whole neighbourhood around the leftover and refills it. Repairs only
+ever improve a layout, and they are what makes thin, irregular veins fill completely.
 
 The promise that follows: **every ore tile a drill can reach is mined**, Ore is only counted
 once per drill, and nothing overlaps. A toast reports anything left over, naming the cause
@@ -134,6 +138,9 @@ extractors and power nodes on Serpulo, beam towers or beam nodes on Erekir, wire
 - `tools/vein-probe.sh` — the awkward-shape battery (thin veins, staircases, tendrils, rings,
   walk veins) with a per-tile diagnosis of what was left and why; `tools/vein-solve.py` solves a
   dumped instance exactly (`uv run --with 'pulp==2.9.0' tools/vein-solve.py <probe output>`).
+- `tools/wall-probe.sh` — the wall-ore battery: builds Erekir-style wall contours and measures
+  how much of the ore the planned plasma bores actually mine, with a faithful BeamDrill
+  simulation (`docs/MINDUSTRY.md` has the mechanics).
 - `scripts/liquid.js` — the attribute fills (steam vents, oil) and the liquid routing they use.
 - `tools/compile-check.sh` — loads the mod in the *compiled* script engine (desktop/Android).
   The interpreted engine iOS uses runs code the compiler rejects, so this catches desktop

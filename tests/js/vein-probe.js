@@ -28,6 +28,16 @@ var direction = require("direction");
 var V = AUTODRILL_VEINS;
 var W = V.world;
 
+// engine debug traces (AUTODRILL_VEIN_DEBUG=1)
+var debugEnv = java.lang.System.getenv("AUTODRILL_VEIN_DEBUG");
+if(debugEnv != null && debugEnv.length > 0 && optimization.setDebug != null) optimization.setDebug(true);
+
+// walls (cliffs) for the map rendering
+var WALL_SET = {};
+if(V.wallCells != null){
+    for(var wc = 0; wc < V.wallCells.length; wc++) WALL_SET[V.wallCells[wc][0] + V.wallCells[wc][1] * W] = true;
+}
+
 // ---- per-run settings override (same trick as engine-tests.js) ----
 
 var OVERRIDE = {};
@@ -197,10 +207,11 @@ function runShape(shape){
         + " cands=" + job.entries.length
         + " seen=" + result.stats.target
         + " stats=" + result.stats.covered + "/" + result.stats.unreachable + "/" + result.stats.blocked
-        + " repair=" + result.stats.repairGain + "/" + result.stats.repairTrials
+        + " repair=" + result.stats.repairGain + "/" + result.stats.repairTrials + "d" + result.stats.repairDeep
         + " source=" + pad(result.stats.source, 8)
         + " stopped=" + result.stats.stopped
-        + " ms=" + ms;
+        + " ms=" + ms
+        + (result.plans.length === 0 ? " NOTHING-PLANNED" : "");
 
     if(coveredCount === total && result.stats.covered === total && result.stats.target === total){
         info(line);
@@ -250,6 +261,7 @@ function runShape(shape){
         var row = "";
         for(var x2 = minX; x2 <= maxX; x2++){
             var kk = keyOf(x2, y2);
+            if(WALL_SET[kk] === true){ row += "|"; continue; }
             if(cells[kk] !== true){ row += " "; continue; }
             if(covered[kk] === true) row += "#";
             else if(reachable[kk] === true) row += "x";
@@ -321,6 +333,7 @@ function runBelt(shape){
         var row = "";
         for(var x2 = minX; x2 <= maxX; x2++){
             var kk = keyOf(x2, y2);
+            if(WALL_SET[kk] === true){ row += "|"; continue; }
             if(cells[kk] !== true){ row += " "; continue; }
             row += covered[kk] === true ? "#" : "x";
         }

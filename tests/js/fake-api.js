@@ -53,6 +53,11 @@ function makeApi(){
     beamNode.range = 10;
     beamTower.range = 23;
     powerNode.laserRange = 6;
+    // beam drills: the numbers the game gives them (Blocks.java v160.7)
+    plasmaBore.beamRange = 5;
+    plasmaBore.tier = 3;
+    largePlasmaBore.beamRange = 6;
+    largePlasmaBore.tier = 5;
 
     var copperWall = block("copperWall", 1);
     var berylliumWall = block("berylliumWall", 1);
@@ -60,24 +65,41 @@ function makeApi(){
 
     var copper = {id: nextItemId++, name: "copper", lowPriority: false, hardness: 1};
     var lead = {id: nextItemId++, name: "lead", lowPriority: false, hardness: 1};
+    var beryllium = {id: nextItemId++, name: "beryllium", lowPriority: false, hardness: 2};
+    var tungsten = {id: nextItemId++, name: "tungsten", lowPriority: false, hardness: 4};
 
     // ---- world: floor tiles with a rectangular ore patch ----
     var ore = {};         // pos -> true
     var ORE_LEAD = {};    // pos -> true (a second ore, for mixed-patch tests)
     var BUILT = {};       // pos -> true (something already stands here)
     var walls = {};       // pos -> true (solid)
+    var WALL_ORE = {};    // pos -> item (wall ore embedded in a solid tile, never consumed)
     var batch = {oreX0: 20, oreX1: 40, oreY0: 20, oreY1: 40};
 
     function pos(x, y){ return x + y * WORLD; }
     function inWorld(x, y){ return x >= 0 && y >= 0 && x < WORLD && y < WORLD_H; }
 
-    // solid ground (walls) from the scenario
-    if(OPTS.wallRect != null){
-        var wr = OPTS.wallRect;
+    // solid ground (walls) from the scenario: one rect, a list of rects, and/or single cells
+    function markWall(x, y){ walls[pos(x, y)] = true; }
+    function markWallRect(wr){
         for(var wx = wr.x0; wx <= wr.x1; wx++){
-            for(var wy = wr.y0; wy <= wr.y1; wy++){
-                walls[pos(wx, wy)] = true;
-            }
+            for(var wy = wr.y0; wy <= wr.y1; wy++) markWall(wx, wy);
+        }
+    }
+    if(OPTS.wallRect != null) markWallRect(OPTS.wallRect);
+    if(OPTS.wallRects != null){
+        for(var wi = 0; wi < OPTS.wallRects.length; wi++) markWallRect(OPTS.wallRects[wi]);
+    }
+    if(OPTS.wallCells != null){
+        for(var wc = 0; wc < OPTS.wallCells.length; wc++) markWall(OPTS.wallCells[wc][0], OPTS.wallCells[wc][1]);
+    }
+    // wall ore: the tile is solid and the ore is never consumed (BeamDrill keeps drilling it),
+    // so a bore mines the first solid tile in front of each of its lanes, forever
+    if(OPTS.wallOreCells != null){
+        for(var wo = 0; wo < OPTS.wallOreCells.length; wo++){
+            var wox = OPTS.wallOreCells[wo][0], woy = OPTS.wallOreCells[wo][1];
+            markWall(wox, woy);
+            WALL_ORE[pos(wox, woy)] = OPTS.wallOreItem === "tungsten" ? tungsten : beryllium;
         }
     }
 
@@ -153,7 +175,10 @@ function makeApi(){
         return ore[pos(tile.x, tile.y)] === true ? copper : null;
     };
     api.modVersion = function(){ return "test"; };
-    api.itemName = function(id){ return id === lead.id ? "Lead" : (id === copper.id ? "Copper" : null); };
+    api.itemName = function(id){
+        return id === lead.id ? "Lead" : (id === copper.id ? "Copper"
+            : (id === beryllium.id ? "Beryllium" : (id === tungsten.id ? "Tungsten" : null)));
+    };
     api.hasBuilding = function(tile){
         return tile != null && BUILT[pos(tile.x, tile.y)] === true;
     };
@@ -161,11 +186,28 @@ function makeApi(){
     api.__build = function(x, y){ BUILT[pos(x, y)] = true; };
     /** Test hook: add an ore tile (vein fixtures are built at runtime by the checks). */
     api.__ore = function(x, y){ ore[pos(x, y)] = true; };
-    api.wallDrop = function(){ return null; };
+    api.wallDrop = function(tile){
+        if(tile == null) return null;
+        var item = WALL_ORE[pos(tile.x, tile.y)];
+        return item === undefined ? null : item;
+    };
     api.solid = function(tile){ return walls[pos(tile.x, tile.y)] === true; };
     api.blockOf = function(){ return air; };
     api.buildOf = function(){ return null; };
-    api.relativeTo = function(){ return -1; };
+    // Tile.relativeTo: the rotation from `other` to `tile` (0=east, 1=north, 2=west, 3=south),
+    // or -1 for the same tile - the wall duct phases need the real thing, not a stub
+    api.relativeTo = function(tile, other){
+        if(tile == null || other == null) return -1;
+        var dx = tile.x - other.x, dy = tile.y - other.y;
+        if(Math.abs(dx) > Math.abs(dy)){
+            if(dx <= -1) return 0;
+            if(dx >= 1) return 2;
+        }else{
+            if(dy <= -1) return 1;
+            if(dy >= 1) return 3;
+        }
+        return -1;
+    };
     api.centerXTile = function(tile){ return tile.x; };
     api.centerYTile = function(tile){ return tile.y; };
     api.tileWorldX = function(tile){ return tile.x * TILESIZE; };
@@ -197,8 +239,8 @@ function makeApi(){
     api.itemHardness = function(item){ return item == null ? -1 : item.hardness; };
     api.canMine = function(drill, tile){ return api.drop(tile) != null && tile.x >= 0 && tile.y >= 0; };
     api.getDrop = function(drill, tile){ return api.drop(tile); };
-    api.beamRange = function(){ return 5; };
-    api.beamTier = function(){ return 3; };
+    api.beamRange = function(drill){ return drill == null || drill.beamRange == null ? 5 : drill.beamRange; };
+    api.beamTier = function(drill){ return drill == null || drill.tier == null ? 3 : drill.tier; };
     api.blockItemDrop = function(){ return null; };
 
     api.validPlace = function(block, team, x, y, rot){

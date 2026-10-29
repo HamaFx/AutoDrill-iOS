@@ -672,6 +672,73 @@ Two of them, both in the direction of "the sweep was measuring something the wor
   hole** (0 % by construction). The band now has a spine, the sweep taps the ore cell nearest
   the centre, and the honest numbers are 100 % for both (`band + power` 90 %, above its floor).
 
+### 1.10.0 — wall-ore coverage, restart layouts, deep repair, honest reports
+
+Groundwork first: `docs/MINDUSTRY.md` now records the game mechanics this repo depends on,
+checked against the v160.7 sources. The findings that shaped this batch:
+
+* **Serpulo has no wall ore at all** (ground ores only: copper, lead, scrap, coal, titanium,
+  thorium). Wall ore exists on Erekir (beryllium) and on asteroids, and the mod's wall tool is
+  gated on `wallDrop`, which is null everywhere on Serpulo - so all wall work below is Erekir.
+* Erekir's generator marks wall ore **tile by tile** (a noise threshold on wall cells with an
+  axis neighbour of air), so real patches are speckled, not solid faces.
+* A `BeamDrill` lane mines **the first solid tile within range and stops there**; wall ore stays
+  solid, so one lane = one tile, forever, and other bores block beams. Wall coverage is a set
+  cover over tiles, which is what the wall fill now solves. The in-engine suite grew a check
+  that measures this on real game data (95/95 in both script modes).
+* Impact/eruption drills consume **water/hydrogen as requirements**, so a fill that cannot
+  deliver liquid leaves inert machines (open work item, below).
+
+**Wall fill rebuilt (`scripts/wall.js`).** Phase 1 now enumerates every bore placement whose
+lane sees a patch tile and greedily covers the patch (a lane-per-tile set cover); bores may face
+**any side** - the picked direction is the output side, not a limit on which faces get mined.
+Ducts are placed behind each bore (falling back to other sides), the network/outlet phases are
+unchanged, and the beam nodes are chained into the player's grid like the optimizer fill does.
+
+Measured with the new `tools/wall-probe.sh` (a faithful BeamDrill simulation over wall bodies
+whose contours carry ore, the way Erekir generates them):
+
+| shape (48-98 ore tiles) | before | after |
+|---|---|---|
+| plain block | 100 % | 100 % |
+| flat slab | 100 % | 100 % |
+| L corner | 50 % | **100 %** |
+| two slots, 3-row gaps | 50 %* | **79.6 %** |
+| comb prongs | 33 %* | **87.5 %** |
+| speckled contour | one face only | tapped patch + "N more nearby" note |
+
+\* those "before" numbers compare different shape definitions (the battery was rebuilt to match
+the generator's contour rule); the honest before/after that matters is the L corner (50 -> 100)
+and the fact that same-row/speckled ore is now covered at all. The remaining gap on slotted
+shapes is geometric: a 3-row slot can host one 2x2 bore, whose two lanes mine two tiles - no
+layout fits more, and the fill's toast now reports what is left.
+
+**Optimizer: restart layouts + deep repair.** Two more moves in the family competition:
+* `buildRestartOrders`: deterministic shuffled candidate orders (fixed seed), four per fill at
+  default quality - a different packing style that closes irregular shapes.
+* the deep repair: when the one-swap pass leaves tiles, ruin the neighbourhood of a leftover
+  (radius 4, <=12 drills), reinsert greedily in every style order and run the swap pass again;
+  bounded and strictly improving. Measured on 200 random vein shapes at default quality: 31
+  shapes ended one tile short before this batch, 6 now (the remaining need multi-tile
+  rearrangements; their toast names the cause). The phase is bounded to patches of <=320
+  candidates and 100 refill units: an unbounded first cut made a 1,209-tile lane fill take 14 s
+  for a one-tile leftover, and on a patch that size the tile is noise.
+
+While implementing the deep repair, the audit's Rhino landmine bit again in a new dress: a
+helper that **contains nested callbacks and returns an object**, called inside the deep loop,
+made the interpreted engine treat assignments to locals inconsistently - the repair committed a
+layout *worse* than the one it started from (91 -> 90 tiles). The fix: `swapRepair` is
+callback-free (insertion sort for the leftovers, counting sort by distance), and the deep phase
+asserts strictly-improving scores only. Both engine modes were re-checked.
+
+**Honest reports.** `classifyUnreachable` checks whether an unreachable tile has *any* legal
+placement (walls/buildings in the way) or only fails the Min Ores/winner rule, and the toast now
+says which - on walled-in patches "lower Min Ores" was the wrong advice. A patch where nothing
+fits at all now gets its own message instead of silence.
+
+**Combination fix.** Belt-lane fills placed a power network that was connected to itself but
+never to the player's grid; they now run the same grid chain as the lattice fills.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

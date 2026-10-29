@@ -143,6 +143,8 @@ function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
         frames: [],
         result: {score: 0, selection: null},
         sweepOrders: [],
+        restartOrders: [],
+        deepOrders: [],
         plannedBlocked: {},
         powerRemovedDrills: 0,
         powerRemovedOre: 0,
@@ -355,6 +357,23 @@ function setupSearch(job){
     // are what makes the quality setting mean something - each one is a different legal
     // layout, the best wins, and how many are tried is what the setting buys.
     job.sweepOrders = buildSweepOrders(entries);
+
+    // Restart orders: shuffled candidate orders, a few every fill regardless of the quality
+    // setting (they are the cheapest family that closes irregular shapes; see
+    // buildRestartOrders). More of them at higher quality.
+    job.restartOrders = buildRestartOrders(entries, Math.max(4, Math.min(8, job.quality)));
+
+    // Order set for the deep repair (ruin-and-recreate): the entry order plus the spatial
+    // sweeps plus the first restart orders - the different insertion styles the repair tries.
+    job.deepOrders = [];
+    var identity = [];
+    for(var e = 0; e < entries.length; e++) identity.push(e);
+    job.deepOrders.push(identity);
+    for(var d = 0; d < job.sweepOrders.length; d++) job.deepOrders.push(job.sweepOrders[d]);
+    for(d = 0; d < 3 && d < job.restartOrders.length; d++) job.deepOrders.push(job.restartOrders[d]);
+
+    // why tiles are unreachable (ground vs Min Ores), for the fill's report
+    classifyUnreachable(job);
 
     job.phase = PHASE_READY;
 
@@ -936,6 +955,71 @@ function greedySweep(job, order){
     return selection;
 }
 
+/**
+ * Greedy insert on top of an existing selection: walk the order and take every candidate that
+ * still fits, keeping what is already there. Used by the deep repair (ruin-and-recreate).
+ */
+function greedyInsert(job, order, base){
+    var entries = job.entries;
+    var occ = {};
+    var selection = base.slice();
+    var i = 0, k = 0, keys = null;
+
+    for(var r in job.reserved) occ[r] = true;
+    for(var p in job.plannedBlocked) occ[p] = true;
+
+    for(i = 0; i < selection.length; i++){
+        keys = selection[i].cellKeys;
+        for(k = 0; k < keys.length; k++) occ[keys[k]] = true;
+    }
+
+    for(i = 0; i < order.length; i++){
+        var entry = entries[order[i]];
+
+        var blocked = false;
+        keys = entry.cellKeys;
+        for(k = 0; k < keys.length; k++){
+            if(occ[keys[k]] === true){ blocked = true; break; }
+        }
+        if(blocked) continue;
+
+        for(k = 0; k < keys.length; k++) occ[keys[k]] = true;
+        selection.push(entry);
+    }
+
+    return selection;
+}
+
+// Fixed seed for the restart orders: the sequence must be identical on every device, so the
+// same patch fills the same way everywhere.
+var RESTART_SEED = 20261029;
+
+/**
+ * Deterministic pseudo-random candidate orders ("restarts"). The eight spatial sweeps are axis
+ * orders and miss the packing some irregular shapes want; a shuffled order often finds it.
+ * Measured on the 13 shapes where the families still ended one tile short: one seeded restart
+ * closed every one of them, and the extra cost is one greedy pass each (a few ms on a big
+ * patch). Bounded and deterministic, so it behaves like an extra family, not like a random mod.
+ */
+function buildRestartOrders(entries, count){
+    var orders = [];
+    var seed = RESTART_SEED;
+
+    for(var r = 0; r < count; r++){
+        var order = [];
+        for(var i = 0; i < entries.length; i++) order.push(i);
+        for(i = order.length - 1; i > 0; i--){
+            seed = (seed * 1103515245 + 12345) % 2147483648;
+            var j = seed % (i + 1);
+            var tmp = order[i];
+            order[i] = order[j];
+            order[j] = tmp;
+        }
+        orders.push(order);
+    }
+    return orders;
+}
+
 /** Ore cells of a selection that nothing else in it mines. */
 function selectionScore(selection){
     var covered = {};
@@ -1076,35 +1160,104 @@ function chooseSelection(job){
         }
     }
 
+    // Deterministic restarts: shuffled candidate orders - the packing style that closes the
+    // irregular shapes the axis sweeps and the lattice miss (see buildRestartOrders).
+    job.candidateScores.restarts = [];
+    for(var r = 0; r < job.restartOrders.length; r++){
+        var restarted = fillGaps(job, greedySweep(job, job.restartOrders[r]));
+        var restartScore = selectionScore(restarted);
+        job.candidateScores.restarts.push(restartScore);
+        if(restartScore > best.score){
+            best = {selection: restarted, score: restartScore};
+            source = "restart" + r;
+        }
+    }
+
     return {selection: best.selection, score: best.score, source: source};
 }
 
-// ---------------------------------------------------------------------------- repair
+// ---------------------------------------------------------------------------- diagnostics
 
-// A bounded local repair pass. The three layout families are all global constructions, and on
-// irregular vein shapes they can end one tile short: the leftover tile is reachable, but every
-// candidate that mines it overlaps a placed drill, so the gap filler (add-only) cannot help and
-// the toast says "blocked". Measured on 200 random vein shapes: 15.5% ended exactly one tile
-// short, every one of them with the cheapest covering candidate blocked by ONE placed drill,
-// and an exact solver (tools/vein-solve.py) proved a perfect layout exists. Raising the quality
-// budget did not fix most of them (25/200 remained at quality 10), because the miss is a local
-// minimum, not a budget limit.
+/**
+ * Why are tiles unreachable? Two causes: no placement fits there at all (solid ground, cliffs,
+ * buildings) or the Min Ores / winner-item rule filters every placement out. The toast used to
+ * always blame Min Ores, which is wrong on walled-in patches and sent players tuning the wrong
+ * setting. Checks up to 60 tiles, only when something is unreachable.
+ */
+function classifyUnreachable(job){
+    if(job.coverable >= job.targetCells) return;
+
+    var entries = job.entries;
+    var reachable = {};
+    var i = 0, k = 0;
+    for(i = 0; i < entries.length; i++){
+        var keys = entries[i].mineableKeys;
+        for(k = 0; k < keys.length; k++) reachable[keys[k]] = true;
+    }
+
+    var size = job.size, half = job.half;
+    var lo = -(size - 1 - half), hi = half;
+    var checked = 0;
+    var ground = 0, minOres = 0;
+
+    for(var key in job.cellFacts){
+        if(checked >= 60) break;
+        var fact = job.cellFacts[key];
+        if(fact === undefined || fact.mineable !== true || reachable[key] === true) continue;
+        checked++;
+
+        var cx = key % job.worldW, cy = Math.floor(key / job.worldW);
+        var possible = false;
+        for(i = lo; i <= hi && !possible; i++){
+            for(k = lo; k <= hi; k++){
+                if(util.canPlaceBlock(job.drill, job.team, cx + i, cy + k, 0)){
+                    possible = true;
+                    break;
+                }
+            }
+        }
+        if(possible) minOres++; else ground++;
+    }
+
+    job.groundBlocked = ground;
+    job.minOresBlocked = minOres;
+}
+
+// A bounded local repair. The layout families are global constructions, and on irregular vein
+// shapes they can end one tile short: the leftover tile is reachable, but every candidate that
+// mines it overlaps a placed drill, so the add-only gap filler cannot help and the toast says
+// "blocked". Measured on 200 random vein shapes: 15.5% ended exactly one tile short at first,
+// every one of them with the cheapest covering candidate blocked by ONE placed drill, and an
+// exact solver (tools/vein-solve.py) proved a perfect layout exists. Raising the quality budget
+// did not fix most of them (25/200 remained at quality 10), because the miss is a local minimum.
 //
-// The repair is a bounded ruin-and-recreate: rank the candidates by their distance to the
-// nearest uncovered tile, drop the drills blocking the closest ones (at most three), take the
-// candidate, refill the gaps, and commit only strictly improving trials. Measured in the
-// simulation: 24 refill trials fix every case a 160-trial budget fixes.
+// Two moves, both strictly improving, determinstic and bounded:
+//   1. swapRepair  - drop the drills blocking a candidate near an uncovered tile, take it, refill
+//   2. the deep phase - ruin-and-recreate the neighbourhood, then the swap pass again
 var REPAIR_PASSES = 3;
 var REPAIR_TRIAL_CAP = 24;
 var REPAIR_MAX_BLOCKERS = 3;
 
-function repairSelection(job, selection){
+// Deep repair: some shapes need their whole neighbourhood rebuilt, not one drill moved. It is
+// only worth its cost on the small/medium patches where one tile is visible: on a big patch the
+// refills are expensive and a single leftover is noise (measured: an unbounded deep phase made a
+// 1,209-tile lane fill take 14 s), so the phase is bounded by size and by total refill work.
+var DEEP_REPAIR_MOVES = 2;
+var DEEP_REPAIR_RADIUS = 4;
+var DEEP_REPAIR_MAX_RUIN = 12;
+var DEEP_REPAIR_LEFTOVERS = 3;
+var DEEP_REPAIR_SWAP_CAP = 8;
+var DEEP_REPAIR_MAX_ENTRIES = 320;
+var DEEP_REPAIR_WORK_CAP = 100;
+
+/** The 1-swap pass: candidates ranked by distance to the nearest uncovered tile. */
+function swapRepair(job, selection, trialCap){
     var entries = job.entries;
     var best = selection;
     var bestScore = selectionScore(best);
     var trials = 0;
 
-    for(var pass = 0; pass < REPAIR_PASSES && trials < REPAIR_TRIAL_CAP; pass++){
+    for(var pass = 0; pass < REPAIR_PASSES && trials < trialCap; pass++){
         // occupancy of the current layout, as a cell -> entry map (a layout never overlaps)
         var placedAt = {};
         var covered = {};
@@ -1127,7 +1280,17 @@ function repairSelection(job, selection){
             }
         }
         if(leftovers.length === 0) break;
-        leftovers.sort(function(a, b){ return a - b; });
+        // insertion sort, no comparator callback: functions that pass nested callbacks into
+        // loops are the interpreter's weak spot (see the note above scanCandidates)
+        for(i = 1; i < leftovers.length; i++){
+            var lv = leftovers[i];
+            var lj = i - 1;
+            while(lj >= 0 && leftovers[lj] > lv){
+                leftovers[lj + 1] = leftovers[lj];
+                lj--;
+            }
+            leftovers[lj + 1] = lv;
+        }
 
         // Rank candidates by their Chebyshev distance to the nearest uncovered tile (drill centre
         // to tile): the one-drill fixes cluster within a few tiles of the hole, so the trial
@@ -1145,11 +1308,22 @@ function repairSelection(job, selection){
             }
             ranked.push({d: nearest, entry: rankCand});
         }
-        util.sortStable(ranked, function(r){ return r.d; });
+        // counting sort by distance (stable, no comparator callback - see the note above)
+        var maxD = 0;
+        for(i = 0; i < ranked.length; i++){
+            if(ranked[i].d > maxD) maxD = ranked[i].d;
+        }
+        var buckets = [];
+        for(i = 0; i <= maxD; i++) buckets.push([]);
+        for(i = 0; i < ranked.length; i++) buckets[ranked[i].d].push(ranked[i]);
+        ranked = [];
+        for(i = 0; i <= maxD; i++){
+            for(k = 0; k < buckets[i].length; k++) ranked.push(buckets[i][k]);
+        }
 
         var bestTrial = null;
 
-        for(i = 0; i < ranked.length && trials < REPAIR_TRIAL_CAP; i++){
+        for(i = 0; i < ranked.length && trials < trialCap; i++){
             var cand = ranked[i].entry;
 
             // every placed drill whose footprint blocks this candidate
@@ -1192,6 +1366,108 @@ function repairSelection(job, selection){
         bestScore = bestTrial.score;
     }
 
+    return {selection: best, score: bestScore, trials: trials};
+}
+
+/**
+ * The full repair: the 1-swap pass, then the deep phase for the shapes that need their whole
+ * neighbourhood rebuilt. Deterministic, bounded, strictly improving only.
+ */
+function repairSelection(job, selection){
+    var entries = job.entries;
+    var swap = swapRepair(job, selection, REPAIR_TRIAL_CAP);
+    var best = swap.selection;
+    var bestScore = swap.score;
+    var trials = swap.trials;
+    var deepMoves = 0;
+
+    // ---- deep repair: rebuild the neighbourhood around a leftover (ruin-and-recreate) ----
+    // Skipped on big patches: the refills cost more than the tile is worth there.
+    var deepWork = 0;
+    for(var move = 0; move < DEEP_REPAIR_MOVES && entries.length <= DEEP_REPAIR_MAX_ENTRIES; move++){
+        var dcovered = {};
+        var di = 0, dk = 0;
+        for(di = 0; di < best.length; di++){
+            var dkeys = best[di].mineableKeys;
+            for(dk = 0; dk < dkeys.length; dk++) dcovered[dkeys[dk]] = true;
+        }
+
+        var dleft = [];
+        var dseen = {};
+        for(di = 0; di < entries.length; di++){
+            dkeys = entries[di].mineableKeys;
+            for(dk = 0; dk < dkeys.length; dk++){
+                if(dcovered[dkeys[dk]] === true || dseen[dkeys[dk]] === true) continue;
+                dseen[dkeys[dk]] = true;
+                dleft.push(dkeys[dk]);
+            }
+        }
+        if(dleft.length === 0) break;
+        dleft.sort(function(a, b){ return a - b; });
+        debugLog("deep repair: leftovers=" + dleft.length + " bestScore=" + bestScore);
+
+        var deepTrial = null;
+        for(di = 0; di < dleft.length && di < DEEP_REPAIR_LEFTOVERS && deepWork < DEEP_REPAIR_WORK_CAP; di++){
+            var tile = dleft[di];
+            var tileX = tile % job.worldW, tileY = Math.floor(tile / job.worldW);
+
+            // the ruin window: every placed drill whose footprint touches the area around it
+            var window = {};
+            for(var wdx = -DEEP_REPAIR_RADIUS - 2; wdx <= DEEP_REPAIR_RADIUS + 2; wdx++){
+                for(var wdy = -DEEP_REPAIR_RADIUS - 2; wdy <= DEEP_REPAIR_RADIUS + 2; wdy++){
+                    window[(tileX + wdx) + (tileY + wdy) * job.worldW] = true;
+                }
+            }
+            var doomed = [];
+            var tooMany = false;
+            for(dk = 0; dk < best.length; dk++){
+                var bkeys = best[dk].cellKeys;
+                var touches = false;
+                for(var bk = 0; bk < bkeys.length; bk++){
+                    if(window[bkeys[bk]] === true){ touches = true; break; }
+                }
+                if(!touches) continue;
+                doomed.push(best[dk]);
+                if(doomed.length > DEEP_REPAIR_MAX_RUIN){ tooMany = true; break; }
+            }
+            if(tooMany || doomed.length === 0) continue;
+            debugLog("deep repair: tile=" + tileX + "," + tileY + " doomed=" + doomed.length);
+
+            var base = [];
+            for(dk = 0; dk < best.length; dk++){
+                var dropIt = false;
+                for(bk = 0; bk < doomed.length; bk++){
+                    if(best[dk] === doomed[bk]){ dropIt = true; break; }
+                }
+                if(!dropIt) base.push(best[dk]);
+            }
+
+            for(var oi = 0; oi < job.deepOrders.length && deepWork < DEEP_REPAIR_WORK_CAP; oi++){
+                var dtrial = greedyInsert(job, job.deepOrders[oi], base);
+                dtrial = fillGaps(job, dtrial);
+                deepWork += 2;               // the refill above, plus the trial's inserts
+
+                // the swap pass again over the rebuilt neighbourhood: the plain recreate packs
+                // the window but can still leave the one tile; measured, this step is what
+                // closes the stubborn shapes
+                var dtrialSwap = swapRepair(job, dtrial, DEEP_REPAIR_SWAP_CAP);
+                deepWork += dtrialSwap.trials;
+                trials += dtrialSwap.trials;
+                if(deepTrial == null || dtrialSwap.score > deepTrial.score){
+                    deepTrial = {selection: dtrialSwap.selection, score: dtrialSwap.score};
+                }
+            }
+        }
+
+        debugLog("deep repair: trial=" + (deepTrial == null ? "none" : deepTrial.score) + " best=" + bestScore);
+        if(deepTrial == null || deepTrial.score <= bestScore) break;
+        best = deepTrial.selection;
+        bestScore = deepTrial.score;
+        deepMoves++;
+        debugLog("deep repair: move " + deepMoves + " bestScore=" + bestScore);
+    }
+
+    job.repairDeep = deepMoves;
     job.repairTrials = trials;
     return {selection: best, score: bestScore};
 }
@@ -1276,8 +1552,10 @@ function finish(job){
     if(support && !job.lanes){
         linked += stitchPowerNetwork(job, allPlans, occupied, info);
         linked += linkPowerGrid(job, allPlans, occupied, selection, powerTarget, info);
-    }else if(support && counts != null && counts.linkNodes !== undefined){
-        linked = counts.linkNodes;
+    }else if(support && info != null){
+        // lanes: the network on the lanes is connected by construction, but it used to stop
+        // there - the patch never reached the player's grid. Chain it the same way.
+        linked += linkPowerGrid(job, allPlans, occupied, selection, powerTarget, info);
     }
 
     var routed = routeOutputs(job, allPlans, occupied);
@@ -1297,6 +1575,7 @@ function finish(job){
         candidateScores: job.candidateScores,
         repairGain: job.repairGain == null ? 0 : job.repairGain,
         repairTrials: job.repairTrials == null ? 0 : job.repairTrials,
+        repairDeep: job.repairDeep == null ? 0 : job.repairDeep,
         extractors: extractorCount,
         nodes: nodeCount,
         powerName: counts == null || counts.powerName == null ? "power nodes" : counts.powerName,
@@ -1340,6 +1619,15 @@ function finish(job){
         if(allPlans.length === 0 && alreadyPlanned > 0){
             api.toast("[AutoDrill v" + api.modVersion() + "] the patch is already planned from your last fill ("
                 + alreadyPlanned + " ore tiles) - nothing to add");
+        }else if(allPlans.length === 0 && job.entries.length === 0 && job.targetCells > 0){
+            // nothing fits at all: say which reason, because "lower Min Ores" and "walls in the
+            // way" ask for opposite actions
+            var groundReason = job.groundBlocked == null ? 0 : job.groundBlocked;
+            var oresReason = job.minOresBlocked == null ? 0 : job.minOresBlocked;
+            api.toast("[AutoDrill v" + api.modVersion() + "] no room for a " + api.blockName(job.drill)
+                + " here - " + (oresReason > 0 && groundReason === 0
+                    ? "no placement reaches Min Ores, lower it to fill"
+                    : "every placement is blocked (walls or buildings)"));
         }else if(allPlans.length === 0 && job.entries.length > 0){
             api.toast("[AutoDrill v" + api.modVersion() + "] nothing could be placed here - is this inside your build range?");
         }else if(drillCount > 0){
@@ -1362,7 +1650,18 @@ function finish(job){
                 }else if(alreadyPlanned > 0){
                     why = alreadyPlanned + " tiles are already planned from your last fill";
                 }else if(unreachable > 0){
-                    why = unreachable + " out of reach (lower Min Ores)";
+                    var unreachGround = job.groundBlocked == null ? 0 : job.groundBlocked;
+                    var unreachOres = job.minOresBlocked == null ? 0 : job.minOresBlocked;
+                    if(unreachGround > 0 && unreachOres === 0){
+                        why = unreachable + " tiles have no room for a drill (walls or buildings in the way)";
+                    }else if(unreachOres > 0 && unreachGround === 0){
+                        why = unreachable + " out of reach (lower Min Ores)";
+                    }else if(unreachGround > 0 && unreachOres > 0){
+                        why = unreachable + " out of reach (" + unreachOres + " need a lower Min Ores, "
+                            + unreachGround + " have no room for a drill)";
+                    }else{
+                        why = unreachable + " out of reach (lower Min Ores)";
+                    }
                 }else{
                     why = blocked + " blocked (raise Optimization Quality)";
                 }
