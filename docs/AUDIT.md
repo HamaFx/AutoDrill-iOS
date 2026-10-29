@@ -589,6 +589,89 @@ The heights that remain from the plan (Batch 2: layout styles, axis alignment, b
 core, multi-ore fills, Erekir liquids, wall-tool measurement; Batch 3: deterministic layouts and
 scratch reuse) are still open.
 
+### 1.9.0 — "for some vein shapes the drills not covering all the ores and tiles"
+
+Reported from the device. Measured with a new dev tool, `tools/vein-probe.sh`: a battery of
+thin/irregular shapes (1-wide veins, staircases, jogs, branches, rings, combs, blobs with
+tendrils, and 200 deterministic drunkard's-walk veins) run through the fill against the fake
+world. Every shape is one 8-connected patch (a shape that is not is rejected loudly), and
+coverage is measured off the committed plans.
+
+| run (support off) | shapes | fully covered | one tile short |
+|---|---|---|---|
+| laser, default quality | 200 random walks | 169 (84.5 %) | **31 (15.5 %)** |
+| laser, quality 10 | 200 random walks | 175 (87.5 %) | 25 (12.5 %) |
+| the 53 hand-built shapes, default | 53 | 51 | 2 |
+
+Every partial case shared one signature: **exactly one ore tile left**, reachable
+(`unreachable=0`, reported as `blocked`), `freeGap=0` (the gap filler's promise held - no free
+candidate could mine it), the `lattice` family won, and the **cheapest candidate mining the
+leftover tile overlapped exactly one placed drill**. The toast's advice ("blocked - raise
+Optimization Quality") is wrong for these: the miss is a local minimum of the layout, not of the
+budget (25/200 stayed partial at 10x the budget; `blob7+4arms` stayed one short even at
+quality 50). An exact solver (`tools/vein-solve.py`, CBC via PuLP: maximise covered tiles with
+disjoint footprints over the engine's own candidate set) proved the optimum is the *full* patch
+for every case solved - provably suboptimal layouts, not rule limits.
+
+**Fix - a bounded repair pass** (`optimization.js`, after the family competition): rank the
+candidates by Chebyshev distance to the nearest uncovered tile, drop the drills blocking the
+closest ones (at most three), take the candidate, refill the gaps, commit only strictly
+improving trials. 24 refill trials per fill (measured: 24 finds everything a 160-trial budget
+finds), deterministic, cannot make a layout worse.
+
+Same batteries after the pass:
+
+| run | before | after |
+|---|---|---|
+| 200 random walks, default quality | 31 partial (15.5 %) | **12 partial (6 %)** |
+| 200 random walks, quality 10 | 25 partial (12.5 %) | **8 partial (4 %)** |
+| 53 hand-built shapes, default | 2 partial | **1 partial** |
+
+The remaining cases need a move family the pass does not have (no single candidate/blocker
+combination improves them); they keep the "blocked" report and are the next thing to model.
+
+Pinned by the existing suites: three new engine checks (two self-contained vein fixtures; the
+walk fixture covers 49/50 without the pass and 50/50 with it - verified by zeroing the trial
+budget), in-engine 94/94 in both script modes, compiled-engine load, iOS-mode check and lint all
+green.
+
+#### Same shape, different map position — measured while doing the above
+
+The lattice family compares its `size²` translations and keeps the first of equal scores
+(`score > best.score`), so ties are broken by the *absolute* phase, which depends on where the
+patch sits modulo the drill size. Verified by shifting the whole battery by one tile: the same
+73-tile walk covers 72/73 at shift 0, **73/73 at shift 1**, 72/73 at shift 2 (the repair can
+only close the gap when the phase happens to leave a repairable layout). So "same patch, same
+layout" holds at a fixed position (what the engine check asserts), but not across positions - the
+same class of bug the belt tool had fixed in 1.7.5. The fix is to break lattice ties by a
+patch-relative signature (or try the repair over the tied bests); not done yet.
+
+#### The belt tool on veins — the larger remaining gap, measured
+
+The same battery with the mechanical/pneumatic tool (`bridge.fill`) covers 90.4-100 % of the ore
+on the 200 random walks (median 95.1 %, 47 % of shapes below 95 %; the 3-wide and band shapes hit
+88.9-90 %), because the fixed 6x6 pattern puts its belt tiles *inside* the patch - on a 3-row
+vein the top row loses every third tile to the belt grid. The counter-measurement: with the
+optimiser's 2x2 selection (no transport) the same shapes are covered **100 %**, and on average
+**96.4 %** of those drills have a free neighbouring tile a belt or conveyor could use (84/200
+shapes have a few packed drills; none fully packed). So "ore first, transport second" - select
+drills for coverage, run belts/bridges on the ring outside the patch, drop and report only the
+enclosed drills - can recover most of that 5-10 %, at the cost of the recognisable 6x6 matrix
+(see "Explicitly not recommended"). Recorded as the next measured opportunity, not done.
+
+#### Test-rig gaps found and fixed while measuring
+
+Two of them, both in the direction of "the sweep was measuring something the world did not have":
+
+* `tests/js/fake-api.js` only implemented the `round` patch filter, so the shape sweep's
+  `band`/`hole` cases were silently full rectangles. The fake world now builds the same
+  band/hole filters the sweep measures.
+* with the shapes made real, two sweep fixtures turned out to be invalid: the band shape was
+  several **disconnected stripes** (only the tapped component can ever be filled; the sweep
+  counted all of them - `diagonal band` read 87 %), and the holed patch was tapped **inside the
+  hole** (0 % by construction). The band now has a spine, the sweep taps the ore cell nearest
+  the centre, and the honest numbers are 100 % for both (`band + power` 90 %, above its floor).
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

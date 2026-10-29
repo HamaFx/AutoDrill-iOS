@@ -5,3 +5,4 @@ bun.lock
 tests/build/
 tests/harness/extract/
 tests/js/scenario.js
+__pycache__/

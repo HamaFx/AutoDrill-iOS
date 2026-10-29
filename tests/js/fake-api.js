@@ -109,6 +109,16 @@ function makeApi(){
                     var d = (i - cx) * (i - cx) + (j - cy) * (j - cy);
                     if(d > r * r * 0.8) continue;
                 }
+                // the same band/hole filters the shape sweep's own measurement uses - without
+                // them the sweep measured filters the world never had (its band/hole cases were
+                // silently full rectangles)
+                if(sh.band === true){
+                    var t = i - sh.oreX0;
+                    if(((j - sh.oreY0) - t) % 9 > 1 && ((j - sh.oreY0) - t) % 9 < 9 && i !== sh.oreX0) continue;
+                }
+                if(sh.hole === true){
+                    if(Math.abs(i - cx) < 3 && Math.abs(j - cy) < 3) continue;
+                }
                 ore[pos(i, j)] = true;
             }
         }
@@ -149,6 +159,8 @@ function makeApi(){
     };
     /** Test hook: mark a tile as already built, so a second fill sees it as taken. */
     api.__build = function(x, y){ BUILT[pos(x, y)] = true; };
+    /** Test hook: add an ore tile (vein fixtures are built at runtime by the checks). */
+    api.__ore = function(x, y){ ore[pos(x, y)] = true; };
     api.wallDrop = function(){ return null; };
     api.solid = function(tile){ return walls[pos(tile.x, tile.y)] === true; };
     api.blockOf = function(){ return air; };

@@ -37,8 +37,11 @@ function oreCells(shape){
                 if(d > Math.min(shape.x1 - shape.oreX0, shape.y1 - shape.oreY0) * Math.min(shape.x1 - shape.oreX0, shape.y1 - shape.oreY0) / 4 * 0.8) continue;
             }
             if(shape.band === true){
+                // 2-wide diagonal stripes with period 9, held together by the left column:
+                // without the spine the stripes are separate patches and only the tapped one
+                // could ever be filled (the sweep used to measure all of them anyway)
                 var t = i - shape.oreX0;
-                if(((j - shape.oreY0) - t) % 9 > 1 && ((j - shape.oreY0) - t) % 9 < 9) continue;
+                if(((j - shape.oreY0) - t) % 9 > 1 && ((j - shape.oreY0) - t) % 9 < 9 && i !== shape.oreX0) continue;
             }
             if(shape.hole === true){
                 var hx = (shape.oreX0 + shape.x1) / 2, hy = (shape.oreY0 + shape.y1) / 2;
@@ -51,7 +54,23 @@ function oreCells(shape){
 }
 
 function centreOf(shape){
-    return {x: Math.floor((shape.oreX0 + shape.x1) / 2), y: Math.floor((shape.oreY0 + shape.y1) / 2)};
+    var cx = Math.floor((shape.oreX0 + shape.x1) / 2), cy = Math.floor((shape.oreY0 + shape.y1) / 2);
+
+    // the centre of a holed patch is not ore: tap the ore cell nearest to it instead, or the
+    // fill starts on an empty tile and plans nothing at all
+    var ore = oreCells(shape);
+    if(ore[cx + cy * W] === true) return {x: cx, y: cy};
+
+    var best = null, bestD = 0;
+    for(var key in ore){
+        var x = key % W, y = Math.floor(key / W);
+        var d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+        if(best == null || d < bestD){
+            best = {x: x, y: y};
+            bestD = d;
+        }
+    }
+    return best == null ? {x: cx, y: cy} : best;
 }
 
 /** Ore tiles a drill mines that nothing mines, and how many of those sit inside the mined area. */

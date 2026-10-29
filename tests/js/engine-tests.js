@@ -208,6 +208,126 @@ var c6 = coverageOf(round, r6.plans, blast);
 check("3x3 airblast: fully mined", c6.covered === c6.total,
     "covered=" + c6.covered + "/" + c6.total + " drills=" + c6.drills);
 
+// ---------------------------------------------------------------- 2b. vein shapes
+
+// Thin, irregular vein shapes are the hard case for the three layout families: over 200 random
+// walks, 15.5% ended exactly one tile short at the default quality, with the gap filler unable
+// to help because every candidate mining the last tile overlapped a placed drill (measured with
+// tools/vein-probe.sh; the optimum was proven full with tools/vein-solve.py). The repair pass
+// in optimization.js exists for exactly that: it drops the blocking drill, takes the candidate
+// and refills. The walk fixture below stops one tile short without the repair, so the first
+// check fails if the pass regresses and the last check demands the repair is what closed it.
+(function(){
+    // the vein probe's deterministic walk (tests/js/vein-scenarios.js), inlined so the fixture
+    // is self-contained
+    function walkVein(seed, steps, turns){
+        var out = [];
+        var seen = {};
+        var x = 0, y = 0;
+        var dirs = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+        var s = seed | 0;
+        out.push([0, 0]);
+        seen["0,0"] = true;
+        for(var i = 0; i < steps; i++){
+            s = (s * 1103515245 + 12345) & 0x7fffffff;
+            var d = (s >> 8) % 4;
+            x += dirs[d][0];
+            y += dirs[d][1];
+            if(seen[x + "," + y] !== true){ seen[x + "," + y] = true; out.push([x, y]); }
+            if(i % turns === turns - 1){
+                s = (s * 1103515245 + 12345) & 0x7fffffff;
+                var e = (s >> 8) % 4;
+                var bx = x + dirs[e][0], by = y + dirs[e][1];
+                if(seen[bx + "," + by] !== true){ seen[bx + "," + by] = true; out.push([bx, by]); }
+            }
+        }
+        return out;
+    }
+
+    function blob4(){
+        var out = [];
+        for(var x = 0; x < 7; x++){
+            for(var y = 0; y < 7; y++) out.push([x, y]);
+        }
+        for(var i = 1; i <= 9; i++){
+            out.push([6 + i, 3]); out.push([3, 6 + i]);
+            out.push([-i, 3]); out.push([3, -i]);
+        }
+        return out;
+    }
+
+    function place(cells, ox, oy){
+        var minX = 1e9, minY = 1e9;
+        for(var i = 0; i < cells.length; i++){
+            minX = Math.min(minX, cells[i][0]);
+            minY = Math.min(minY, cells[i][1]);
+        }
+        var out = [];
+        for(i = 0; i < cells.length; i++) out.push([cells[i][0] - minX + ox, cells[i][1] - minY + oy]);
+        return out;
+    }
+
+    function tapOf(cells){
+        var sx = 0, sy = 0;
+        for(var i = 0; i < cells.length; i++){ sx += cells[i][0]; sy += cells[i][1]; }
+        var cx = sx / cells.length, cy = sy / cells.length;
+        var best = cells[0], bestD = 1e9;
+        for(i = 0; i < cells.length; i++){
+            var d = (cells[i][0] - cx) * (cells[i][0] - cx) + (cells[i][1] - cy) * (cells[i][1] - cy);
+            if(d < bestD){ bestD = d; best = cells[i]; }
+        }
+        return best;
+    }
+
+    function veinCoverage(cells){
+        var set = {};
+        for(var i = 0; i < cells.length; i++){
+            set[cells[i][0] + cells[i][1] * W] = true;
+            api.__ore(cells[i][0], cells[i][1]);
+        }
+
+        var tap = tapOf(cells);
+        util.undoLastCommitted();
+        var res = optimization.fillDetailed({x: tap[0], y: tap[1]}, laser, false, "sharded", null, 0);
+
+        var size = api.size(laser);
+        var half = Math.floor((size - 1) / 2);
+        var covered = {};
+        var drills = 0;
+        for(var p = 0; p < res.plans.length; p++){
+            if(api.blockId(res.plans[p].block) !== api.blockId(laser)) continue;
+            drills++;
+            for(var dx = 0; dx < size; dx++){
+                for(var dy = 0; dy < size; dy++){
+                    var key = (res.plans[p].x - half + dx) + (res.plans[p].y - half + dy) * W;
+                    if(set[key] === true) covered[key] = true;
+                }
+            }
+        }
+        var count = 0;
+        for(var c in covered) count++;
+        return {covered: count, total: cells.length, drills: drills, repairGain: res.stats.repairGain};
+    }
+
+    var fixtures = [
+        {name: "walk vein", cells: place(walkVein(158481, 51, 8), 10, 108)},
+        {name: "blob with four arms", cells: place(blob4(), 100, 108)}
+    ];
+    var repaired = 0;
+
+    for(var f = 0; f < fixtures.length; f++){
+        var got = veinCoverage(fixtures[f].cells);
+        check("vein shape (" + fixtures[f].name + "): covered whole at the default quality",
+            got.covered === got.total && got.total > 0,
+            "covered=" + got.covered + "/" + got.total + " drills=" + got.drills
+                + " repairGain=" + got.repairGain);
+        if(got.repairGain > 0) repaired++;
+    }
+
+    check("vein shapes: the repair pass is what closes the last tile",
+        repaired > 0, "shapes fixed by the repair=" + repaired + "/" + fixtures.length);
+})();
+
 // ---------------------------------------------------------------- 3. nothing overlaps
 
 check("no two plans claim the same tile (drills, extractors, nodes, routes)",
