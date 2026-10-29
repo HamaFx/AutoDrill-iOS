@@ -1,0 +1,5527 @@
+[
+ {
+  "name": "0.msav_copper_18",
+  "source": "0.msav_copper_18.txt",
+  "save": "0.msav",
+  "map": "Fortress",
+  "ore": "copper",
+  "tiles": 12,
+  "tap": [
+   173,
+   473
+  ],
+  "dumpTap": [
+   38,
+   84
+  ],
+  "bbox": [
+   35,
+   83,
+   38,
+   87
+  ],
+  "built": [],
+  "x": 164,
+  "y": 466
+ },
+ {
+  "name": "0.msav_copper_2",
+  "source": "0.msav_copper_2.txt",
+  "save": "0.msav",
+  "map": "Fortress",
+  "ore": "copper",
+  "tiles": 73,
+  "tap": [
+   336,
+   132
+  ],
+  "dumpTap": [
+   96,
+   212
+  ],
+  "bbox": [
+   88,
+   206,
+   98,
+   219
+  ],
+  "built": [],
+  "x": 322,
+  "y": 120
+ },
+ {
+  "name": "0.msav_copper_3",
+  "source": "0.msav_copper_3.txt",
+  "save": "0.msav",
+  "map": "Fortress",
+  "ore": "copper",
+  "tiles": 58,
+  "tap": [
+   271,
+   203
+  ],
+  "dumpTap": [
+   113,
+   176
+  ],
+  "bbox": [
+   110,
+   170,
+   119,
+   180
+  ],
+  "built": [],
+  "x": 262,
+  "y": 191
+ },
+ {
+  "name": "0.msav_copper_5",
+  "source": "0.msav_copper_5.txt",
+  "save": "0.msav",
+  "map": "Fortress",
+  "ore": "copper",
+  "tiles": 49,
+  "tap": [
+   256,
+   357
+  ],
+  "dumpTap": [
+   191,
+   78
+  ],
+  "bbox": [
+   182,
+   76,
+   191,
+   83
+  ],
+  "built": [],
+  "x": 241,
+  "y": 349
+ },
+ {
+  "name": "0.msav_copper_7",
+  "source": "0.msav_copper_7.txt",
+  "save": "0.msav",
+  "map": "Fortress",
+  "ore": "copper",
+  "tiles": 23,
+  "tap": [
+   489,
+   355
+  ],
+  "dumpTap": [
+   215,
+   189
+  ],
+  "bbox": [
+   215,
+   189,
+   219,
+   196
+  ],
+  "built": [],
+  "x": 483,
+  "y": 349
+ },
+ {
+  "name": "0.msav_copper_8",
+  "source": "0.msav_copper_8.txt",
+  "save": "0.msav",
+  "map": "Fortress",
+  "ore": "copper",
+  "tiles": 25,
+  "tap": [
+   112,
+   499
+  ],
+  "dumpTap": [
+   66,
+   141
+  ],
+  "bbox": [
+   63,
+   141,
+   68,
+   146
+  ],
+  "built": [],
+  "x": 103,
+  "y": 493
+ },
+ {
+  "name": "0.msav_lead_6",
+  "source": "0.msav_lead_6.txt",
+  "save": "0.msav",
+  "map": "Fortress",
+  "ore": "lead",
+  "tiles": 46,
+  "tap": [
+   12,
+   235
+  ],
+  "dumpTap": [
+   39,
+   219
+  ],
+  "bbox": [
+   33,
+   215,
+   41,
+   223
+  ],
+  "built": [],
+  "x": 0,
+  "y": 225
+ },
+ {
+  "name": "0.msav_thorium_26",
+  "source": "0.msav_thorium_26.txt",
+  "save": "0.msav",
+  "map": "Fortress",
+  "ore": "thorium",
+  "tiles": 17,
+  "tap": [
+   39,
+   475
+  ],
+  "dumpTap": [
+   42,
+   232
+  ],
+  "bbox": [
+   38,
+   229,
+   42,
+   233
+  ],
+  "built": [],
+  "x": 29,
+  "y": 466
+ },
+ {
+  "name": "1.msav_coal_2",
+  "source": "1.msav_coal_2.txt",
+  "save": "1.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 30,
+  "tap": [
+   252,
+   472
+  ],
+  "dumpTap": [
+   84,
+   101
+  ],
+  "bbox": [
+   80,
+   101,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 242,
+  "y": 466
+ },
+ {
+  "name": "1.msav_copper_0",
+  "source": "1.msav_copper_0.txt",
+  "save": "1.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   41,
+   235
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 31,
+  "y": 225
+ },
+ {
+  "name": "1.msav_lead_1",
+  "source": "1.msav_lead_1.txt",
+  "save": "1.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   72,
+   235
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 62,
+  "y": 225
+ },
+ {
+  "name": "1.msav_scrap_5",
+  "source": "1.msav_scrap_5.txt",
+  "save": "1.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   103,
+   235
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 93,
+  "y": 225
+ },
+ {
+  "name": "1.msav_thorium_4",
+  "source": "1.msav_thorium_4.txt",
+  "save": "1.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 13,
+  "tap": [
+   123,
+   420
+  ],
+  "dumpTap": [
+   85,
+   87
+  ],
+  "bbox": [
+   84,
+   83,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 116,
+  "y": 410
+ },
+ {
+  "name": "1.msav_titanium_3",
+  "source": "1.msav_titanium_3.txt",
+  "save": "1.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   134,
+   235
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 124,
+  "y": 225
+ },
+ {
+  "name": "10.msav_coal_2",
+  "source": "10.msav_coal_2.txt",
+  "save": "10.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   165,
+   235
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 155,
+  "y": 225
+ },
+ {
+  "name": "10.msav_copper_0",
+  "source": "10.msav_copper_0.txt",
+  "save": "10.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   196,
+   235
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 186,
+  "y": 225
+ },
+ {
+  "name": "10.msav_lead_1",
+  "source": "10.msav_lead_1.txt",
+  "save": "10.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   227,
+   235
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 217,
+  "y": 225
+ },
+ {
+  "name": "10.msav_scrap_5",
+  "source": "10.msav_scrap_5.txt",
+  "save": "10.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   258,
+   235
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 248,
+  "y": 225
+ },
+ {
+  "name": "10.msav_thorium_4",
+  "source": "10.msav_thorium_4.txt",
+  "save": "10.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   289,
+   235
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 279,
+  "y": 225
+ },
+ {
+  "name": "10.msav_titanium_3",
+  "source": "10.msav_titanium_3.txt",
+  "save": "10.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   320,
+   235
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 310,
+  "y": 225
+ },
+ {
+  "name": "11.msav_coal_2",
+  "source": "11.msav_coal_2.txt",
+  "save": "11.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   351,
+   235
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 341,
+  "y": 225
+ },
+ {
+  "name": "11.msav_copper_0",
+  "source": "11.msav_copper_0.txt",
+  "save": "11.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 64,
+  "tap": [
+   347,
+   359
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   87
+  ],
+  "built": [],
+  "x": 337,
+  "y": 349
+ },
+ {
+  "name": "11.msav_lead_1",
+  "source": "11.msav_lead_1.txt",
+  "save": "11.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   382,
+   235
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 372,
+  "y": 225
+ },
+ {
+  "name": "11.msav_scrap_5",
+  "source": "11.msav_scrap_5.txt",
+  "save": "11.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   413,
+   235
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 403,
+  "y": 225
+ },
+ {
+  "name": "11.msav_thorium_4",
+  "source": "11.msav_thorium_4.txt",
+  "save": "11.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 65,
+  "tap": [
+   444,
+   235
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 434,
+  "y": 225
+ },
+ {
+  "name": "11.msav_titanium_3",
+  "source": "11.msav_titanium_3.txt",
+  "save": "11.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   475,
+   235
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 465,
+  "y": 225
+ },
+ {
+  "name": "12.msav_coal_28",
+  "source": "12.msav_coal_28.txt",
+  "save": "12.msav",
+  "map": "Labyrinth",
+  "ore": "coal",
+  "tiles": 14,
+  "tap": [
+   479,
+   474
+  ],
+  "dumpTap": [
+   125,
+   103
+  ],
+  "bbox": [
+   125,
+   101,
+   128,
+   104
+  ],
+  "built": [],
+  "x": 473,
+  "y": 466
+ },
+ {
+  "name": "12.msav_coal_3",
+  "source": "12.msav_coal_3.txt",
+  "save": "12.msav",
+  "map": "Labyrinth",
+  "ore": "coal",
+  "tiles": 38,
+  "tap": [
+   406,
+   359
+  ],
+  "dumpTap": [
+   12,
+   133
+  ],
+  "bbox": [
+   10,
+   129,
+   16,
+   136
+  ],
+  "built": [],
+  "x": 398,
+  "y": 349
+ },
+ {
+  "name": "12.msav_copper_1",
+  "source": "12.msav_copper_1.txt",
+  "save": "12.msav",
+  "map": "Labyrinth",
+  "ore": "copper",
+  "tiles": 37,
+  "tap": [
+   436,
+   358
+  ],
+  "dumpTap": [
+   93,
+   160
+  ],
+  "bbox": [
+   90,
+   157,
+   95,
+   164
+  ],
+  "built": [],
+  "x": 427,
+  "y": 349
+ },
+ {
+  "name": "12.msav_copper_8",
+  "source": "12.msav_copper_8.txt",
+  "save": "12.msav",
+  "map": "Labyrinth",
+  "ore": "copper",
+  "tiles": 31,
+  "tap": [
+   495,
+   388
+  ],
+  "dumpTap": [
+   79,
+   68
+  ],
+  "bbox": [
+   74,
+   66,
+   80,
+   71
+  ],
+  "built": [],
+  "x": 484,
+  "y": 380
+ },
+ {
+  "name": "12.msav_lead_2",
+  "source": "12.msav_lead_2.txt",
+  "save": "12.msav",
+  "map": "Labyrinth",
+  "ore": "lead",
+  "tiles": 47,
+  "tap": [
+   406,
+   92
+  ],
+  "dumpTap": [
+   22,
+   60
+  ],
+  "bbox": [
+   21,
+   53,
+   26,
+   68
+  ],
+  "built": [],
+  "x": 399,
+  "y": 79
+ },
+ {
+  "name": "12.msav_lead_36",
+  "source": "12.msav_lead_36.txt",
+  "save": "12.msav",
+  "map": "Labyrinth",
+  "ore": "lead",
+  "tiles": 15,
+  "tap": [
+   94,
+   447
+  ],
+  "dumpTap": [
+   18,
+   137
+  ],
+  "bbox": [
+   14,
+   134,
+   18,
+   139
+  ],
+  "built": [],
+  "x": 84,
+  "y": 438
+ },
+ {
+  "name": "12.msav_lead_37",
+  "source": "12.msav_lead_37.txt",
+  "save": "12.msav",
+  "map": "Labyrinth",
+  "ore": "lead",
+  "tiles": 12,
+  "tap": [
+   452,
+   474
+  ],
+  "dumpTap": [
+   45,
+   62
+  ],
+  "bbox": [
+   45,
+   60,
+   49,
+   63
+  ],
+  "built": [],
+  "x": 446,
+  "y": 466
+ },
+ {
+  "name": "12.msav_titanium_23",
+  "source": "12.msav_titanium_23.txt",
+  "save": "12.msav",
+  "map": "Labyrinth",
+  "ore": "titanium",
+  "tiles": 14,
+  "tap": [
+   224,
+   447
+  ],
+  "dumpTap": [
+   119,
+   104
+  ],
+  "bbox": [
+   117,
+   101,
+   119,
+   106
+  ],
+  "built": [],
+  "x": 216,
+  "y": 438
+ },
+ {
+  "name": "13.msav_coal_2",
+  "source": "13.msav_coal_2.txt",
+  "save": "13.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   10,
+   266
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 0,
+  "y": 256
+ },
+ {
+  "name": "13.msav_copper_0",
+  "source": "13.msav_copper_0.txt",
+  "save": "13.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   41,
+   266
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 31,
+  "y": 256
+ },
+ {
+  "name": "13.msav_lead_1",
+  "source": "13.msav_lead_1.txt",
+  "save": "13.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   72,
+   266
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 62,
+  "y": 256
+ },
+ {
+  "name": "13.msav_scrap_5",
+  "source": "13.msav_scrap_5.txt",
+  "save": "13.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   103,
+   266
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 93,
+  "y": 256
+ },
+ {
+  "name": "13.msav_titanium_3",
+  "source": "13.msav_titanium_3.txt",
+  "save": "13.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   134,
+   266
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 124,
+  "y": 256
+ },
+ {
+  "name": "14.msav_coal_2",
+  "source": "14.msav_coal_2.txt",
+  "save": "14.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   165,
+   266
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 155,
+  "y": 256
+ },
+ {
+  "name": "14.msav_copper_0",
+  "source": "14.msav_copper_0.txt",
+  "save": "14.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   196,
+   266
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 186,
+  "y": 256
+ },
+ {
+  "name": "14.msav_lead_1",
+  "source": "14.msav_lead_1.txt",
+  "save": "14.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   227,
+   266
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 217,
+  "y": 256
+ },
+ {
+  "name": "14.msav_scrap_5",
+  "source": "14.msav_scrap_5.txt",
+  "save": "14.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   258,
+   266
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 248,
+  "y": 256
+ },
+ {
+  "name": "14.msav_thorium_4",
+  "source": "14.msav_thorium_4.txt",
+  "save": "14.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   289,
+   266
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 279,
+  "y": 256
+ },
+ {
+  "name": "14.msav_titanium_3",
+  "source": "14.msav_titanium_3.txt",
+  "save": "14.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   320,
+   266
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 310,
+  "y": 256
+ },
+ {
+  "name": "15.msav_scrap_0",
+  "source": "15.msav_scrap_0.txt",
+  "save": "15.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 1201,
+  "tap": [
+   345,
+   25
+  ],
+  "dumpTap": [
+   125,
+   98
+  ],
+  "bbox": [
+   106,
+   79,
+   144,
+   117
+  ],
+  "built": [],
+  "x": 320,
+  "y": 0
+ },
+ {
+  "name": "16.msav_scrap_0",
+  "source": "16.msav_scrap_0.txt",
+  "save": "16.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 1201,
+  "tap": [
+   406,
+   25
+  ],
+  "dumpTap": [
+   125,
+   98
+  ],
+  "bbox": [
+   106,
+   79,
+   144,
+   117
+  ],
+  "built": [],
+  "x": 381,
+  "y": 0
+ },
+ {
+  "name": "17.msav_copper_16",
+  "source": "17.msav_copper_16.txt",
+  "save": "17.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 47,
+  "tap": [
+   495,
+   198
+  ],
+  "dumpTap": [
+   142,
+   313
+  ],
+  "bbox": [
+   135,
+   312,
+   149,
+   320
+  ],
+  "built": [],
+  "x": 482,
+  "y": 191
+ },
+ {
+  "name": "17.msav_copper_3",
+  "source": "17.msav_copper_3.txt",
+  "save": "17.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 98,
+  "tap": [
+   317,
+   201
+  ],
+  "dumpTap": [
+   102,
+   127
+  ],
+  "bbox": [
+   85,
+   123,
+   108,
+   132
+  ],
+  "built": [],
+  "x": 294,
+  "y": 191
+ },
+ {
+  "name": "17.msav_lead_17",
+  "source": "17.msav_lead_17.txt",
+  "save": "17.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 48,
+  "tap": [
+   88,
+   389
+  ],
+  "dumpTap": [
+   321,
+   113
+  ],
+  "bbox": [
+   317,
+   110,
+   333,
+   116
+  ],
+  "built": [],
+  "x": 78,
+  "y": 380
+ },
+ {
+  "name": "17.msav_lead_18",
+  "source": "17.msav_lead_18.txt",
+  "save": "17.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 37,
+  "tap": [
+   170,
+   387
+  ],
+  "dumpTap": [
+   294,
+   298
+  ],
+  "bbox": [
+   283,
+   297,
+   295,
+   303
+  ],
+  "built": [],
+  "x": 153,
+  "y": 380
+ },
+ {
+  "name": "17.msav_lead_2",
+  "source": "17.msav_lead_2.txt",
+  "save": "17.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 98,
+  "tap": [
+   7,
+   133
+  ],
+  "dumpTap": [
+   123,
+   169
+  ],
+  "bbox": [
+   122,
+   162,
+   135,
+   175
+  ],
+  "built": [],
+  "x": 0,
+  "y": 120
+ },
+ {
+  "name": "17.msav_lead_9",
+  "source": "17.msav_lead_9.txt",
+  "save": "17.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 20,
+  "tap": [
+   131,
+   358
+  ],
+  "dumpTap": [
+   255,
+   96
+  ],
+  "bbox": [
+   253,
+   93,
+   257,
+   101
+  ],
+  "built": [],
+  "x": 123,
+  "y": 349
+ },
+ {
+  "name": "17.msav_scrap_0",
+  "source": "17.msav_scrap_0.txt",
+  "save": "17.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 129,
+  "tap": [
+   14,
+   168
+  ],
+  "dumpTap": [
+   36,
+   120
+  ],
+  "bbox": [
+   28,
+   114,
+   39,
+   126
+  ],
+  "built": [],
+  "x": 0,
+  "y": 156
+ },
+ {
+  "name": "17.msav_scrap_1",
+  "source": "17.msav_scrap_1.txt",
+  "save": "17.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 106,
+  "tap": [
+   90,
+   201
+  ],
+  "dumpTap": [
+   108,
+   117
+  ],
+  "bbox": [
+   102,
+   113,
+   117,
+   124
+  ],
+  "built": [],
+  "x": 78,
+  "y": 191
+ },
+ {
+  "name": "18.msav_coal_14",
+  "source": "18.msav_coal_14.txt",
+  "save": "18.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "coal",
+  "tiles": 12,
+  "tap": [
+   137,
+   499
+  ],
+  "dumpTap": [
+   302,
+   235
+  ],
+  "bbox": [
+   302,
+   235,
+   306,
+   239
+  ],
+  "built": [],
+  "x": 131,
+  "y": 493
+ },
+ {
+  "name": "18.msav_copper_27",
+  "source": "18.msav_copper_27.txt",
+  "save": "18.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 25,
+  "tap": [
+   435,
+   390
+  ],
+  "dumpTap": [
+   110,
+   242
+  ],
+  "bbox": [
+   105,
+   238,
+   112,
+   243
+  ],
+  "built": [],
+  "x": 424,
+  "y": 380
+ },
+ {
+  "name": "18.msav_copper_29",
+  "source": "18.msav_copper_29.txt",
+  "save": "18.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 17,
+  "tap": [
+   144,
+   447
+  ],
+  "dumpTap": [
+   191,
+   301
+  ],
+  "bbox": [
+   191,
+   298,
+   194,
+   303
+  ],
+  "built": [],
+  "x": 138,
+  "y": 438
+ },
+ {
+  "name": "18.msav_lead_11",
+  "source": "18.msav_lead_11.txt",
+  "save": "18.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 26,
+  "tap": [
+   457,
+   448
+  ],
+  "dumpTap": [
+   270,
+   276
+  ],
+  "bbox": [
+   268,
+   272,
+   275,
+   276
+  ],
+  "built": [],
+  "x": 449,
+  "y": 438
+ },
+ {
+  "name": "18.msav_lead_3",
+  "source": "18.msav_lead_3.txt",
+  "save": "18.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 88,
+  "tap": [
+   156,
+   92
+  ],
+  "dumpTap": [
+   298,
+   60
+  ],
+  "bbox": [
+   293,
+   53,
+   307,
+   70
+  ],
+  "built": [],
+  "x": 145,
+  "y": 79
+ },
+ {
+  "name": "18.msav_lead_4",
+  "source": "18.msav_lead_4.txt",
+  "save": "18.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 87,
+  "tap": [
+   42,
+   133
+  ],
+  "dumpTap": [
+   122,
+   169
+  ],
+  "bbox": [
+   122,
+   162,
+   135,
+   175
+  ],
+  "built": [],
+  "x": 36,
+  "y": 120
+ },
+ {
+  "name": "18.msav_scrap_0",
+  "source": "18.msav_scrap_0.txt",
+  "save": "18.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 116,
+  "tap": [
+   308,
+   166
+  ],
+  "dumpTap": [
+   105,
+   117
+  ],
+  "bbox": [
+   102,
+   113,
+   118,
+   124
+  ],
+  "built": [],
+  "x": 299,
+  "y": 156
+ },
+ {
+  "name": "18.msav_scrap_1",
+  "source": "18.msav_scrap_1.txt",
+  "save": "18.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 93,
+  "tap": [
+   49,
+   168
+  ],
+  "dumpTap": [
+   37,
+   120
+  ],
+  "bbox": [
+   28,
+   114,
+   39,
+   126
+  ],
+  "built": [],
+  "x": 34,
+  "y": 156
+ },
+ {
+  "name": "19.msav_coal_23",
+  "source": "19.msav_coal_23.txt",
+  "save": "19.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "coal",
+  "tiles": 24,
+  "tap": [
+   487,
+   448
+  ],
+  "dumpTap": [
+   125,
+   214
+  ],
+  "bbox": [
+   123,
+   210,
+   129,
+   214
+  ],
+  "built": [],
+  "x": 479,
+  "y": 438
+ },
+ {
+  "name": "19.msav_coal_30",
+  "source": "19.msav_coal_30.txt",
+  "save": "19.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "coal",
+  "tiles": 23,
+  "tap": [
+   7,
+   416
+  ],
+  "dumpTap": [
+   302,
+   227
+  ],
+  "bbox": [
+   301,
+   227,
+   307,
+   232
+  ],
+  "built": [],
+  "x": 0,
+  "y": 410
+ },
+ {
+  "name": "19.msav_coal_31",
+  "source": "19.msav_coal_31.txt",
+  "save": "19.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "coal",
+  "tiles": 25,
+  "tap": [
+   311,
+   387
+  ],
+  "dumpTap": [
+   276,
+   343
+  ],
+  "bbox": [
+   276,
+   342,
+   281,
+   348
+  ],
+  "built": [],
+  "x": 305,
+  "y": 380
+ },
+ {
+  "name": "19.msav_copper_0",
+  "source": "19.msav_copper_0.txt",
+  "save": "19.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 86,
+  "tap": [
+   256,
+   88
+  ],
+  "dumpTap": [
+   79,
+   230
+  ],
+  "bbox": [
+   79,
+   227,
+   93,
+   243
+  ],
+  "built": [],
+  "x": 250,
+  "y": 79
+ },
+ {
+  "name": "19.msav_lead_2",
+  "source": "19.msav_lead_2.txt",
+  "save": "19.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 108,
+  "tap": [
+   84,
+   134
+  ],
+  "dumpTap": [
+   128,
+   170
+  ],
+  "bbox": [
+   122,
+   162,
+   135,
+   175
+  ],
+  "built": [],
+  "x": 72,
+  "y": 120
+ },
+ {
+  "name": "19.msav_lead_27",
+  "source": "19.msav_lead_27.txt",
+  "save": "19.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 26,
+  "tap": [
+   151,
+   421
+  ],
+  "dumpTap": [
+   248,
+   276
+  ],
+  "bbox": [
+   247,
+   271,
+   252,
+   276
+  ],
+  "built": [],
+  "x": 144,
+  "y": 410
+ },
+ {
+  "name": "19.msav_scrap_1",
+  "source": "19.msav_scrap_1.txt",
+  "save": "19.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 134,
+  "tap": [
+   82,
+   168
+  ],
+  "dumpTap": [
+   36,
+   120
+  ],
+  "bbox": [
+   28,
+   114,
+   39,
+   126
+  ],
+  "built": [],
+  "x": 68,
+  "y": 156
+ },
+ {
+  "name": "19.msav_scrap_3",
+  "source": "19.msav_scrap_3.txt",
+  "save": "19.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 101,
+  "tap": [
+   346,
+   166
+  ],
+  "dumpTap": [
+   104,
+   117
+  ],
+  "bbox": [
+   102,
+   113,
+   118,
+   124
+  ],
+  "built": [],
+  "x": 338,
+  "y": 156
+ },
+ {
+  "name": "2.msav_coal_2",
+  "source": "2.msav_coal_2.txt",
+  "save": "2.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   351,
+   266
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 341,
+  "y": 256
+ },
+ {
+  "name": "2.msav_copper_0",
+  "source": "2.msav_copper_0.txt",
+  "save": "2.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   382,
+   266
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 372,
+  "y": 256
+ },
+ {
+  "name": "2.msav_thorium_4",
+  "source": "2.msav_thorium_4.txt",
+  "save": "2.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   413,
+   266
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 403,
+  "y": 256
+ },
+ {
+  "name": "2.msav_titanium_3",
+  "source": "2.msav_titanium_3.txt",
+  "save": "2.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   444,
+   266
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 434,
+  "y": 256
+ },
+ {
+  "name": "20.msav_coal_21",
+  "source": "20.msav_coal_21.txt",
+  "save": "20.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "coal",
+  "tiles": 15,
+  "tap": [
+   37,
+   418
+  ],
+  "dumpTap": [
+   160,
+   331
+  ],
+  "bbox": [
+   158,
+   329,
+   164,
+   334
+  ],
+  "built": [],
+  "x": 29,
+  "y": 410
+ },
+ {
+  "name": "20.msav_copper_16",
+  "source": "20.msav_copper_16.txt",
+  "save": "20.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 15,
+  "tap": [
+   343,
+   474
+  ],
+  "dumpTap": [
+   109,
+   242
+  ],
+  "bbox": [
+   106,
+   240,
+   111,
+   243
+  ],
+  "built": [],
+  "x": 334,
+  "y": 466
+ },
+ {
+  "name": "20.msav_copper_33",
+  "source": "20.msav_copper_33.txt",
+  "save": "20.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 16,
+  "tap": [
+   66,
+   472
+  ],
+  "dumpTap": [
+   52,
+   266
+  ],
+  "bbox": [
+   48,
+   266,
+   52,
+   270
+  ],
+  "built": [],
+  "x": 56,
+  "y": 466
+ },
+ {
+  "name": "20.msav_copper_36",
+  "source": "20.msav_copper_36.txt",
+  "save": "20.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 12,
+  "tap": [
+   198,
+   388
+  ],
+  "dumpTap": [
+   90,
+   337
+  ],
+  "bbox": [
+   86,
+   335,
+   93,
+   341
+  ],
+  "built": [],
+  "x": 188,
+  "y": 380
+ },
+ {
+  "name": "20.msav_copper_4",
+  "source": "20.msav_copper_4.txt",
+  "save": "20.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 85,
+  "tap": [
+   210,
+   201
+  ],
+  "dumpTap": [
+   121,
+   228
+  ],
+  "bbox": [
+   104,
+   224,
+   121,
+   234
+  ],
+  "built": [],
+  "x": 187,
+  "y": 191
+ },
+ {
+  "name": "20.msav_lead_1",
+  "source": "20.msav_lead_1.txt",
+  "save": "20.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 118,
+  "tap": [
+   115,
+   134
+  ],
+  "dumpTap": [
+   123,
+   170
+  ],
+  "bbox": [
+   122,
+   162,
+   135,
+   175
+  ],
+  "built": [],
+  "x": 108,
+  "y": 120
+ },
+ {
+  "name": "20.msav_scrap_0",
+  "source": "20.msav_scrap_0.txt",
+  "save": "20.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 134,
+  "tap": [
+   116,
+   168
+  ],
+  "dumpTap": [
+   36,
+   120
+  ],
+  "bbox": [
+   28,
+   114,
+   39,
+   126
+  ],
+  "built": [],
+  "x": 102,
+  "y": 156
+ },
+ {
+  "name": "20.msav_scrap_2",
+  "source": "20.msav_scrap_2.txt",
+  "save": "20.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 117,
+  "tap": [
+   387,
+   166
+  ],
+  "dumpTap": [
+   106,
+   117
+  ],
+  "bbox": [
+   102,
+   113,
+   118,
+   124
+  ],
+  "built": [],
+  "x": 377,
+  "y": 156
+ },
+ {
+  "name": "21.msav_copper_22",
+  "source": "21.msav_copper_22.txt",
+  "save": "21.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 28,
+  "tap": [
+   406,
+   388
+  ],
+  "dumpTap": [
+   177,
+   297
+  ],
+  "bbox": [
+   170,
+   295,
+   178,
+   300
+  ],
+  "built": [],
+  "x": 393,
+  "y": 380
+ },
+ {
+  "name": "21.msav_copper_24",
+  "source": "21.msav_copper_24.txt",
+  "save": "21.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 13,
+  "tap": [
+   165,
+   499
+  ],
+  "dumpTap": [
+   318,
+   233
+  ],
+  "bbox": [
+   315,
+   233,
+   318,
+   236
+  ],
+  "built": [],
+  "x": 158,
+  "y": 493
+ },
+ {
+  "name": "21.msav_copper_4",
+  "source": "21.msav_copper_4.txt",
+  "save": "21.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 87,
+  "tap": [
+   375,
+   91
+  ],
+  "dumpTap": [
+   118,
+   259
+  ],
+  "bbox": [
+   114,
+   253,
+   125,
+   268
+  ],
+  "built": [],
+  "x": 365,
+  "y": 79
+ },
+ {
+  "name": "21.msav_lead_3",
+  "source": "21.msav_lead_3.txt",
+  "save": "21.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 102,
+  "tap": [
+   156,
+   134
+  ],
+  "dumpTap": [
+   128,
+   170
+  ],
+  "bbox": [
+   122,
+   162,
+   135,
+   175
+  ],
+  "built": [],
+  "x": 144,
+  "y": 120
+ },
+ {
+  "name": "21.msav_lead_31",
+  "source": "21.msav_lead_31.txt",
+  "save": "21.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 23,
+  "tap": [
+   178,
+   417
+  ],
+  "dumpTap": [
+   204,
+   241
+  ],
+  "bbox": [
+   204,
+   240,
+   210,
+   245
+  ],
+  "built": [],
+  "x": 172,
+  "y": 410
+ },
+ {
+  "name": "21.msav_lead_34",
+  "source": "21.msav_lead_34.txt",
+  "save": "21.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 20,
+  "tap": [
+   317,
+   474
+  ],
+  "dumpTap": [
+   277,
+   174
+  ],
+  "bbox": [
+   270,
+   172,
+   277,
+   175
+  ],
+  "built": [],
+  "x": 304,
+  "y": 466
+ },
+ {
+  "name": "21.msav_scrap_0",
+  "source": "21.msav_scrap_0.txt",
+  "save": "21.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 134,
+  "tap": [
+   150,
+   168
+  ],
+  "dumpTap": [
+   36,
+   120
+  ],
+  "bbox": [
+   28,
+   114,
+   39,
+   126
+  ],
+  "built": [],
+  "x": 136,
+  "y": 156
+ },
+ {
+  "name": "21.msav_scrap_1",
+  "source": "21.msav_scrap_1.txt",
+  "save": "21.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 117,
+  "tap": [
+   425,
+   166
+  ],
+  "dumpTap": [
+   105,
+   117
+  ],
+  "bbox": [
+   102,
+   113,
+   118,
+   124
+  ],
+  "built": [],
+  "x": 416,
+  "y": 156
+ },
+ {
+  "name": "22.msav_coal_35",
+  "source": "22.msav_coal_35.txt",
+  "save": "22.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "coal",
+  "tiles": 17,
+  "tap": [
+   206,
+   421
+  ],
+  "dumpTap": [
+   148,
+   336
+  ],
+  "bbox": [
+   148,
+   331,
+   153,
+   336
+  ],
+  "built": [],
+  "x": 200,
+  "y": 410
+ },
+ {
+  "name": "22.msav_copper_16",
+  "source": "22.msav_copper_16.txt",
+  "save": "22.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 13,
+  "tap": [
+   199,
+   474
+  ],
+  "dumpTap": [
+   318,
+   166
+  ],
+  "bbox": [
+   315,
+   164,
+   318,
+   168
+  ],
+  "built": [],
+  "x": 190,
+  "y": 466
+ },
+ {
+  "name": "22.msav_copper_5",
+  "source": "22.msav_copper_5.txt",
+  "save": "22.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 104,
+  "tap": [
+   122,
+   203
+  ],
+  "dumpTap": [
+   306,
+   353
+  ],
+  "bbox": [
+   306,
+   347,
+   321,
+   358
+  ],
+  "built": [],
+  "x": 116,
+  "y": 191
+ },
+ {
+  "name": "22.msav_lead_0",
+  "source": "22.msav_lead_0.txt",
+  "save": "22.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 117,
+  "tap": [
+   187,
+   134
+  ],
+  "dumpTap": [
+   123,
+   170
+  ],
+  "bbox": [
+   122,
+   162,
+   135,
+   175
+  ],
+  "built": [],
+  "x": 180,
+  "y": 120
+ },
+ {
+  "name": "22.msav_lead_22",
+  "source": "22.msav_lead_22.txt",
+  "save": "22.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 24,
+  "tap": [
+   224,
+   386
+  ],
+  "dumpTap": [
+   333,
+   235
+  ],
+  "bbox": [
+   333,
+   235,
+   340,
+   241
+  ],
+  "built": [],
+  "x": 218,
+  "y": 380
+ },
+ {
+  "name": "22.msav_lead_38",
+  "source": "22.msav_lead_38.txt",
+  "save": "22.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 12,
+  "tap": [
+   368,
+   471
+  ],
+  "dumpTap": [
+   24,
+   359
+  ],
+  "bbox": [
+   24,
+   358,
+   29,
+   363
+  ],
+  "built": [],
+  "x": 362,
+  "y": 466
+ },
+ {
+  "name": "22.msav_scrap_1",
+  "source": "22.msav_scrap_1.txt",
+  "save": "22.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 118,
+  "tap": [
+   465,
+   166
+  ],
+  "dumpTap": [
+   106,
+   117
+  ],
+  "bbox": [
+   102,
+   113,
+   118,
+   124
+  ],
+  "built": [],
+  "x": 455,
+  "y": 156
+ },
+ {
+  "name": "22.msav_scrap_4",
+  "source": "22.msav_scrap_4.txt",
+  "save": "22.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 105,
+  "tap": [
+   297,
+   131
+  ],
+  "dumpTap": [
+   31,
+   119
+  ],
+  "bbox": [
+   28,
+   114,
+   39,
+   127
+  ],
+  "built": [],
+  "x": 288,
+  "y": 120
+ },
+ {
+  "name": "23.msav_copper_12",
+  "source": "23.msav_copper_12.txt",
+  "save": "23.msav",
+  "map": "anthill v5",
+  "ore": "copper",
+  "tiles": 19,
+  "tap": [
+   403,
+   449
+  ],
+  "dumpTap": [
+   46,
+   143
+  ],
+  "bbox": [
+   46,
+   138,
+   49,
+   143
+  ],
+  "built": [],
+  "x": 397,
+  "y": 438
+ },
+ {
+  "name": "23.msav_copper_2",
+  "source": "23.msav_copper_2.txt",
+  "save": "23.msav",
+  "map": "anthill v5",
+  "ore": "copper",
+  "tiles": 125,
+  "tap": [
+   334,
+   94
+  ],
+  "dumpTap": [
+   84,
+   227
+  ],
+  "bbox": [
+   84,
+   218,
+   98,
+   233
+  ],
+  "built": [],
+  "x": 328,
+  "y": 79
+ },
+ {
+  "name": "23.msav_copper_31",
+  "source": "23.msav_copper_31.txt",
+  "save": "23.msav",
+  "map": "anthill v5",
+  "ore": "copper",
+  "tiles": 12,
+  "tap": [
+   287,
+   472
+  ],
+  "dumpTap": [
+   160,
+   285
+  ],
+  "bbox": [
+   152,
+   285,
+   160,
+   288
+  ],
+  "built": [],
+  "x": 273,
+  "y": 466
+ },
+ {
+  "name": "23.msav_copper_4",
+  "source": "23.msav_copper_4.txt",
+  "save": "23.msav",
+  "map": "anthill v5",
+  "ore": "copper",
+  "tiles": 19,
+  "tap": [
+   9,
+   386
+  ],
+  "dumpTap": [
+   153,
+   417
+  ],
+  "bbox": [
+   150,
+   417,
+   153,
+   424
+  ],
+  "built": [],
+  "x": 0,
+  "y": 380
+ },
+ {
+  "name": "23.msav_lead_18",
+  "source": "23.msav_lead_18.txt",
+  "save": "23.msav",
+  "map": "anthill v5",
+  "ore": "lead",
+  "tiles": 17,
+  "tap": [
+   171,
+   445
+  ],
+  "dumpTap": [
+   162,
+   92
+  ],
+  "bbox": [
+   161,
+   91,
+   164,
+   96
+  ],
+  "built": [],
+  "x": 164,
+  "y": 438
+ },
+ {
+  "name": "23.msav_lead_8",
+  "source": "23.msav_lead_8.txt",
+  "save": "23.msav",
+  "map": "anthill v5",
+  "ore": "lead",
+  "tiles": 52,
+  "tap": [
+   246,
+   169
+  ],
+  "dumpTap": [
+   88,
+   59
+  ],
+  "bbox": [
+   86,
+   52,
+   95,
+   64
+  ],
+  "built": [],
+  "x": 238,
+  "y": 156
+ },
+ {
+  "name": "23.msav_scrap_0",
+  "source": "23.msav_scrap_0.txt",
+  "save": "23.msav",
+  "map": "anthill v5",
+  "ore": "scrap",
+  "tiles": 2647,
+  "tap": [
+   261,
+   33
+  ],
+  "dumpTap": [
+   129,
+   51
+  ],
+  "bbox": [
+   38,
+   24,
+   171,
+   79
+  ],
+  "built": [],
+  "x": 164,
+  "y": 0
+ },
+ {
+  "name": "23.msav_scrap_1",
+  "source": "23.msav_scrap_1.txt",
+  "save": "23.msav",
+  "map": "anthill v5",
+  "ore": "scrap",
+  "tiles": 143,
+  "tap": [
+   12,
+   93
+  ],
+  "dumpTap": [
+   36,
+   81
+  ],
+  "bbox": [
+   30,
+   73,
+   59,
+   91
+  ],
+  "built": [],
+  "x": 0,
+  "y": 79
+ },
+ {
+  "name": "24.msav_coal_24",
+  "source": "24.msav_coal_24.txt",
+  "save": "24.msav",
+  "map": "4 corners  of death ",
+  "ore": "coal",
+  "tiles": 27,
+  "tap": [
+   235,
+   418
+  ],
+  "dumpTap": [
+   90,
+   207
+  ],
+  "bbox": [
+   89,
+   205,
+   94,
+   210
+  ],
+  "built": [],
+  "x": 228,
+  "y": 410
+ },
+ {
+  "name": "24.msav_coal_25",
+  "source": "24.msav_coal_25.txt",
+  "save": "24.msav",
+  "map": "4 corners  of death ",
+  "ore": "coal",
+  "tiles": 27,
+  "tap": [
+   263,
+   418
+  ],
+  "dumpTap": [
+   206,
+   207
+  ],
+  "bbox": [
+   205,
+   205,
+   210,
+   210
+  ],
+  "built": [],
+  "x": 256,
+  "y": 410
+ },
+ {
+  "name": "24.msav_copper_32",
+  "source": "24.msav_copper_32.txt",
+  "save": "24.msav",
+  "map": "4 corners  of death ",
+  "ore": "copper",
+  "tiles": 18,
+  "tap": [
+   290,
+   419
+  ],
+  "dumpTap": [
+   85,
+   212
+  ],
+  "bbox": [
+   85,
+   209,
+   90,
+   214
+  ],
+  "built": [],
+  "x": 284,
+  "y": 410
+ },
+ {
+  "name": "24.msav_copper_33",
+  "source": "24.msav_copper_33.txt",
+  "save": "24.msav",
+  "map": "4 corners  of death ",
+  "ore": "copper",
+  "tiles": 18,
+  "tap": [
+   321,
+   419
+  ],
+  "dumpTap": [
+   212,
+   212
+  ],
+  "bbox": [
+   209,
+   209,
+   214,
+   214
+  ],
+  "built": [],
+  "x": 312,
+  "y": 410
+ },
+ {
+  "name": "24.msav_copper_7",
+  "source": "24.msav_copper_7.txt",
+  "save": "24.msav",
+  "map": "4 corners  of death ",
+  "ore": "copper",
+  "tiles": 36,
+  "tap": [
+   346,
+   419
+  ],
+  "dumpTap": [
+   49,
+   248
+  ],
+  "bbox": [
+   49,
+   245,
+   54,
+   250
+  ],
+  "built": [],
+  "x": 340,
+  "y": 410
+ },
+ {
+  "name": "24.msav_copper_8",
+  "source": "24.msav_copper_8.txt",
+  "save": "24.msav",
+  "map": "4 corners  of death ",
+  "ore": "copper",
+  "tiles": 36,
+  "tap": [
+   374,
+   419
+  ],
+  "dumpTap": [
+   245,
+   248
+  ],
+  "bbox": [
+   245,
+   245,
+   250,
+   250
+  ],
+  "built": [],
+  "x": 368,
+  "y": 410
+ },
+ {
+  "name": "24.msav_titanium_38",
+  "source": "24.msav_titanium_38.txt",
+  "save": "24.msav",
+  "map": "4 corners  of death ",
+  "ore": "titanium",
+  "tiles": 18,
+  "tap": [
+   269,
+   447
+  ],
+  "dumpTap": [
+   3,
+   248
+  ],
+  "bbox": [
+   3,
+   245,
+   5,
+   250
+  ],
+  "built": [],
+  "x": 266,
+  "y": 438
+ },
+ {
+  "name": "24.msav_titanium_39",
+  "source": "24.msav_titanium_39.txt",
+  "save": "24.msav",
+  "map": "4 corners  of death ",
+  "ore": "titanium",
+  "tiles": 18,
+  "tap": [
+   294,
+   447
+  ],
+  "dumpTap": [
+   294,
+   248
+  ],
+  "bbox": [
+   294,
+   245,
+   296,
+   250
+  ],
+  "built": [],
+  "x": 288,
+  "y": 438
+ },
+ {
+  "name": "26.msav_coal_31",
+  "source": "26.msav_coal_31.txt",
+  "save": "26.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "coal",
+  "tiles": 18,
+  "tap": [
+   401,
+   475
+  ],
+  "dumpTap": [
+   19,
+   276
+  ],
+  "bbox": [
+   14,
+   273,
+   19,
+   276
+  ],
+  "built": [],
+  "x": 390,
+  "y": 466
+ },
+ {
+  "name": "26.msav_copper_5",
+  "source": "26.msav_copper_5.txt",
+  "save": "26.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "copper",
+  "tiles": 90,
+  "tap": [
+   360,
+   202
+  ],
+  "dumpTap": [
+   55,
+   353
+  ],
+  "bbox": [
+   41,
+   348,
+   61,
+   357
+  ],
+  "built": [],
+  "x": 340,
+  "y": 191
+ },
+ {
+  "name": "26.msav_lead_1",
+  "source": "26.msav_lead_1.txt",
+  "save": "26.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 119,
+  "tap": [
+   223,
+   134
+  ],
+  "dumpTap": [
+   123,
+   170
+  ],
+  "bbox": [
+   122,
+   162,
+   135,
+   175
+  ],
+  "built": [],
+  "x": 216,
+  "y": 120
+ },
+ {
+  "name": "26.msav_lead_2",
+  "source": "26.msav_lead_2.txt",
+  "save": "26.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 113,
+  "tap": [
+   430,
+   133
+  ],
+  "dumpTap": [
+   212,
+   169
+  ],
+  "bbox": [
+   205,
+   162,
+   223,
+   174
+  ],
+  "built": [],
+  "x": 417,
+  "y": 120
+ },
+ {
+  "name": "26.msav_lead_27",
+  "source": "26.msav_lead_27.txt",
+  "save": "26.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 12,
+  "tap": [
+   317,
+   444
+  ],
+  "dumpTap": [
+   345,
+   236
+  ],
+  "bbox": [
+   344,
+   236,
+   346,
+   241
+  ],
+  "built": [],
+  "x": 310,
+  "y": 438
+ },
+ {
+  "name": "26.msav_lead_3",
+  "source": "26.msav_lead_3.txt",
+  "save": "26.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 33,
+  "tap": [
+   254,
+   392
+  ],
+  "dumpTap": [
+   208,
+   100
+  ],
+  "bbox": [
+   208,
+   94,
+   214,
+   100
+  ],
+  "built": [],
+  "x": 248,
+  "y": 380
+ },
+ {
+  "name": "26.msav_lead_7",
+  "source": "26.msav_lead_7.txt",
+  "save": "26.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "lead",
+  "tiles": 17,
+  "tap": [
+   382,
+   445
+  ],
+  "dumpTap": [
+   32,
+   375
+  ],
+  "bbox": [
+   32,
+   374,
+   36,
+   379
+  ],
+  "built": [],
+  "x": 376,
+  "y": 438
+ },
+ {
+  "name": "26.msav_scrap_0",
+  "source": "26.msav_scrap_0.txt",
+  "save": "26.msav",
+  "map": "[Orange]Attack_Secret Island Outpost",
+  "ore": "scrap",
+  "tiles": 133,
+  "tap": [
+   184,
+   168
+  ],
+  "dumpTap": [
+   36,
+   120
+  ],
+  "bbox": [
+   28,
+   114,
+   39,
+   126
+  ],
+  "built": [],
+  "x": 170,
+  "y": 156
+ },
+ {
+  "name": "3.msav_coal_2",
+  "source": "3.msav_coal_2.txt",
+  "save": "3.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   475,
+   266
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 465,
+  "y": 256
+ },
+ {
+  "name": "3.msav_copper_0",
+  "source": "3.msav_copper_0.txt",
+  "save": "3.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   10,
+   297
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 0,
+  "y": 287
+ },
+ {
+  "name": "3.msav_lead_1",
+  "source": "3.msav_lead_1.txt",
+  "save": "3.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   41,
+   297
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 31,
+  "y": 287
+ },
+ {
+  "name": "3.msav_scrap_5",
+  "source": "3.msav_scrap_5.txt",
+  "save": "3.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   72,
+   297
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 62,
+  "y": 287
+ },
+ {
+  "name": "3.msav_thorium_4",
+  "source": "3.msav_thorium_4.txt",
+  "save": "3.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   103,
+   297
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 93,
+  "y": 287
+ },
+ {
+  "name": "3.msav_titanium_3",
+  "source": "3.msav_titanium_3.txt",
+  "save": "3.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   134,
+   297
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 124,
+  "y": 287
+ },
+ {
+  "name": "4.msav_coal_2",
+  "source": "4.msav_coal_2.txt",
+  "save": "4.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   165,
+   297
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 155,
+  "y": 287
+ },
+ {
+  "name": "4.msav_copper_0",
+  "source": "4.msav_copper_0.txt",
+  "save": "4.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   196,
+   297
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 186,
+  "y": 287
+ },
+ {
+  "name": "4.msav_lead_1",
+  "source": "4.msav_lead_1.txt",
+  "save": "4.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   227,
+   297
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 217,
+  "y": 287
+ },
+ {
+  "name": "4.msav_scrap_5",
+  "source": "4.msav_scrap_5.txt",
+  "save": "4.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   258,
+   297
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 248,
+  "y": 287
+ },
+ {
+  "name": "4.msav_thorium_4",
+  "source": "4.msav_thorium_4.txt",
+  "save": "4.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   289,
+   297
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 279,
+  "y": 287
+ },
+ {
+  "name": "4.msav_titanium_3",
+  "source": "4.msav_titanium_3.txt",
+  "save": "4.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   320,
+   297
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 310,
+  "y": 287
+ },
+ {
+  "name": "4v4_bombing.msav.msav_coal_24",
+  "source": "4v4_bombing.msav.msav_coal_24.txt",
+  "save": "4v4 bombing.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "coal",
+  "tiles": 27,
+  "tap": [
+   403,
+   418
+  ],
+  "dumpTap": [
+   90,
+   207
+  ],
+  "bbox": [
+   89,
+   205,
+   94,
+   210
+  ],
+  "built": [],
+  "x": 396,
+  "y": 410
+ },
+ {
+  "name": "4v4_bombing.msav.msav_coal_25",
+  "source": "4v4_bombing.msav.msav_coal_25.txt",
+  "save": "4v4 bombing.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "coal",
+  "tiles": 27,
+  "tap": [
+   431,
+   418
+  ],
+  "dumpTap": [
+   206,
+   207
+  ],
+  "bbox": [
+   205,
+   205,
+   210,
+   210
+  ],
+  "built": [],
+  "x": 424,
+  "y": 410
+ },
+ {
+  "name": "4v4_bombing.msav.msav_copper_32",
+  "source": "4v4_bombing.msav.msav_copper_32.txt",
+  "save": "4v4 bombing.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "copper",
+  "tiles": 18,
+  "tap": [
+   458,
+   419
+  ],
+  "dumpTap": [
+   85,
+   212
+  ],
+  "bbox": [
+   85,
+   209,
+   90,
+   214
+  ],
+  "built": [],
+  "x": 452,
+  "y": 410
+ },
+ {
+  "name": "4v4_bombing.msav.msav_copper_33",
+  "source": "4v4_bombing.msav.msav_copper_33.txt",
+  "save": "4v4 bombing.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "copper",
+  "tiles": 18,
+  "tap": [
+   489,
+   419
+  ],
+  "dumpTap": [
+   212,
+   212
+  ],
+  "bbox": [
+   209,
+   209,
+   214,
+   214
+  ],
+  "built": [],
+  "x": 480,
+  "y": 410
+ },
+ {
+  "name": "4v4_bombing.msav.msav_copper_7",
+  "source": "4v4_bombing.msav.msav_copper_7.txt",
+  "save": "4v4 bombing.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "copper",
+  "tiles": 36,
+  "tap": [
+   6,
+   447
+  ],
+  "dumpTap": [
+   49,
+   248
+  ],
+  "bbox": [
+   49,
+   245,
+   54,
+   250
+  ],
+  "built": [],
+  "x": 0,
+  "y": 438
+ },
+ {
+  "name": "4v4_bombing.msav.msav_copper_8",
+  "source": "4v4_bombing.msav.msav_copper_8.txt",
+  "save": "4v4 bombing.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "copper",
+  "tiles": 36,
+  "tap": [
+   34,
+   447
+  ],
+  "dumpTap": [
+   245,
+   248
+  ],
+  "bbox": [
+   245,
+   245,
+   250,
+   250
+  ],
+  "built": [],
+  "x": 28,
+  "y": 438
+ },
+ {
+  "name": "4v4_bombing.msav.msav_titanium_38",
+  "source": "4v4_bombing.msav.msav_titanium_38.txt",
+  "save": "4v4 bombing.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "titanium",
+  "tiles": 18,
+  "tap": [
+   335,
+   447
+  ],
+  "dumpTap": [
+   3,
+   248
+  ],
+  "bbox": [
+   3,
+   245,
+   5,
+   250
+  ],
+  "built": [],
+  "x": 332,
+  "y": 438
+ },
+ {
+  "name": "4v4_bombing.msav.msav_titanium_39",
+  "source": "4v4_bombing.msav.msav_titanium_39.txt",
+  "save": "4v4 bombing.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "titanium",
+  "tiles": 18,
+  "tap": [
+   360,
+   447
+  ],
+  "dumpTap": [
+   294,
+   248
+  ],
+  "bbox": [
+   294,
+   245,
+   296,
+   250
+  ],
+  "built": [],
+  "x": 354,
+  "y": 438
+ },
+ {
+  "name": "5.msav_coal_2",
+  "source": "5.msav_coal_2.txt",
+  "save": "5.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   351,
+   297
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 341,
+  "y": 287
+ },
+ {
+  "name": "5.msav_copper_0",
+  "source": "5.msav_copper_0.txt",
+  "save": "5.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   382,
+   297
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 372,
+  "y": 287
+ },
+ {
+  "name": "5.msav_lead_1",
+  "source": "5.msav_lead_1.txt",
+  "save": "5.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   413,
+   297
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 403,
+  "y": 287
+ },
+ {
+  "name": "5.msav_scrap_5",
+  "source": "5.msav_scrap_5.txt",
+  "save": "5.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   444,
+   297
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 434,
+  "y": 287
+ },
+ {
+  "name": "5.msav_thorium_4",
+  "source": "5.msav_thorium_4.txt",
+  "save": "5.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   475,
+   297
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 465,
+  "y": 287
+ },
+ {
+  "name": "5.msav_titanium_3",
+  "source": "5.msav_titanium_3.txt",
+  "save": "5.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   10,
+   328
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 0,
+  "y": 318
+ },
+ {
+  "name": "6.msav_coal_2",
+  "source": "6.msav_coal_2.txt",
+  "save": "6.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   41,
+   328
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 31,
+  "y": 318
+ },
+ {
+  "name": "6.msav_copper_0",
+  "source": "6.msav_copper_0.txt",
+  "save": "6.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   72,
+   328
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 62,
+  "y": 318
+ },
+ {
+  "name": "6.msav_lead_1",
+  "source": "6.msav_lead_1.txt",
+  "save": "6.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   103,
+   328
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 93,
+  "y": 318
+ },
+ {
+  "name": "6.msav_scrap_5",
+  "source": "6.msav_scrap_5.txt",
+  "save": "6.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   134,
+   328
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 124,
+  "y": 318
+ },
+ {
+  "name": "6.msav_thorium_4",
+  "source": "6.msav_thorium_4.txt",
+  "save": "6.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   165,
+   328
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 155,
+  "y": 318
+ },
+ {
+  "name": "6.msav_titanium_3",
+  "source": "6.msav_titanium_3.txt",
+  "save": "6.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   196,
+   328
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 186,
+  "y": 318
+ },
+ {
+  "name": "7.msav_coal_3",
+  "source": "7.msav_coal_3.txt",
+  "save": "7.msav",
+  "map": "Ancient Caldera",
+  "ore": "coal",
+  "tiles": 13,
+  "tap": [
+   62,
+   499
+  ],
+  "dumpTap": [
+   156,
+   84
+  ],
+  "bbox": [
+   155,
+   80,
+   158,
+   84
+  ],
+  "built": [],
+  "x": 55,
+  "y": 493
+ },
+ {
+  "name": "7.msav_copper_12",
+  "source": "7.msav_copper_12.txt",
+  "save": "7.msav",
+  "map": "Ancient Caldera",
+  "ore": "copper",
+  "tiles": 23,
+  "tap": [
+   35,
+   389
+  ],
+  "dumpTap": [
+   160,
+   197
+  ],
+  "bbox": [
+   157,
+   194,
+   160,
+   201
+  ],
+  "built": [],
+  "x": 26,
+  "y": 380
+ },
+ {
+  "name": "7.msav_copper_2",
+  "source": "7.msav_copper_2.txt",
+  "save": "7.msav",
+  "map": "Ancient Caldera",
+  "ore": "copper",
+  "tiles": 62,
+  "tap": [
+   470,
+   91
+  ],
+  "dumpTap": [
+   52,
+   133
+  ],
+  "bbox": [
+   48,
+   127,
+   54,
+   141
+  ],
+  "built": [],
+  "x": 460,
+  "y": 79
+ },
+ {
+  "name": "7.msav_copper_6",
+  "source": "7.msav_copper_6.txt",
+  "save": "7.msav",
+  "map": "Ancient Caldera",
+  "ore": "copper",
+  "tiles": 49,
+  "tap": [
+   282,
+   359
+  ],
+  "dumpTap": [
+   114,
+   150
+  ],
+  "bbox": [
+   111,
+   146,
+   120,
+   153
+  ],
+  "built": [],
+  "x": 273,
+  "y": 349
+ },
+ {
+  "name": "7.msav_lead_24",
+  "source": "7.msav_lead_24.txt",
+  "save": "7.msav",
+  "map": "Ancient Caldera",
+  "ore": "lead",
+  "tiles": 23,
+  "tap": [
+   378,
+   359
+  ],
+  "dumpTap": [
+   91,
+   124
+  ],
+  "bbox": [
+   87,
+   120,
+   94,
+   127
+  ],
+  "built": [],
+  "x": 368,
+  "y": 349
+ },
+ {
+  "name": "7.msav_lead_25",
+  "source": "7.msav_lead_25.txt",
+  "save": "7.msav",
+  "map": "Ancient Caldera",
+  "ore": "lead",
+  "tiles": 56,
+  "tap": [
+   65,
+   416
+  ],
+  "dumpTap": [
+   54,
+   206
+  ],
+  "bbox": [
+   53,
+   206,
+   59,
+   217
+  ],
+  "built": [],
+  "x": 58,
+  "y": 410
+ },
+ {
+  "name": "7.msav_lead_33",
+  "source": "7.msav_lead_33.txt",
+  "save": "7.msav",
+  "map": "Ancient Caldera",
+  "ore": "lead",
+  "tiles": 25,
+  "tap": [
+   86,
+   499
+  ],
+  "dumpTap": [
+   224,
+   148
+  ],
+  "bbox": [
+   220,
+   148,
+   224,
+   153
+  ],
+  "built": [],
+  "x": 81,
+  "y": 493
+ },
+ {
+  "name": "7.msav_lead_4",
+  "source": "7.msav_lead_4.txt",
+  "save": "7.msav",
+  "map": "Ancient Caldera",
+  "ore": "lead",
+  "tiles": 60,
+  "tap": [
+   277,
+   170
+  ],
+  "dumpTap": [
+   54,
+   214
+  ],
+  "bbox": [
+   53,
+   206,
+   59,
+   218
+  ],
+  "built": [],
+  "x": 270,
+  "y": 156
+ },
+ {
+  "name": "8.msav_coal_2",
+  "source": "8.msav_coal_2.txt",
+  "save": "8.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   227,
+   328
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 217,
+  "y": 318
+ },
+ {
+  "name": "8.msav_copper_0",
+  "source": "8.msav_copper_0.txt",
+  "save": "8.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   258,
+   328
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 248,
+  "y": 318
+ },
+ {
+  "name": "8.msav_lead_1",
+  "source": "8.msav_lead_1.txt",
+  "save": "8.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   289,
+   328
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 279,
+  "y": 318
+ },
+ {
+  "name": "8.msav_scrap_5",
+  "source": "8.msav_scrap_5.txt",
+  "save": "8.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   320,
+   328
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 310,
+  "y": 318
+ },
+ {
+  "name": "8.msav_thorium_4",
+  "source": "8.msav_thorium_4.txt",
+  "save": "8.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   351,
+   328
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 341,
+  "y": 318
+ },
+ {
+  "name": "8.msav_titanium_3",
+  "source": "8.msav_titanium_3.txt",
+  "save": "8.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   382,
+   328
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 372,
+  "y": 318
+ },
+ {
+  "name": "9.msav_coal_2",
+  "source": "9.msav_coal_2.txt",
+  "save": "9.msav",
+  "map": "sandbox",
+  "ore": "coal",
+  "tiles": 69,
+  "tap": [
+   413,
+   328
+  ],
+  "dumpTap": [
+   84,
+   100
+  ],
+  "bbox": [
+   80,
+   96,
+   88,
+   104
+  ],
+  "built": [],
+  "x": 403,
+  "y": 318
+ },
+ {
+  "name": "9.msav_copper_0",
+  "source": "9.msav_copper_0.txt",
+  "save": "9.msav",
+  "map": "sandbox",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   444,
+   328
+  ],
+  "dumpTap": [
+   99,
+   84
+  ],
+  "bbox": [
+   95,
+   80,
+   103,
+   88
+  ],
+  "built": [],
+  "x": 434,
+  "y": 318
+ },
+ {
+  "name": "9.msav_lead_1",
+  "source": "9.msav_lead_1.txt",
+  "save": "9.msav",
+  "map": "sandbox",
+  "ore": "lead",
+  "tiles": 69,
+  "tap": [
+   475,
+   328
+  ],
+  "dumpTap": [
+   99,
+   114
+  ],
+  "bbox": [
+   95,
+   110,
+   103,
+   118
+  ],
+  "built": [],
+  "x": 465,
+  "y": 318
+ },
+ {
+  "name": "9.msav_scrap_5",
+  "source": "9.msav_scrap_5.txt",
+  "save": "9.msav",
+  "map": "sandbox",
+  "ore": "scrap",
+  "tiles": 69,
+  "tap": [
+   10,
+   359
+  ],
+  "dumpTap": [
+   115,
+   99
+  ],
+  "bbox": [
+   111,
+   95,
+   119,
+   103
+  ],
+  "built": [],
+  "x": 0,
+  "y": 349
+ },
+ {
+  "name": "9.msav_thorium_4",
+  "source": "9.msav_thorium_4.txt",
+  "save": "9.msav",
+  "map": "sandbox",
+  "ore": "thorium",
+  "tiles": 69,
+  "tap": [
+   41,
+   359
+  ],
+  "dumpTap": [
+   85,
+   84
+  ],
+  "bbox": [
+   81,
+   80,
+   89,
+   88
+  ],
+  "built": [],
+  "x": 31,
+  "y": 349
+ },
+ {
+  "name": "9.msav_titanium_3",
+  "source": "9.msav_titanium_3.txt",
+  "save": "9.msav",
+  "map": "sandbox",
+  "ore": "titanium",
+  "tiles": 69,
+  "tap": [
+   72,
+   359
+  ],
+  "dumpTap": [
+   115,
+   84
+  ],
+  "bbox": [
+   111,
+   80,
+   119,
+   88
+  ],
+  "built": [],
+  "x": 62,
+  "y": 349
+ },
+ {
+  "name": "Attack_Secret_Island_Outpost_1.msav.msav_coal_20",
+  "source": "Attack_Secret_Island_Outpost_1.msav.msav_coal_20.txt",
+  "save": "Attack_Secret_Island_Outpost_1.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "coal",
+  "tiles": 27,
+  "tap": [
+   464,
+   387
+  ],
+  "dumpTap": [
+   79,
+   303
+  ],
+  "bbox": [
+   75,
+   302,
+   82,
+   307
+  ],
+  "built": [],
+  "x": 454,
+  "y": 380
+ },
+ {
+  "name": "Attack_Secret_Island_Outpost_1.msav.msav_copper_29",
+  "source": "Attack_Secret_Island_Outpost_1.msav.msav_copper_29.txt",
+  "save": "Attack_Secret_Island_Outpost_1.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "copper",
+  "tiles": 32,
+  "tap": [
+   428,
+   446
+  ],
+  "dumpTap": [
+   72,
+   331
+  ],
+  "bbox": [
+   67,
+   329,
+   76,
+   333
+  ],
+  "built": [],
+  "x": 417,
+  "y": 438
+ },
+ {
+  "name": "Attack_Secret_Island_Outpost_1.msav.msav_copper_37",
+  "source": "Attack_Secret_Island_Outpost_1.msav.msav_copper_37.txt",
+  "save": "Attack_Secret_Island_Outpost_1.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "copper",
+  "tiles": 34,
+  "tap": [
+   94,
+   419
+  ],
+  "dumpTap": [
+   62,
+   221
+  ],
+  "bbox": [
+   61,
+   218,
+   67,
+   223
+  ],
+  "built": [],
+  "x": 87,
+  "y": 410
+ },
+ {
+  "name": "Attack_Secret_Island_Outpost_1.msav.msav_copper_39",
+  "source": "Attack_Secret_Island_Outpost_1.msav.msav_copper_39.txt",
+  "save": "Attack_Secret_Island_Outpost_1.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "copper",
+  "tiles": 17,
+  "tap": [
+   196,
+   447
+  ],
+  "dumpTap": [
+   191,
+   301
+  ],
+  "bbox": [
+   191,
+   298,
+   194,
+   303
+  ],
+  "built": [],
+  "x": 190,
+  "y": 438
+ },
+ {
+  "name": "Attack_Secret_Island_Outpost_1.msav.msav_lead_1",
+  "source": "Attack_Secret_Island_Outpost_1.msav.msav_lead_1.txt",
+  "save": "Attack_Secret_Island_Outpost_1.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "lead",
+  "tiles": 119,
+  "tap": [
+   259,
+   134
+  ],
+  "dumpTap": [
+   123,
+   170
+  ],
+  "bbox": [
+   122,
+   162,
+   135,
+   175
+  ],
+  "built": [],
+  "x": 252,
+  "y": 120
+ },
+ {
+  "name": "Attack_Secret_Island_Outpost_1.msav.msav_lead_7",
+  "source": "Attack_Secret_Island_Outpost_1.msav.msav_lead_7.txt",
+  "save": "Attack_Secret_Island_Outpost_1.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "lead",
+  "tiles": 67,
+  "tap": [
+   167,
+   201
+  ],
+  "dumpTap": [
+   220,
+   166
+  ],
+  "bbox": [
+   213,
+   162,
+   223,
+   173
+  ],
+  "built": [],
+  "x": 154,
+  "y": 191
+ },
+ {
+  "name": "Attack_Secret_Island_Outpost_1.msav.msav_scrap_0",
+  "source": "Attack_Secret_Island_Outpost_1.msav.msav_scrap_0.txt",
+  "save": "Attack_Secret_Island_Outpost_1.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 134,
+  "tap": [
+   218,
+   168
+  ],
+  "dumpTap": [
+   36,
+   120
+  ],
+  "bbox": [
+   28,
+   114,
+   39,
+   126
+  ],
+  "built": [],
+  "x": 204,
+  "y": 156
+ },
+ {
+  "name": "Attack_Secret_Island_Outpost_1.msav.msav_scrap_2",
+  "source": "Attack_Secret_Island_Outpost_1.msav.msav_scrap_2.txt",
+  "save": "Attack_Secret_Island_Outpost_1.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 118,
+  "tap": [
+   10,
+   201
+  ],
+  "dumpTap": [
+   106,
+   117
+  ],
+  "bbox": [
+   102,
+   113,
+   118,
+   124
+  ],
+  "built": [],
+  "x": 0,
+  "y": 191
+ },
+ {
+  "name": "CrashSite.msav.msav_coal_0",
+  "source": "CrashSite.msav.msav_coal_0.txt",
+  "save": "CrashSite.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "coal",
+  "tiles": 58,
+  "tap": [
+   476,
+   135
+  ],
+  "dumpTap": [
+   241,
+   298
+  ],
+  "bbox": [
+   229,
+   289,
+   247,
+   301
+  ],
+  "built": [],
+  "x": 458,
+  "y": 120
+ },
+ {
+  "name": "CrashSite.msav.msav_coal_3",
+  "source": "CrashSite.msav.msav_coal_3.txt",
+  "save": "CrashSite.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "coal",
+  "tiles": 49,
+  "tap": [
+   52,
+   202
+  ],
+  "dumpTap": [
+   193,
+   206
+  ],
+  "bbox": [
+   186,
+   201,
+   202,
+   212
+  ],
+  "built": [],
+  "x": 39,
+  "y": 191
+ },
+ {
+  "name": "CrashSite.msav.msav_coal_5",
+  "source": "CrashSite.msav.msav_coal_5.txt",
+  "save": "CrashSite.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "coal",
+  "tiles": 40,
+  "tap": [
+   437,
+   93
+  ],
+  "dumpTap": [
+   269,
+   202
+  ],
+  "bbox": [
+   265,
+   194,
+   275,
+   208
+  ],
+  "built": [],
+  "x": 427,
+  "y": 79
+ },
+ {
+  "name": "CrashSite.msav.msav_coal_6",
+  "source": "CrashSite.msav.msav_coal_6.txt",
+  "save": "CrashSite.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "coal",
+  "tiles": 38,
+  "tap": [
+   130,
+   390
+  ],
+  "dumpTap": [
+   238,
+   159
+  ],
+  "bbox": [
+   231,
+   155,
+   244,
+   161
+  ],
+  "built": [],
+  "x": 117,
+  "y": 380
+ },
+ {
+  "name": "CrashSite.msav.msav_scrap_32",
+  "source": "CrashSite.msav.msav_scrap_32.txt",
+  "save": "CrashSite.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 12,
+  "tap": [
+   249,
+   446
+  ],
+  "dumpTap": [
+   227,
+   240
+  ],
+  "bbox": [
+   225,
+   238,
+   227,
+   243
+  ],
+  "built": [],
+  "x": 241,
+  "y": 438
+ },
+ {
+  "name": "CrashSite.msav.msav_scrap_4",
+  "source": "CrashSite.msav.msav_scrap_4.txt",
+  "save": "CrashSite.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 12,
+  "tap": [
+   424,
+   472
+  ],
+  "dumpTap": [
+   96,
+   197
+  ],
+  "bbox": [
+   96,
+   197,
+   101,
+   200
+  ],
+  "built": [],
+  "x": 418,
+  "y": 466
+ },
+ {
+  "name": "CrashSite.msav.msav_thorium_30",
+  "source": "CrashSite.msav.msav_thorium_30.txt",
+  "save": "CrashSite.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "thorium",
+  "tiles": 12,
+  "tap": [
+   92,
+   474
+  ],
+  "dumpTap": [
+   236,
+   254
+  ],
+  "bbox": [
+   233,
+   252,
+   237,
+   256
+  ],
+  "built": [],
+  "x": 83,
+  "y": 466
+ },
+ {
+  "name": "anthill_v5.msav.msav_scrap_0",
+  "source": "anthill_v5.msav.msav_scrap_0.txt",
+  "save": "anthill_v5.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 2986,
+  "tap": [
+   50,
+   35
+  ],
+  "dumpTap": [
+   82,
+   52
+  ],
+  "bbox": [
+   38,
+   23,
+   179,
+   79
+  ],
+  "built": [],
+  "x": 0,
+  "y": 0
+ },
+ {
+  "name": "anthill_v5.msav.msav_scrap_1",
+  "source": "anthill_v5.msav.msav_scrap_1.txt",
+  "save": "anthill_v5.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 148,
+  "tap": [
+   64,
+   93
+  ],
+  "dumpTap": [
+   36,
+   81
+  ],
+  "bbox": [
+   30,
+   73,
+   59,
+   91
+  ],
+  "built": [],
+  "x": 52,
+  "y": 79
+ },
+ {
+  "name": "anthill_v5.msav.msav_scrap_2",
+  "source": "anthill_v5.msav.msav_scrap_2.txt",
+  "save": "anthill_v5.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 21,
+  "tap": [
+   376,
+   388
+  ],
+  "dumpTap": [
+   124,
+   87
+  ],
+  "bbox": [
+   113,
+   85,
+   124,
+   90
+  ],
+  "built": [],
+  "x": 359,
+  "y": 380
+ },
+ {
+  "name": "anthill_v5.msav.msav_scrap_3",
+  "source": "anthill_v5.msav.msav_scrap_3.txt",
+  "save": "anthill_v5.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 20,
+  "tap": [
+   465,
+   203
+  ],
+  "dumpTap": [
+   163,
+   30
+  ],
+  "bbox": [
+   157,
+   24,
+   163,
+   33
+  ],
+  "built": [],
+  "x": 453,
+  "y": 191
+ },
+ {
+  "name": "anthill_v5.msav.msav_scrap_5",
+  "source": "anthill_v5.msav.msav_scrap_5.txt",
+  "save": "anthill_v5.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 14,
+  "tap": [
+   287,
+   389
+  ],
+  "dumpTap": [
+   128,
+   84
+  ],
+  "bbox": [
+   124,
+   81,
+   129,
+   87
+  ],
+  "built": [],
+  "x": 277,
+  "y": 380
+ },
+ {
+  "name": "anthill_v5.msav.msav_scrap_6",
+  "source": "anthill_v5.msav.msav_scrap_6.txt",
+  "save": "anthill_v5.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 13,
+  "tap": [
+   11,
+   474
+  ],
+  "dumpTap": [
+   89,
+   65
+  ],
+  "bbox": [
+   84,
+   63,
+   90,
+   67
+  ],
+  "built": [],
+  "x": 0,
+  "y": 466
+ },
+ {
+  "name": "anthill_v5.msav.msav_scrap_7",
+  "source": "anthill_v5.msav.msav_scrap_7.txt",
+  "save": "anthill_v5.msav.msav",
+  "map": "Editor Playtesting",
+  "ore": "scrap",
+  "tiles": 12,
+  "tap": [
+   61,
+   389
+  ],
+  "dumpTap": [
+   137,
+   83
+  ],
+  "bbox": [
+   134,
+   80,
+   137,
+   87
+  ],
+  "built": [],
+  "x": 52,
+  "y": 380
+ },
+ {
+  "name": "sandbox.msav_scrap_0",
+  "source": "sandbox.msav_scrap_0.txt",
+  "save": "sandbox.msav",
+  "map": "\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e",
+  "ore": "scrap",
+  "tiles": 1201,
+  "tap": [
+   467,
+   25
+  ],
+  "dumpTap": [
+   125,
+   98
+  ],
+  "bbox": [
+   106,
+   79,
+   144,
+   117
+  ],
+  "built": [],
+  "x": 442,
+  "y": 0
+ },
+ {
+  "name": "sector-serpulo-165.msav_coal_21",
+  "source": "sector-serpulo-165.msav_coal_21.txt",
+  "save": "sector-serpulo-165.msav",
+  "map": "Naval Fortress",
+  "ore": "coal",
+  "tiles": 12,
+  "tap": [
+   6,
+   499
+  ],
+  "dumpTap": [
+   154,
+   246
+  ],
+  "bbox": [
+   154,
+   246,
+   157,
+   249
+  ],
+  "built": [],
+  "x": 0,
+  "y": 493
+ },
+ {
+  "name": "sector-serpulo-165.msav_coal_38",
+  "source": "sector-serpulo-165.msav_coal_38.txt",
+  "save": "sector-serpulo-165.msav",
+  "map": "Naval Fortress",
+  "ore": "coal",
+  "tiles": 14,
+  "tap": [
+   465,
+   356
+  ],
+  "dumpTap": [
+   324,
+   169
+  ],
+  "bbox": [
+   320,
+   168,
+   325,
+   175
+  ],
+  "built": [],
+  "x": 455,
+  "y": 349
+ },
+ {
+  "name": "sector-serpulo-165.msav_coal_8",
+  "source": "sector-serpulo-165.msav_coal_8.txt",
+  "save": "sector-serpulo-165.msav",
+  "map": "Naval Fortress",
+  "ore": "coal",
+  "tiles": 67,
+  "tap": [
+   225,
+   92
+  ],
+  "dumpTap": [
+   337,
+   81
+  ],
+  "bbox": [
+   329,
+   74,
+   345,
+   90
+  ],
+  "built": [],
+  "x": 211,
+  "y": 79
+ },
+ {
+  "name": "sector-serpulo-165.msav_copper_0",
+  "source": "sector-serpulo-165.msav_copper_0.txt",
+  "save": "sector-serpulo-165.msav",
+  "map": "Naval Fortress",
+  "ore": "copper",
+  "tiles": 83,
+  "tap": [
+   370,
+   133
+  ],
+  "dumpTap": [
+   314,
+   43
+  ],
+  "bbox": [
+   305,
+   36,
+   314,
+   49
+  ],
+  "built": [],
+  "x": 355,
+  "y": 120
+ },
+ {
+  "name": "sector-serpulo-165.msav_copper_1",
+  "source": "sector-serpulo-165.msav_copper_1.txt",
+  "save": "sector-serpulo-165.msav",
+  "map": "Naval Fortress",
+  "ore": "copper",
+  "tiles": 76,
+  "tap": [
+   395,
+   202
+  ],
+  "dumpTap": [
+   362,
+   100
+  ],
+  "bbox": [
+   356,
+   95,
+   369,
+   104
+  ],
+  "built": [],
+  "x": 383,
+  "y": 191
+ },
+ {
+  "name": "sector-serpulo-165.msav_copper_2",
+  "source": "sector-serpulo-165.msav_copper_2.txt",
+  "save": "sector-serpulo-165.msav",
+  "map": "Naval Fortress",
+  "ore": "copper",
+  "tiles": 79,
+  "tap": [
+   237,
+   202
+  ],
+  "dumpTap": [
+   320,
+   32
+  ],
+  "bbox": [
+   316,
+   27,
+   328,
+   37
+  ],
+  "built": [],
+  "x": 227,
+  "y": 191
+ },
+ {
+  "name": "sector-serpulo-165.msav_lead_39",
+  "source": "sector-serpulo-165.msav_lead_39.txt",
+  "save": "sector-serpulo-165.msav",
+  "map": "Naval Fortress",
+  "ore": "lead",
+  "tiles": 21,
+  "tap": [
+   156,
+   357
+  ],
+  "dumpTap": [
+   374,
+   67
+  ],
+  "bbox": [
+   374,
+   65,
+   380,
+   73
+  ],
+  "built": [],
+  "x": 150,
+  "y": 349
+ },
+ {
+  "name": "sector-serpulo-165.msav_titanium_34",
+  "source": "sector-serpulo-165.msav_titanium_34.txt",
+  "save": "sector-serpulo-165.msav",
+  "map": "Naval Fortress",
+  "ore": "titanium",
+  "tiles": 15,
+  "tap": [
+   341,
+   386
+  ],
+  "dumpTap": [
+   112,
+   115
+  ],
+  "bbox": [
+   109,
+   115,
+   113,
+   121
+  ],
+  "built": [],
+  "x": 332,
+  "y": 380
+ },
+ {
+  "name": "sector-serpulo-170.msav_copper_1",
+  "source": "sector-serpulo-170.msav_copper_1.txt",
+  "save": "sector-serpulo-170.msav",
+  "map": "\u041e\u0442\u043f\u0440\u0430\u0432\u043d\u0430\u044f \u0442\u043e\u0447\u043a\u0430",
+  "ore": "copper",
+  "tiles": 15,
+  "tap": [
+   104,
+   360
+  ],
+  "dumpTap": [
+   101,
+   94
+  ],
+  "bbox": [
+   96,
+   89,
+   103,
+   97
+  ],
+  "built": [],
+  "x": 93,
+  "y": 349
+ },
+ {
+  "name": "sector-serpulo-271.msav_coal_38",
+  "source": "sector-serpulo-271.msav_coal_38.txt",
+  "save": "sector-serpulo-271.msav",
+  "map": "Desolate Rift",
+  "ore": "coal",
+  "tiles": 12,
+  "tap": [
+   118,
+   474
+  ],
+  "dumpTap": [
+   63,
+   251
+  ],
+  "bbox": [
+   61,
+   249,
+   65,
+   253
+  ],
+  "built": [],
+  "x": 110,
+  "y": 466
+ },
+ {
+  "name": "sector-serpulo-271.msav_copper_1",
+  "source": "sector-serpulo-271.msav_copper_1.txt",
+  "save": "sector-serpulo-271.msav",
+  "map": "Desolate Rift",
+  "ore": "copper",
+  "tiles": 57,
+  "tap": [
+   181,
+   358
+  ],
+  "dumpTap": [
+   61,
+   39
+  ],
+  "bbox": [
+   59,
+   36,
+   70,
+   43
+  ],
+  "built": [],
+  "x": 173,
+  "y": 349
+ },
+ {
+  "name": "sector-serpulo-271.msav_lead_3",
+  "source": "sector-serpulo-271.msav_lead_3.txt",
+  "save": "sector-serpulo-271.msav",
+  "map": "Desolate Rift",
+  "ore": "lead",
+  "tiles": 51,
+  "tap": [
+   224,
+   357
+  ],
+  "dumpTap": [
+   47,
+   43
+  ],
+  "bbox": [
+   36,
+   41,
+   47,
+   48
+  ],
+  "built": [],
+  "x": 207,
+  "y": 349
+ },
+ {
+  "name": "sector-serpulo-271.msav_scrap_35",
+  "source": "sector-serpulo-271.msav_scrap_35.txt",
+  "save": "sector-serpulo-271.msav",
+  "map": "Desolate Rift",
+  "ore": "scrap",
+  "tiles": 13,
+  "tap": [
+   34,
+   500
+  ],
+  "dumpTap": [
+   34,
+   123
+  ],
+  "bbox": [
+   32,
+   122,
+   38,
+   124
+  ],
+  "built": [],
+  "x": 26,
+  "y": 493
+ },
+ {
+  "name": "sector-serpulo-271.msav_scrap_37",
+  "source": "sector-serpulo-271.msav_scrap_37.txt",
+  "save": "sector-serpulo-271.msav",
+  "map": "Desolate Rift",
+  "ore": "scrap",
+  "tiles": 12,
+  "tap": [
+   225,
+   474
+  ],
+  "dumpTap": [
+   74,
+   243
+  ],
+  "bbox": [
+   71,
+   241,
+   74,
+   245
+  ],
+  "built": [],
+  "x": 216,
+  "y": 466
+ },
+ {
+  "name": "sector-serpulo-271.msav_titanium_2",
+  "source": "sector-serpulo-271.msav_titanium_2.txt",
+  "save": "sector-serpulo-271.msav",
+  "map": "Desolate Rift",
+  "ore": "titanium",
+  "tiles": 46,
+  "tap": [
+   398,
+   132
+  ],
+  "dumpTap": [
+   86,
+   91
+  ],
+  "bbox": [
+   81,
+   85,
+   88,
+   98
+  ],
+  "built": [],
+  "x": 387,
+  "y": 120
+ },
+ {
+  "name": "sector-serpulo-271.msav_titanium_5",
+  "source": "sector-serpulo-271.msav_titanium_5.txt",
+  "save": "sector-serpulo-271.msav",
+  "map": "Desolate Rift",
+  "ore": "titanium",
+  "tiles": 42,
+  "tap": [
+   317,
+   358
+  ],
+  "dumpTap": [
+   32,
+   226
+  ],
+  "bbox": [
+   26,
+   223,
+   35,
+   230
+  ],
+  "built": [],
+  "x": 305,
+  "y": 349
+ },
+ {
+  "name": "sporeMountains.msav.msav_copper_13",
+  "source": "sporeMountains.msav.msav_copper_13.txt",
+  "save": "sporeMountains.msav.msav",
+  "map": "unknown",
+  "ore": "copper",
+  "tiles": 69,
+  "tap": [
+   432,
+   202
+  ],
+  "dumpTap": [
+   174,
+   176
+  ],
+  "bbox": [
+   167,
+   171,
+   178,
+   180
+  ],
+  "built": [],
+  "x": 419,
+  "y": 191
+ },
+ {
+  "name": "sporeMountains.msav.msav_copper_9",
+  "source": "sporeMountains.msav.msav_copper_9.txt",
+  "save": "sporeMountains.msav.msav",
+  "map": "unknown",
+  "ore": "copper",
+  "tiles": 83,
+  "tap": [
+   192,
+   93
+  ],
+  "dumpTap": [
+   38,
+   66
+  ],
+  "bbox": [
+   34,
+   58,
+   40,
+   75
+  ],
+  "built": [],
+  "x": 182,
+  "y": 79
+ },
+ {
+  "name": "sporeMountains.msav.msav_lead_0",
+  "source": "sporeMountains.msav.msav_lead_0.txt",
+  "save": "sporeMountains.msav.msav",
+  "map": "unknown",
+  "ore": "lead",
+  "tiles": 79,
+  "tap": [
+   128,
+   90
+  ],
+  "dumpTap": [
+   33,
+   22
+  ],
+  "bbox": [
+   15,
+   17,
+   33,
+   34
+  ],
+  "built": [],
+  "x": 104,
+  "y": 79
+ },
+ {
+  "name": "sporeMountains.msav.msav_lead_2",
+  "source": "sporeMountains.msav.msav_lead_2.txt",
+  "save": "sporeMountains.msav.msav",
+  "map": "unknown",
+  "ore": "lead",
+  "tiles": 86,
+  "tap": [
+   299,
+   89
+  ],
+  "dumpTap": [
+   106,
+   14
+  ],
+  "bbox": [
+   100,
+   10,
+   118,
+   25
+  ],
+  "built": [],
+  "x": 287,
+  "y": 79
+ },
+ {
+  "name": "sporeMountains.msav.msav_lead_26",
+  "source": "sporeMountains.msav.msav_lead_26.txt",
+  "save": "sporeMountains.msav.msav",
+  "map": "unknown",
+  "ore": "lead",
+  "tiles": 16,
+  "tap": [
+   144,
+   472
+  ],
+  "dumpTap": [
+   139,
+   87
+  ],
+  "bbox": [
+   138,
+   87,
+   142,
+   91
+  ],
+  "built": [],
+  "x": 137,
+  "y": 466
+ },
+ {
+  "name": "sporeMountains.msav.msav_titanium_17",
+  "source": "sporeMountains.msav.msav_titanium_17.txt",
+  "save": "sporeMountains.msav.msav",
+  "map": "unknown",
+  "ore": "titanium",
+  "tiles": 16,
+  "tap": [
+   64,
+   447
+  ],
+  "dumpTap": [
+   79,
+   61
+  ],
+  "bbox": [
+   77,
+   58,
+   82,
+   63
+  ],
+  "built": [],
+  "x": 56,
+  "y": 438
+ },
+ {
+  "name": "sporeMountains.msav.msav_titanium_35",
+  "source": "sporeMountains.msav.msav_titanium_35.txt",
+  "save": "sporeMountains.msav.msav",
+  "map": "unknown",
+  "ore": "titanium",
+  "tiles": 14,
+  "tap": [
+   120,
+   447
+  ],
+  "dumpTap": [
+   162,
+   134
+  ],
+  "bbox": [
+   159,
+   131,
+   163,
+   136
+  ],
+  "built": [],
+  "x": 111,
+  "y": 438
+ }
+]

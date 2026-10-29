@@ -1,0 +1,7 @@
+displayName: "Map Dump"
+name: "mapdump"
+author: "dev"
+description: "One-off dump of real save/map terrain (every ore patch) for the real-map corpus. Not for players."
+version: "2.0"
+minGameVersion: 160
+hidden: true
