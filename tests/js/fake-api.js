@@ -67,6 +67,16 @@ function makeApi(){
     var lead = {id: nextItemId++, name: "lead", lowPriority: false, hardness: 1};
     var beryllium = {id: nextItemId++, name: "beryllium", lowPriority: false, hardness: 2};
     var tungsten = {id: nextItemId++, name: "tungsten", lowPriority: false, hardness: 4};
+    // the rest of the Serpulo ores, for real-map terrain fixtures (ids keep the same
+    // tie-break order the game uses: copper < lead < coal < titanium < thorium < scrap)
+    var coal = {id: 5, name: "coal", lowPriority: false, hardness: 1};
+    var titanium = {id: 6, name: "titanium", lowPriority: false, hardness: 3};
+    var thorium = {id: 7, name: "thorium", lowPriority: false, hardness: 4};
+    var scrap = {id: 8, name: "scrap", lowPriority: false, hardness: 1};
+    var ORE_ITEMS = {
+        copper: copper, lead: lead, beryllium: beryllium, tungsten: tungsten,
+        coal: coal, titanium: titanium, thorium: thorium, scrap: scrap
+    };
 
     // ---- world: floor tiles with a rectangular ore patch ----
     var ore = {};         // pos -> true
@@ -75,6 +85,31 @@ function makeApi(){
     var walls = {};       // pos -> true (solid)
     var WALL_ORE = {};    // pos -> item (wall ore embedded in a solid tile, never consumed)
     var batch = {oreX0: 20, oreX1: 40, oreY0: 20, oreY1: 40};
+
+    // Real-map terrain fixtures: `terrain: {x0, y0, rows: [...], chars: {l: "lead", ...}}`
+    // where each row string has one character per tile. '#' is solid (cliff/wall), 'B' is a
+    // built block, '.' is plain ground, anything else is an ore (via `chars`). Used by the
+    // audit probes to run the fillers on terrain exported from a real save.
+    var TERRAIN_ORE = {};     // pos -> item
+    var TERRAIN_SOLID = {};   // pos -> true
+    var TERRAIN_BUILT = {};   // pos -> true
+    var T = OPTS.terrain;
+    if(T != null){
+        var tchars = T.chars == null ? {} : T.chars;
+        for(var ty = 0; ty < T.rows.length; ty++){
+            var row = T.rows[ty];
+            for(var tx = 0; tx < row.length; tx++){
+                var ch = row.charAt(tx);
+                var tkey = pos(T.x0 + tx, T.y0 + ty);
+                if(ch === "#") TERRAIN_SOLID[tkey] = true;
+                else if(ch === "B") TERRAIN_BUILT[tkey] = true;
+                else if(ch !== "."){
+                    var iname = tchars[ch] == null ? "copper" : tchars[ch];
+                    if(ORE_ITEMS[iname] != null) TERRAIN_ORE[tkey] = ORE_ITEMS[iname];
+                }
+            }
+        }
+    }
 
     function pos(x, y){ return x + y * WORLD; }
     function inWorld(x, y){ return x >= 0 && y >= 0 && x < WORLD && y < WORLD_H; }
@@ -170,9 +205,13 @@ function makeApi(){
     api.worldH = function(){ return WORLD_H; };
 
     api.drop = function(tile){
+        if(tile == null) return null;
+        var tp = pos(tile.x, tile.y);
+        if(TERRAIN_ORE[tp] !== undefined) return TERRAIN_ORE[tp];
+        if(TERRAIN_SOLID[tp] === true || TERRAIN_BUILT[tp] === true) return null;
         var lr = OPTS.leadRect;
         if(lr != null && tile.x >= lr.x0 && tile.x <= lr.x1 && tile.y >= lr.y0 && tile.y <= lr.y1) return lead;
-        return ore[pos(tile.x, tile.y)] === true ? copper : null;
+        return ore[tp] === true ? copper : null;
     };
     api.modVersion = function(){ return "test"; };
     api.itemName = function(id){
@@ -180,7 +219,9 @@ function makeApi(){
             : (id === beryllium.id ? "Beryllium" : (id === tungsten.id ? "Tungsten" : null)));
     };
     api.hasBuilding = function(tile){
-        return tile != null && BUILT[pos(tile.x, tile.y)] === true;
+        if(tile == null) return false;
+        if(TERRAIN_BUILT[pos(tile.x, tile.y)] === true) return true;
+        return BUILT[pos(tile.x, tile.y)] === true;
     };
     /** Test hook: mark a tile as already built, so a second fill sees it as taken. */
     api.__build = function(x, y){ BUILT[pos(x, y)] = true; };
@@ -191,7 +232,12 @@ function makeApi(){
         var item = WALL_ORE[pos(tile.x, tile.y)];
         return item === undefined ? null : item;
     };
-    api.solid = function(tile){ return walls[pos(tile.x, tile.y)] === true; };
+    api.solid = function(tile){
+        if(tile == null) return false;
+        var p = pos(tile.x, tile.y);
+        if(TERRAIN_SOLID[p] === true) return true;
+        return walls[p] === true;
+    };
     api.blockOf = function(){ return air; };
     api.buildOf = function(){ return null; };
     // Tile.relativeTo: the rotation from `other` to `tile` (0=east, 1=north, 2=west, 3=south),
@@ -249,8 +295,11 @@ function makeApi(){
         for(var cx = x - half; cx < x - half + size; cx++){
             for(var cy = y - half; cy < y - half + size; cy++){
                 if(!inWorld(cx, cy)) return false;
-                if(walls[pos(cx, cy)] === true) return false;
-                if(BUILT[pos(cx, cy)] === true) return false;    // occupied by a building
+                var pkey = pos(cx, cy);
+                if(walls[pkey] === true) return false;
+                if(BUILT[pkey] === true) return false;    // occupied by a building
+                if(TERRAIN_SOLID[pkey] === true) return false;
+                if(TERRAIN_BUILT[pkey] === true) return false;
             }
         }
         return true;
