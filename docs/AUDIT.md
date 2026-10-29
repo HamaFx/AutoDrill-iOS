@@ -556,6 +556,39 @@ Two conclusions, and they redirect the work:
 The plan that follows from that is in the reply: lanes that carry belts *and* power, a global
 cheapest-tile choice for the reserved tiles, and styles for how the layout is organised.
 
+### 1.8.0 — Batch 1 of the plan: lanes, and support that pays for itself
+
+From the sweep: drill placement was already exact; the cost sat in the support pass (15-16 % on
+big patches) and in there being no room for belts at all. Both are answered by one change.
+
+**Belt lanes** (new setting, off by default). A lane row every four rows, and on each lane a tile
+every three (item bridges link exactly three tiles along an axis, so three-spaced tiles chain).
+The lanes carry the water, the power and the belts:
+
+* the belts - the lane *is* a bridge chain, so the drills beside it hand their ore over and the
+  patch runs without being wired by hand;
+* the power - a block every other lane tile is within reach of the drills on both sides, and the
+  lane chain is connected by construction, so the whole patch is one grid (110 drills, 55 blocks,
+  0 unpowered in the engine check);
+* the water - the extractors fit in the lanes and the gaps they open.
+
+Measured, same sweep:
+
+| case (round 45x45, laser) | coverage | belts | power | water |
+|---|---|---|---|---|
+| no support | 100 % | - | - | - |
+| support, no lanes (default) | 84.6 % | - | yes | yes |
+| **lanes on** | 74.4 % | yes | yes | yes |
+
+So the honest choice is "every tile, you route the ore" (100 % / 84.6 %) against "the patch runs
+itself" (74.4 %). Every fifth row was tried first and measured 62 % - four rows is the tightest
+that still leaves a full row of 3x3 drills between two lanes - and that measurement is in the
+code as a comment so it is not "improved" back.
+
+The heights that remain from the plan (Batch 2: layout styles, axis alignment, belt routing to a
+core, multi-ore fills, Erekir liquids, wall-tool measurement; Batch 3: deterministic layouts and
+scratch reuse) are still open.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

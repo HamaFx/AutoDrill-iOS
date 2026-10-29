@@ -17,6 +17,7 @@ var KEY_SHOW_BUTTON = "auto-drill-ios-display-toggle-button";
 var KEY_WELCOME = "auto-drill-ios-welcome";
 var KEY_QUALITY = "auto-drill-ios-optimization-quality";
 var KEY_SUPPORT = "auto-drill-ios-place-water-extractor-and-power-nodes";
+var KEY_LANES = "auto-drill-ios-build-belt-lanes";
 var KEY_ROUTE = "auto-drill-ios-output-routing-length";
 
 var enabled = false;
@@ -458,6 +459,7 @@ function buildSettings(){
 
         st.slider(KEY_QUALITY, 2, 1, 10, 1, function(v){ return "level " + v; });
         st.check(KEY_SUPPORT, true);
+        st.check(KEY_LANES, false);
 
         st.slider(KEY_ROUTE, 0, 0, 12, 1, function(v){
             return v === 0 ? api.bundle("auto-drill-ios-unit-off") : v + " " + api.bundle("auto-drill-ios-unit-tiles");

@@ -232,6 +232,8 @@ var cases = [
     {name: "round + power", shape: S.patches[1], drill: laser, mode: "optimizer", minOres: 2, support: true},
     {name: "vein + power", shape: S.patches[4], drill: laser, mode: "optimizer", minOres: 2, support: true},
     {name: "band + power", shape: S.patches[5], drill: laser, mode: "optimizer", minOres: 2, support: true},
+    {name: "square + lanes", shape: S.patches[0], drill: laser, mode: "optimizer", minOres: 2, support: true, lanes: true},
+    {name: "round + lanes", shape: S.patches[1], drill: laser, mode: "optimizer", minOres: 2, support: true, lanes: true},
     {name: "2-wide vein + belts", shape: S.patches[7], drill: mechanical, mode: "belt", minOres: 1},
     {name: "small square + belts", shape: S.patches[8], drill: mechanical, mode: "belt", minOres: 1}
 ];
@@ -240,6 +242,9 @@ for(var c = 0; c < cases.length; c++){
     var test = cases[c];
     var centre = centreOf(test.shape);
     var support = test.support === true;
+
+    if(S.settings == null) S.settings = {};
+    S.settings["auto-drill-ios-build-belt-lanes"] = test.lanes === true;
     var plans = null;
     var started = Date.now();
 
@@ -258,7 +263,7 @@ for(var c = 0; c < cases.length; c++){
 
     // floors are the promises the engine makes: every tile with the support off, and the
     // measured support cost (the power blocks need tiles) with it on
-    var floor = test.support === true ? 80 : (test.mode === "belt" ? 85 : 99);
+    var floor = test.lanes === true ? 70 : (test.support === true ? 80 : (test.mode === "belt" ? 85 : 99));
     if(pct < floor){
         java.lang.System.out.println("SWEEP FAIL " + test.name + ": " + pct + "% < " + floor + "%");
         failures++;

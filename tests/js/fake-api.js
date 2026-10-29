@@ -295,7 +295,9 @@ function makeApi(){
     api.settingInt = function(key, def){
         return (OPTS.settings != null && OPTS.settings[key] != null) ? OPTS.settings[key] : def;
     };
-    api.settingBool = function(key, def){ return def; };
+    api.settingBool = function(key, def){
+        return (OPTS.settings != null && OPTS.settings[key] != null) ? OPTS.settings[key] === true : def;
+    };
     api.settingString = function(key, def){ return def; };
     api.putSetting = function(){};
 

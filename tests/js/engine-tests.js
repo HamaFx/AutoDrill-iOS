@@ -653,6 +653,48 @@ check("a patch with no power nearby is not wired to anything",
     withSettings(null);
 })();
 
+// ---------------------------------------------------------------- 6h. belt lanes
+
+// The lane mode is a different support path: belts, power and water share the lane rows, and the
+// drills beside a lane have to end up in reach of a power block.
+(function(){
+    S.settings = {"auto-drill-ios-build-belt-lanes": true};
+    var laneFill = optimization.fillDetailed(centreOf(round), laser, true, "sharded", null, 0);
+    S.settings = null;
+
+    var belts = 0, power = 0, drills = 0;
+    for(var i = 0; i < laneFill.plans.length; i++){
+        var name = api.blockName(laneFill.plans[i].block);
+        if(name === "itemBridge") belts++;
+        if(isPowerBlock(laneFill.plans[i].block)) power++;
+        if(api.blockId(laneFill.plans[i].block) === api.blockId(laser)) drills++;
+    }
+
+    check("lanes: belts are planned on the lanes", belts > 10, "belts=" + belts);
+    check("lanes: power blocks ride the lanes", power > 5, "power=" + power);
+    check("lanes: coverage stays in the range the lanes allow",
+        laneFill.stats.covered >= laneFill.stats.target * 0.7,
+        "covered=" + laneFill.stats.covered + "/" + laneFill.stats.target);
+    check("lanes: nothing overlaps", overlapCells(laneFill.plans) === 0);
+
+    var nodes = plannedNodes(laneFill.plans);
+    var linkRange2 = rangeOf(nodes);
+    var unpowered = 0;
+    for(i = 0; i < laneFill.plans.length; i++){
+        if(api.blockId(laneFill.plans[i].block) !== api.blockId(laser)) continue;
+
+        var ok = false;
+        for(var k = 0; k < nodes.length && !ok; k++){
+            var dx = api.tx(laneFill.plans[i]) - api.tx(nodes[k]);
+            var dy = api.ty(laneFill.plans[i]) - api.ty(nodes[k]);
+            if(dx * dx + dy * dy <= linkRange2 * linkRange2) ok = true;
+        }
+        if(!ok) unpowered++;
+    }
+    check("lanes: every drill is in reach of a lane power block", unpowered === 0,
+        "unpowered=" + unpowered + "/" + drills + " blocks=" + power);
+})();
+
 // ---------------------------------------------------------------- 7. same patch, same layout
 
 var first = fillAt(round, laser, null);

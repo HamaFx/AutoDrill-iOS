@@ -62,6 +62,12 @@ exports.settingDefaults = SETTING_DEFAULTS;
 var KEY_QUALITY = "auto-drill-ios-optimization-quality";
 var KEY_SUPPORT = "auto-drill-ios-place-water-extractor-and-power-nodes";
 var KEY_ROUTE = "auto-drill-ios-output-routing-length";
+var KEY_LANES = "auto-drill-ios-build-belt-lanes";
+// One lane row (3x3 drills need three rows of their own, so the lane takes the fourth). Every
+// fifth row was measured: the drill rows cannot fit in the four rows left, and coverage fell to
+// 62%. Four is the tightest that still leaves a full row of drills between two lanes.
+var LANE_PITCH = 4;
+var LANE_HOP = 3;        // item bridges link exactly three tiles along an axis
 
 /** Java: OptimizationDrill.getDrillSettingsPrefix */
 function settingsPrefix(drill){
@@ -122,8 +128,10 @@ function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
         lowPriority: {},        // dropId -> boolean
         candidates: [],
         coverable: 0,           // ore tiles at least one candidate could mine
-        reserved: {},           // tiles kept free for the power node lattice
+        lanes: false,           // belt lanes: tiles kept free for belts, power and water
+        reserved: {},           // tiles kept free for the lanes or the power lattice
         reservedNodes: [],
+        laneTiles: [],
         reservedCost: 0,        // candidates dropped to keep them free
 
         // ---- search ----
@@ -301,7 +309,8 @@ function setupSearch(job){
     // it; the reserved tiles cost a drill each, which is why this only happens when the
     // water-extractor/power-node support is on.
     if(job.withSupport && api.settingBool(KEY_SUPPORT, true)){
-        reservePowerTiles(job);
+        if(api.settingBool(KEY_LANES, false)) reserveLaneTiles(job);
+        else reservePowerTiles(job);
     }
 
     if(entries.length > 0) filterPlanned(job);
@@ -351,6 +360,69 @@ function setupSearch(job){
 
     debugLog("stage: candidates=" + entries.length + " coverable=" + coverable + "/" + job.targetCells
         + " budget=" + job.maxTries + " truncated=" + job.truncated);
+}
+
+/**
+ * Places what the lanes carry: an item bridge on every lane tile - a chain that hops three tiles,
+ * pushing the ore out of the patch - and the power blocks on every other lane tile, which puts a
+ * block within reach of the drills on both sides and keeps the whole network linked.
+ */
+function placeLaneSupplies(job, team, allPlans, occupied, info){
+    var itemBridge = api.block("itemBridge");
+    var belts = 0;
+    var nodes = 0;
+    var i = 0;
+
+    for(i = 0; i < job.laneTiles.length; i++){
+        var lane = job.laneTiles[i];
+        var next = i + 1 < job.laneTiles.length ? job.laneTiles[i + 1] : null;
+
+        var plan = util.newPlan(lane.x, lane.y, 0, itemBridge);
+        if(!util.canPlaceWithoutPlanCollision(plan, team, allPlans)) continue;
+
+        if(next != null){
+            plan.configX = next.x - lane.x;
+            plan.configY = next.y - lane.y;
+        }
+        allPlans.push(plan);
+        util.markOccupancy(occupied, itemBridge, lane.x, lane.y, true);
+        belts++;
+    }
+
+    // power on the lanes: one block every other lane tile reaches the drills on both sides, and
+    // the blocks sit well inside link range of each other along the lane
+    for(i = 0; i < job.laneTiles.length; i += 2){
+        var laneSpot = job.laneTiles[i];
+        var placedBlock = null;
+
+        for(var d = 0; d < 5 && placedBlock == null; d++){
+            var dx = d === 0 ? 1 : (d === 1 ? -1 : 0);
+            var dy = d === 2 ? 1 : (d === 3 ? -1 : 0);
+            var bx = laneSpot.x + dx;
+            var by = laneSpot.y + dy;
+
+            if(d === 4){
+                bx = laneSpot.x;    // last resort: the lane tile itself
+                by = laneSpot.y;
+            }else if(job.reserved[bx + by * job.worldW] === true){
+                continue;
+            }
+
+            var candidate = util.newPlan(bx, by, 0, info.block);
+            if(!util.canPlacePlan(candidate, team)) continue;
+            if(!util.freeInOccupancy(occupied, info.block, bx, by)) continue;
+
+            placedBlock = candidate;
+        }
+
+        if(placedBlock == null) continue;
+        allPlans.push(placedBlock);
+        util.markOccupancy(occupied, info.block, placedBlock.x, placedBlock.y, true);
+        nodes++;
+    }
+
+    debugLog("lanes: belts=" + belts + " power=" + nodes);
+    return {belts: belts, nodes: nodes};
 }
 
 /**
@@ -414,6 +486,74 @@ function cheapestSpot(job, candidateAt, x, y, radius){
 function spotCost(job, candidateAt, x, y){
     var entry = candidateAt[x + y * job.worldW];
     return entry === undefined ? 0 : entry.winnerCount;
+}
+
+/**
+ * Reserves a belt lane grid: one lane row every LANE_PITCH rows, and on each lane a tile every
+ * LANE_HOP (item bridges link exactly three tiles along an axis, so three-spaced tiles form a
+ * chain). Everything else stays free for drills, which makes the lanes cheap - about one tile in
+ * fifteen - and they carry what otherwise costs its own tiles:
+ *
+ *   the belts   - the lane is a bridge chain, so the drills beside it can hand their ore over;
+ *   the power   - nodes on the lane are within link range of the drills on both sides, and the
+ *                 chain is connected by construction, so the whole patch is one grid;
+ *   the water   - extractors fit in the lanes and the gaps the lanes open up.
+ *
+ * Lanes run along the patch's longer side so the belts leave by the shorter one.
+ */
+function reserveLaneTiles(job){
+    var lanes = [];
+    var i = 0;
+    var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+
+    for(i = 0; i < job.candidates.length; i++){
+        var t = job.candidates[i].tile;
+        var tx = api.tx(t), ty = api.ty(t);
+        if(tx < minX) minX = tx;
+        if(ty < minY) minY = ty;
+        if(tx > maxX) maxX = tx;
+        if(ty > maxY) maxY = ty;
+    }
+    if(job.candidates.length === 0) return;
+
+    var half = job.half;
+    minX -= half; minY -= half; maxX += half; maxY += half;
+
+    // lanes along the longer side, and the chain pushes ore towards the far end of it
+    var alongX = (maxX - minX) >= (maxY - minY);
+
+    if(alongX){
+        for(var y = minY; y <= maxY; y += LANE_PITCH){
+            for(var x = minX; x <= maxX; x += LANE_HOP){
+                if(job.cellFacts[x + y * job.worldW] === undefined) continue;
+                lanes.push({x: x, y: y});
+            }
+        }
+    }else{
+        for(var x2 = minX; x2 <= maxX; x2 += LANE_PITCH){
+            for(var y2 = minY; y2 <= maxY; y2 += LANE_HOP){
+                if(job.cellFacts[x2 + y2 * job.worldW] === undefined) continue;
+                lanes.push({x: x2, y: y2});
+            }
+        }
+    }
+
+    if(lanes.length === 0) return;
+
+    // keep the chain in order so each bridge can point at the next one
+    util.sortStable(lanes, function(p){
+        return alongX ? (p.y * 4096 + p.x) : (p.x * 4096 + p.y);
+    });
+
+    job.lanes = true;
+    job.laneTiles = lanes;
+    job.reservedNodes = lanes;
+
+    for(i = 0; i < lanes.length; i++){
+        job.reserved[lanes[i].x + lanes[i].y * job.worldW] = true;
+    }
+
+    debugLog("stage: lanes=" + lanes.length + " (" + (alongX ? "along x" : "along y") + ")");
 }
 
 /**
@@ -1000,16 +1140,25 @@ function finish(job){
     var counts = support
         ? placeWaterExtractorsAndPowerNodes(job, selection, job.drill, team, allPlans, occupied, powerTarget)
         : null;
+
+    if(support && job.lanes && info != null){
+        var laneResult = placeLaneSupplies(job, team, allPlans, occupied, info);
+        counts.lanes = laneResult.belts;
+        counts.nodes = (counts.nodes === undefined ? 0 : counts.nodes) + laneResult.nodes;
+    }
     var linked = 0;
-    if(support){
+    if(support && !job.lanes){
         linked += stitchPowerNetwork(job, allPlans, occupied, info);
         linked += linkPowerGrid(job, allPlans, occupied, selection, powerTarget, info);
+    }else if(support && counts != null && counts.linkNodes !== undefined){
+        linked = counts.linkNodes;
     }
 
     var routed = routeOutputs(job, allPlans, occupied);
 
     var extractorCount = counts == null ? 0 : counts.extractors;
     var nodeCount = counts == null ? 0 : counts.nodes;
+    var laneCount = counts == null || counts.lanes === undefined ? 0 : counts.lanes;
 
     // a drill dropped for a power bridge is no longer mined, so the coverage report is honest
     covered = Math.max(0, covered - job.powerRemovedOre);
@@ -1055,6 +1204,7 @@ function finish(job){
             var summary = drillCount + (drillCount === 1 ? " drill" : " drills");
             if(extractorCount > 0) summary += " + " + extractorCount + " water extractors";
             if(nodeCount > 0) summary += " + " + nodeCount + " " + job.stats.powerName;
+            if(laneCount > 0) summary += " + " + laneCount + " belt tiles";
             if(linked > 0) summary += " (" + linked + " more wiring them to your grid)";
             api.toast("[AutoDrill v" + api.modVersion() + "] planned " + summary);
         }
@@ -1076,6 +1226,9 @@ function finish(job){
                 if(job.truncated){
                     why = "the patch is larger than Max Tiles (" + job.maxTiles
                         + ") - the fill covers the part nearest your tap, raise Max Tiles for the rest";
+                }else if(job.lanes){
+                    why = "the rest is the belt lanes that carry the belts, power and water"
+                        + " (turn off Build Belt Lanes to fill every tile instead)";
                 }else if(job.reservedNodes.length > 0){
                     why = "the rest is kept free for the power blocks (turn off Water & Power Support to fill every tile)";
                 }else if(alreadyPlanned > 0){
@@ -1190,7 +1343,11 @@ function placeWaterExtractorsAndPowerNodes(job, selection, drill, team, allPlans
         }
     }
 
-    var nodes = placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget, info, drillCells);
+    // With lanes on, the power rides the lanes (placeLaneSupplies does that afterwards); the
+    // lattice of nodes beside the drills would only take the very tiles the belts need.
+    var nodes = job.lanes
+        ? 0
+        : placePowerNodes(job, selection, drill, team, allPlans, occupied, powerTarget, info, drillCells);
 
     return {extractors: extractors, nodes: nodes, powerName: info == null ? null : powerName(info)};
 }
