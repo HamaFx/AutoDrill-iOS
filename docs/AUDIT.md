@@ -379,6 +379,30 @@ lane between drill rows (about one tile in five, sharing the lane with the power
 is a layout change of its own and is **not** in this release. Until then the fills place the
 drills and the player supplies the liquid - the toast says so.
 
+### Hotfix 1.7.1 — the game crashed on laser and airblast fills
+
+Reported from the device: *"when I choose the airblast drill and laser drill to build on top of
+ores the game crashes"*. Exactly the two fills that use the optimiser, and exactly the two that
+show a progress bar.
+
+**Cause:** `api.setProgress` was handed a *number* while the game's `LoadFragment` wants a
+`Floatp` provider. A number passes the type check as an object with a `get` that *is* that
+number, and the bar then calls `get()` while it draws - an exception inside the render loop,
+which on iOS takes the whole app down. It had been wrong since 1.4.0 (the chunked fill) and
+only showed once the bar actually redrew during a long optimiser fill.
+
+**Fix:** the progress value lives in `api.js`; the provider is created once per fill and reads
+it, so a number can never be mistaken for a function again.
+
+**Why the test rig missed it, and what changed:** every in-game check called the *synchronous*
+`optimization.fill`, so the chunked path the UI actually uses (`fillAsync` → `Core.app.post`
+per frame → the progress bar) was never executed against the real game. The suite now drives
+`fillAsync` on the 1,681-tile patch and waits for it across frames, asserting the plans and
+overlaps from its completion callback - that check reproduces the crash before the fix and
+passes after it. The fake world's `setProgress` is now deliberately strict (numbers only), so
+the same mistake fails the fast engine checks too. The chunked fill takes 1.9 s on the
+interpreted (iOS-mode) build for 1,681 ore tiles, spread across frames.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

@@ -243,7 +243,12 @@ function makeApi(){
     api.removePlan = function(){ return true; };
     api.postStep = function(fn){ fn(); };
     api.showProgress = function(text){ fakeLog.push("progress: " + text); };
-    api.setProgress = function(){};
+    api.setProgress = function(value){
+        // the real one takes a number and feeds it to a Floatp; passing a function there threw
+        // inside the game's render loop, so the fake is deliberately strict
+        if(typeof value !== "number") throw new Error("setProgress takes a number, got " + typeof value);
+        if(value < 0 || value > 1) throw new Error("setProgress out of range: " + value);
+    };
     api.setProgressCancel = function(){};
     api.hideProgress = function(){};
 

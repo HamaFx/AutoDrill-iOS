@@ -60,7 +60,12 @@ function runAll(){
     try{ testUi(); }catch(e){ failed++; report("testUi threw: " + e); }
     try{ testPerformance(); }catch(e){ failed++; report("testPerformance threw: " + e); }
 
-    finish();
+    // The UI never calls the synchronous fill: it uses fillAsync, which runs across frames
+    // through Core.app.post and the progress bar. That path needs its own coverage, so the
+    // remaining checks - and the result line - happen in its completion callback.
+    Core.app.post(new java.lang.Runnable({run: function(){
+        try{ testAsyncFill(); }catch(e){ failed++; report("testAsyncFill threw: " + e); finish(); }
+    }}));
 }
 
 function finish(){
@@ -503,6 +508,54 @@ function testUi(){
 }
 
 var BIG = {x0: 100, x1: 140, y0: 100, y1: 140};
+
+var asyncDone = false;
+var asyncWatchdog = 0;
+
+/** Drives the chunked fill exactly like the toolbar button does, and waits for it. */
+function testAsyncFill(){
+    var team = Team.sharded;
+    var tiles = Vars.world.tiles;
+    var x = 0, y = 0;
+
+    // testPerformance restores the ground it used, so the ore has to be rewritten here
+    for(x = BIG.x0; x <= BIG.x1; x++){
+        for(y = BIG.y0; y <= BIG.y1; y++){
+            var t = tiles.get(x, y);
+            t.setBlock(Blocks.air);
+            t.setFloor(Blocks.stone);
+            t.setOverlay(Blocks.oreCopper);
+        }
+    }
+
+    var center = api.tile((BIG.x0 + BIG.x1) / 2 | 0, (BIG.y0 + BIG.y1) / 2 | 0);
+    var started = api.now();
+
+    var watchdog = null;
+    watchdog = new java.lang.Runnable({run: function(){
+        if(asyncDone) return;
+        asyncWatchdog++;
+        report("async: still running after " + asyncWatchdog + " frames");
+        Core.app.post(watchdog);
+    }});
+
+    optimization.setDebug(true);
+    optimization.fillAsync(center, Blocks.laserDrill, true, team, null, 0, function(plans){
+        optimization.setDebug(false);
+        asyncDone = true;
+        var drills = tileCount(plans, Blocks.laserDrill);
+        report("async: chunked fill finished with " + plans.length + " plans (" + drills
+            + " drills) in " + (api.now() - started) + "ms");
+        check("async: chunked fill produced plans", plans.length > 0, "plans=" + plans.length);
+        check("async: chunked fill drills", drills > 0, "drills=" + drills);
+        check("async: chunked fill no overlaps", noOverlaps(plans));
+        check("async: chunked fill placeable", allPlaceable(plans, team) === true,
+            String(allPlaceable(plans, team)));
+        finish();
+    });
+
+    Core.app.post(watchdog);
+}
 
 function testLiquid(){
     var team = Team.sharded;

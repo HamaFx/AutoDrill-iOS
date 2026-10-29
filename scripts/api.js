@@ -540,13 +540,28 @@ function buildReal(){
     };
 
     // ---- progress bar (the same widget the mod importer uses) ----
+    //
+    // Took three releases to find: LoadFragment wants a Floatp, and handing it a number passes
+    // a Floatp-shaped object whose get() *is* that number. The bar then calls get() while it
+    // draws, which throws inside the render loop - on iOS that takes the whole game down, and
+    // only the fills that show a progress bar (the optimiser ones) crashed.
+    //
+    // The value lives here instead; the provider is created once and reads it.
+    var progressValue = 0;
+
     api.showProgress = function(title){
+        progressValue = 0;
         V.ui.loadfrag.show(title);
-        V.ui.loadfrag.setProgress(0);
+        V.ui.loadfrag.setProgress(new Packages.arc.func.Floatp({
+            get: function(){
+                return progressValue;
+            }
+        }));
     };
 
-    api.setProgress = function(fn){
-        V.ui.loadfrag.setProgress(new Packages.arc.func.Floatp({get: fn}));
+    /** Sets the progress fraction (0..1). Takes a number, not a function. */
+    api.setProgress = function(value){
+        progressValue = value;
     };
 
     api.setProgressCancel = function(fn){

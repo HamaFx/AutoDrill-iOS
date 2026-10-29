@@ -14,6 +14,8 @@ can read, and the listing is generated from the repository, not from a zip).
 - [ ] Engine checks: `tools/engine-tests.sh` → `failed=0` (coverage, overlap, determinism)
 - [ ] Compiled-engine load: `tools/compile-check.sh` → passes (catches optimizer landmines that
       the interpreted iOS engine happily runs)
+- [ ] The in-engine suite must include the chunked (`fillAsync`) path, not just `fill` - the UI
+      never calls the synchronous one
 - [ ] `./tools/pack.sh` → zip contains `mod.hjson`, `scripts/`, `sprites/`, `bundles/` at the root
 - [ ] Device test on a real iPhone/iPad (see below)
 
