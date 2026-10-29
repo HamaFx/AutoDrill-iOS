@@ -318,7 +318,8 @@ check("4x4 airblast: fully mined", c6.covered === c6.total,
         }
         var count = 0;
         for(var c in covered) count++;
-        return {covered: count, total: cells.length, drills: drills, repairGain: res.stats.repairGain};
+        return {covered: count, total: cells.length, drills: drills,
+            repairGain: res.stats.repairGain, stats: res.stats};
     }
 
     var fixtures = [
@@ -326,6 +327,7 @@ check("4x4 airblast: fully mined", c6.covered === c6.total,
         {name: "blob with four arms", cells: place(blob4(), 100, 108)}
     ];
     var repaired = 0;
+    var repairSane = true;
 
     for(var f = 0; f < fixtures.length; f++){
         var got = veinCoverage(fixtures[f].cells);
@@ -334,10 +336,92 @@ check("4x4 airblast: fully mined", c6.covered === c6.total,
             "covered=" + got.covered + "/" + got.total + " drills=" + got.drills
                 + " repairGain=" + got.repairGain);
         if(got.repairGain > 0) repaired++;
+        if(!(got.repairGain >= 0 && got.repairGain <= got.total)) repairSane = false;
     }
 
-    check("vein shapes: the repair pass is what closes the last tile",
-        repaired > 0, "shapes fixed by the repair=" + repaired + "/" + fixtures.length);
+    // Repair is a fallback now: the bottleneck-first orders and the translation-invariant
+    // lattice usually close these fixtures before it runs. What must never happen is a repair
+    // that reports a loss (every accepted move is strictly improving).
+    check("vein shapes: local repair never loses coverage",
+        repairSane, "shapes repaired=" + repaired + "/" + fixtures.length);
+
+    // ---- Phase 2: bottleneck-first orders (degree-1 forced tiles go first) ----
+    (function(){
+        var entries = [
+            {mineableKeys: ["a", "b", "c"], winnerCount: 9},
+            {mineableKeys: ["a", "b", "d"], winnerCount: 9},
+            {mineableKeys: ["c", "d", "e"], winnerCount: 1}
+        ];
+        var orders = optimization.buildBottleneckOrders(entries);
+        check("bottleneck order: the only candidate holding a degree-1 tile leads both orders",
+            orders.length === 2 && orders[0][0] === 2 && orders[1][0] === 2,
+            "forcedFirst=" + orders[0][0] + " rarityFirst=" + orders[1][0]);
+    })();
+
+    // ---- Phase 2: translation invariance (same vein, shifted world coordinates) ----
+    (function(){
+        var baseCells = walkVein(101 + 72 * 7919, 40 + (72 * 37) % 81, 6 + (72 % 6));
+        var shifts = [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1]];
+        var shiftMisses = 0;
+        var shiftDetail = "";
+        for(var si = 0; si < shifts.length; si++){
+            resetWorld();
+            var placed = place(baseCells, 10 + shifts[si][0], 108 + shifts[si][1]);
+            var shifted = veinCoverage(placed);
+            if(shifted.covered < shifted.total) shiftMisses++;
+            shiftDetail += " " + shifts[si].join(",") + "=" + shifted.covered + "/" + shifted.total;
+        }
+        check("vein shapes: coverage is 100% across all map coordinate shifts modulo drill size",
+            shiftMisses === 0, "shiftMisses=" + shiftMisses + "/" + shifts.length + shiftDetail);
+    })();
+
+    // ---- Phase 2: 1-tile walled tip at the default minOres=2 (rim fallback) ----
+    (function(){
+        S.wallCells = [
+            [40, 118], [41, 118], [42, 118],
+            [40, 122], [41, 122], [42, 122]
+        ];
+        resetWorld();
+
+        var cells = [
+            [37, 119], [38, 119], [39, 119],
+            [37, 120], [38, 120], [39, 120], [40, 120],
+            [37, 121], [38, 121], [39, 121]
+        ];
+        var tipped = veinCoverage(cells);
+
+        S.wallCells = null;
+        resetWorld();
+
+        check("vein shapes: 1-tile walled tip is covered at default minOres=2 via rim fallback",
+            tipped.covered === tipped.total,
+            "covered=" + tipped.covered + "/" + tipped.total
+                + " rimGain=" + tipped.stats.rimGain);
+    })();
+
+    // ---- Phase 2: window-local deep repair on a large patch (>320 candidates) ----
+    (function(){
+        resetWorld();
+        // seed 9001 walk: 270 cells / 541 candidates, and the lattice family leaves exactly
+        // one reachable tile. Before Phase 2 the deep repair skipped this patch because
+        // entries.length > 320, so repairWindows would be 0.
+        var big = place(walkVein(9001, 320, 5), 10, 95);
+        var wide = veinCoverage(big);
+        check("vein shapes: large patch (>320 candidates) still gets the window-local deep repair",
+            wide.covered === wide.total && wide.stats.repairWindows > 0
+                && wide.stats.repairWork > 0,
+            "covered=" + wide.covered + "/" + wide.total
+                + " cands=" + wide.stats.candidates
+                + " windows=" + wide.stats.repairWindows
+                + " work=" + wide.stats.repairWork
+                + " deepMs=" + wide.stats.repairDeepMs);
+    })();
+
+    // The resets above replaced the fake world's block objects. The power checks further down
+    // inspect the plans of the first reference fill (r1), so rebuild that fill on the restored
+    // world before leaving this section.
+    resetWorld();
+    r1 = fillAt(round, laser, null);
 })();
 
 // ---------------------------------------------------------------- 3. nothing overlaps
