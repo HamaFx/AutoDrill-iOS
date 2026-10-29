@@ -427,6 +427,33 @@ Verified by the engine checks (a second fill after standing the drills up report
 there; a second ore under the patch is counted) and in the real game (build the 180 planned
 drills, fill again: 9 further drills, 1411 tiles reported as already taken, no overlaps).
 
+### 1.7.3 — making "it only covered a few ores" impossible to misread
+
+Reported: the first fill covered a whole patch, a later one only a few ores, on ground with
+nothing built on it. Measured for every case that can do this (fresh patch, small patch, long
+thin vein, big patch, mixed ore, already-planned patch), the causes are: the patch is bigger
+than *Max Tiles* (the fill covers the part nearest the tap), the patch holds a second ore (a
+fill only covers the ore you tap), *Water & Power Support* keeps tiles free, or *Min Ores* is
+above what the patch can give a drill. None of them is visible from the map, so:
+
+* the scan limit default went 2,500 -> 5,000 tiles (slider up to 10,000), rewritten once for
+  updating players by the settings migration;
+* every fill now ends with one plain line - *"mined 373 of 376 Copper tiles - the patch is
+  larger than Max Tiles (300), the fill covers the part nearest your tap, raise Max Tiles for
+  the rest"*, *"mined 1005 of 1209 Copper tiles - the rest is kept free for the power blocks"*,
+  *"note: this patch also has Lead (40 tiles) - a fill only covers the ore you tap"*, or
+  *"mined all 576 Copper tiles here"*;
+* the wording is pinned by engine checks, so it cannot drift.
+
+Two behaviour fixes came out of the same report:
+
+* **A second tap no longer queues a second set of drills.** The previous fill's plans are not
+  built yet, so the game would happily accept another layout right on top of them; they now
+  count as taken ("the patch is already planned from your last fill (N ore tiles) - nothing to
+  add"). Cancel the plans with the undo button and the patch is filled normally again.
+* Mixed-patch reporting counts the other ore where it is actually found: while walking the
+  patch edge (the flood fill never enters the other ore, which is why the count was zero).
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

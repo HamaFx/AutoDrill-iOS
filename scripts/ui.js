@@ -68,13 +68,14 @@ exports.init = function(){
 };
 
 var KEY_SETTINGS_VERSION = "auto-drill-ios-settings-version";
-var SETTINGS_VERSION = 2;
+var SETTINGS_VERSION = 3;
 
 /**
- * Versions before 1.4.0 shipped fill limits that made the fill look broken: a laser fill only
- * saw 100 ore tiles (so a big patch was filled in the middle and nowhere else) and Min Ores was
- * up to 9 (so the rim of every patch was out of reach for any drill). Those values were the
- * bug, not a preference, so they are rewritten once for anyone updating from an older version.
+ * The fill limits shipped by older versions made the fill look broken: a laser fill saw 100 ore
+ * tiles (so a big patch was filled in the middle and nowhere else), Min Ores was up to 9 (so
+ * the rim of every patch was out of reach), and 2,500 tiles still truncated the biggest
+ * patches. Those values were the bug, not a preference, so they are rewritten once per step
+ * for anyone updating from an older version.
  */
 function migrateFillLimits(){
     if(api.settingInt(KEY_SETTINGS_VERSION, 0) >= SETTINGS_VERSION) return;
@@ -443,16 +444,16 @@ function buildSettings(){
         // defaults come from the engine table, so the two can never drift apart
         var d = optimization.settingDefaults;
 
-        st.slider("mechanical-drill-max-tiles", d.mechanical.tiles, 100, 5000, 100, tiles);
+        st.slider("mechanical-drill-max-tiles", d.mechanical.tiles, 100, 10000, 100, tiles);
         st.slider("mechanical-drill-min-ores", d.mechanical.ores, 1, 4, 1, ores);
 
-        st.slider("pneumatic-drill-max-tiles", d.pneumatic.tiles, 100, 5000, 100, tiles);
+        st.slider("pneumatic-drill-max-tiles", d.pneumatic.tiles, 100, 10000, 100, tiles);
         st.slider("pneumatic-drill-min-ores", d.pneumatic.ores, 1, 4, 1, ores);
 
-        st.slider("laser-drill-max-tiles", d.laser.tiles, 100, 5000, 100, tiles);
+        st.slider("laser-drill-max-tiles", d.laser.tiles, 100, 10000, 100, tiles);
         st.slider("laser-drill-min-ores", d.laser.ores, 1, 9, 1, ores);
 
-        st.slider("airblast-drill-max-tiles", d.airblast.tiles, 100, 5000, 100, tiles);
+        st.slider("airblast-drill-max-tiles", d.airblast.tiles, 100, 10000, 100, tiles);
         st.slider("airblast-drill-min-ores", d.airblast.ores, 1, 16, 1, ores);
 
         st.slider(KEY_QUALITY, 2, 1, 10, 1, function(v){ return "level " + v; });

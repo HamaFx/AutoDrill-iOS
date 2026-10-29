@@ -14,6 +14,7 @@
 var api = require("api");
 var optimization = require("optimization");
 var liquid = require("liquid");
+var util = require("util");
 
 var S = AUTODRILL_FAKE_SCENARIO;
 var W = S.world;
@@ -124,8 +125,11 @@ api.settingInt = function(key, def){
     return SETTING_OVERRIDE[key] != null ? SETTING_OVERRIDE[key] : realSettingInt(key, def);
 };
 
-function fillAt(shape, drill, overrides, withSupport){
+function fillAt(shape, drill, overrides, withSupport, keepPlans){
     withSettings(overrides);
+    // a fill now treats the plans of the previous fill as taken (so tapping twice cannot queue
+    // every drill twice), so checks that want a fresh patch drop them first
+    if(keepPlans !== true) util.undoLastCommitted();
     var c = centreOf(shape);
     var t0 = Date.now();
     var result = optimization.fillDetailed(c, drill, withSupport !== false, "sharded", null, 0);
@@ -150,6 +154,7 @@ var vein = S.patches[4];         // 40x1 vein: one tile wide
 // Power support reserves tiles for the node network, so coverage and power are measured
 // separately: full coverage with the support off, and "every drill powered" with it on.
 var r1 = fillAt(round, laser, null);            // support on: the shipping default
+util.undoLastCommitted();
 var r1free = optimization.fillDetailed(centreOf(round), laser, false, "sharded", null, 0);
 var roundTiles = 0;
 for(var rt in oreCells(round)) roundTiles++;
@@ -212,6 +217,7 @@ check("no two plans claim the same tile (drills, extractors, nodes, routes)",
 (function(){
     withSettings(null);
     var c = centreOf(round);
+    util.undoLastCommitted();
     var job = optimization.prepare(c, laser, true, "sharded", null, 0);
     while(!optimization.searchStep(job, Infinity)){
         // run to completion
@@ -446,6 +452,7 @@ check("a patch with no power nearby is not wired to anything",
 (function(){
     S.erekir = true;
 
+    util.undoLastCommitted();
     var ere = optimization.fillDetailed(centreOf(round), laser, true, "sharded", null, 0);
     var ereNodes = plannedNodes(ere.plans);
     var serpuloNodes = 0;
@@ -541,11 +548,24 @@ check("a patch with no power nearby is not wired to anything",
         }
     }
 
-    var again = fillAt(small, laser, null, false);
+    var again = fillAt(small, laser, null, false, true);
     check("a second fill reports what is already built", again.stats.alreadyBuilt > 0,
         "alreadyBuilt=" + again.stats.alreadyBuilt + " drills=" + again.stats.drills);
     check("a second fill only plans the gaps", again.stats.drills < fresh.stats.drills,
         "first=" + fresh.stats.drills + " second=" + again.stats.drills);
+})();
+
+// Tapping twice without waiting for the first fill to be built must not queue everything twice
+(function(){
+    util.undoLastCommitted();
+    var first = fillAt(round, laser, null, false);
+    var second = fillAt(round, laser, null, false, true);
+
+    check("a second tap does not plan the same drills again",
+        second.stats.plans === 0 || second.stats.drills < first.stats.drills / 4,
+        "first=" + first.stats.drills + " second=" + second.stats.drills
+            + " planned=" + second.stats.alreadyPlanned);
+    util.undoLastCommitted();
 })();
 
 // A patch with a second ore in it only gets the tapped ore, which is worth saying outright.
@@ -557,6 +577,44 @@ check("a patch with no power nearby is not wired to anything",
     var leadTiles = 0;
     for(var id in mixed.stats.otherOres) leadTiles += mixed.stats.otherOres[id];
     check("other ore under the patch is counted", leadTiles > 0, "other ore tiles=" + leadTiles);
+})();
+
+// ---------------------------------------------------------------- 6f. what the fill says
+
+// Every fill ends with a plain statement of what it did and why, because "it only covered a
+// few ores" is impossible to diagnose from the map alone. These checks pin the wording.
+(function(){
+    function lastToast(){
+        var log = AUTODRILL_API_FAKE.__info().log;
+        for(var i = log.length - 1; i >= 0; i--){
+            if(String(log[i]).indexOf("toast: ") === 0) return String(log[i]);
+        }
+        return "";
+    }
+
+    fillAt(square, laser, null, false);
+    var full = lastToast();
+    check("a fully filled patch says so", full.indexOf("mined all") >= 0, full);
+
+    fillAt(round, laser, {"laser-drill-max-tiles": 300}, false);
+    var cut = lastToast();
+    check("a truncated patch names Max Tiles", cut.indexOf("Max Tiles") >= 0, cut);
+
+    fillAt(round, laser, null, true);
+    var power = lastToast();
+    check("kept-free tiles name the power support", power.indexOf("power blocks") >= 0, power);
+
+    S.leadRect = {x0: 70, y0: 25, x1: 80, y1: 35};
+    fillAt(round, laser, null, false);
+    var mixed = lastToast();
+    S.leadRect = null;
+    check("a second ore is called out by name", mixed.indexOf("also has") >= 0, mixed);
+
+    // and the messages themselves, so the report can quote them
+    info("toast (full patch): " + full);
+    info("toast (truncated):  " + cut);
+    info("toast (with power): " + power);
+    info("toast (mixed ore):  " + mixed);
 })();
 
 // ---------------------------------------------------------------- 7. same patch, same layout

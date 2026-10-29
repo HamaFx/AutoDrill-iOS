@@ -338,13 +338,39 @@ function testOptimization(){
     check("optimization: power nodes for laser", nodes > 0, "nodes=" + nodes);
     report("optimization: laser drills=" + laserDrills + " extractors=" + extractors + " nodes=" + nodes);
 
+    // the fill treats the previous fill's plans as taken (a second tap must not queue every
+    // drill twice), so each layout check starts from an empty queue
+    util.undoLastCommitted();
+
     var blast = optimization.fill(ore, Blocks.blastDrill, true, team);
     check("optimization: airblast produces plans", tileCount(blast, Blocks.blastDrill) > 0, "plans=" + blast.length);
     check("optimization: airblast no overlaps", noOverlaps(blast));
 
+    util.undoLastCommitted();
+
     var impact = optimization.fill(ore, Blocks.impactDrill, false, team);
     check("optimization: impact produces plans", tileCount(impact, Blocks.impactDrill) > 0, "plans=" + impact.length);
     check("optimization: impact has no support blocks", tileCount(impact, Blocks.waterExtractor) === 0);
+
+    util.undoLastCommitted();
+
+    // a second tap while the first fill's plans are still waiting must not queue them again.
+    // The test world has no player unit, so addPlan cannot put anything in the game's queue;
+    // record the plans the way a real fill would so the rule can still be checked here.
+    var firstOfPair = optimization.fill(ore, Blocks.laserDrill, true, team);
+    var recorded = util.lastCommitted();
+    if(recorded.length === 0){
+        for(i = 0; i < firstOfPair.length; i++) recorded.push(firstOfPair[i]);
+    }
+    var repeated = optimization.fill(ore, Blocks.laserDrill, true, team);
+    // NOTE: only a report, not a check. This harness has no player unit (so nothing is queued)
+    // and it gets its own module instance, so it cannot reach the record the mod's own util
+    // keeps. The "a second tap adds nothing" rule is asserted in the engine checks instead,
+    // where both fills run in one module.
+    report("optimization: re-fill on a planned patch first=" + firstOfPair.length
+        + " second=" + repeated.length + " (no player unit: "
+        + (Vars.player == null ? "true" : String(Vars.player.unit() != null)) + ")");
+    util.undoLastCommitted();
 
     // deterministic: the shared-array search must not leak state between runs
     var again = optimization.fill(ore, Blocks.laserDrill, true, team);
@@ -550,6 +576,8 @@ function testAsyncFill(){
     var team = Team.sharded;
     var tiles = Vars.world.tiles;
     var x = 0, y = 0;
+
+    util.undoLastCommitted();
 
     // testPerformance restores the ground it used, so the ore has to be rewritten here
     for(x = BIG.x0; x <= BIG.x1; x++){

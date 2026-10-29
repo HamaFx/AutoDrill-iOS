@@ -50,10 +50,10 @@ function debugLog(msg){
 // routinely several hundred tiles, and a limit below that silently fills only the part nearest
 // the tap. The search itself is bounded by the quality budget and the wall clock instead.
 var SETTING_DEFAULTS = {
-    mechanical: {tiles: 2500, ores: 1},
-    pneumatic: {tiles: 2500, ores: 1},
-    laser: {tiles: 2500, ores: 2},
-    airblast: {tiles: 2500, ores: 2}
+    mechanical: {tiles: 5000, ores: 1},
+    pneumatic: {tiles: 5000, ores: 1},
+    laser: {tiles: 5000, ores: 2},
+    airblast: {tiles: 5000, ores: 2}
 };
 
 /** Shared with the bridge/wall fillers so the four defaults exist in exactly one place. */
@@ -135,6 +135,7 @@ function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
         frames: [],
         result: {score: 0, selection: null},
         sweepOrders: [],
+        plannedBlocked: {},
         powerRemovedDrills: 0,
         powerRemovedOre: 0,
         done: false,
@@ -303,6 +304,8 @@ function setupSearch(job){
         reservePowerTiles(job);
     }
 
+    if(entries.length > 0) filterPlanned(job);
+
     // Everything below is built from the candidates that survived the reservation: the bound,
     // the coverage, and the layouts all have to agree on what may be placed.
     entries = job.entries;
@@ -334,8 +337,10 @@ function setupSearch(job){
     job.maxTries = Math.max(job.quality * 1000, entries.length * 3);
     job.deadline = api.now() + SEARCH_BUDGET_MS;
 
-    // seed the search's occupancy with the reserved tiles: no drill may sit on one
+    // seed the search's occupancy with the reserved tiles and the last fill's plans: no drill
+    // may sit on one
     for(var key in job.reserved) job.occ[key] = 1;
+    for(var pkey in job.plannedBlocked) job.occ[pkey] = 1;
 
     // Ordering passes: greedy runs over the same candidates in different spatial orders. They
     // are what makes the quality setting mean something - each one is a different legal
@@ -529,6 +534,46 @@ function reservePowerTiles(job){
     job.coverable = coverable;
 
     debugLog("stage: reserved " + positions.length + " power tiles (step=" + step + ")");
+}
+
+/**
+ * Drops the candidates the previous fill already planned: those plans are not built yet, so the
+ * game would accept a second set right on top of them and a second tap would queue everything
+ * twice. What is left is the ground that is genuinely still free.
+ */
+function filterPlanned(job){
+    var lastPlans = util.lastCommitted();
+    if(lastPlans.length === 0) return;
+
+    var planned = {};
+    var i = 0, k = 0;
+
+    for(i = 0; i < lastPlans.length; i++){
+        var rect = util.blockRect(lastPlans[i].x, lastPlans[i].y, lastPlans[i].block);
+        for(var x = rect.x; x < rect.x + rect.w; x++){
+            for(var y = rect.y; y < rect.y + rect.h; y++){
+                planned[x + y * job.worldW] = true;
+            }
+        }
+    }
+    job.plannedBlocked = planned;
+
+    var kept = [];
+    for(i = 0; i < job.entries.length; i++){
+        var entry = job.entries[i];
+        var blocked = false;
+
+        for(k = 0; k < entry.cellKeys.length; k++){
+            if(planned[entry.cellKeys[k]] === true){
+                blocked = true;
+                break;
+            }
+        }
+        if(!blocked) kept.push(entry);
+    }
+
+    job.entries = kept;
+    job.candidates = kept;
 }
 
 /** Advances the patch scan. `work` bounds the api-heavy loops per call. */
@@ -729,6 +774,7 @@ function greedySweep(job, order){
     var i = 0, k = 0, keys = null;
 
     for(var r in job.reserved) occ[r] = true;
+    for(var p in job.plannedBlocked) occ[p] = true;
 
     for(i = 0; i < order.length; i++){
         var entry = entries[order[i]];
@@ -789,7 +835,8 @@ function bestLattice(job){
                 var entry = entries[i];
                 if((api.tx(entry.tile) - ax) % size !== 0) continue;
                 if((api.ty(entry.tile) - ay) % size !== 0) continue;
-                if(!free(job.reserved, entry)) continue;    // never sit on a power node
+                if(!free(job.reserved, entry)) continue;            // never sit on a power block
+                if(!free(job.plannedBlocked, entry)) continue;      // nor on a plan from last time
                 selection.push(entry);
             }
 
@@ -919,22 +966,9 @@ function finish(job){
     for(i in job.builtCells) alreadyBuilt++;
 
     var alreadyPlanned = 0;
-    var lastPlans = util.lastCommitted();
-    if(lastPlans.length > 0){
-        var plannedCells = {};
-        for(i = 0; i < lastPlans.length; i++){
-            var rect = util.blockRect(lastPlans[i].x, lastPlans[i].y, lastPlans[i].block);
-            for(var px = rect.x; px < rect.x + rect.w; px++){
-                for(var py = rect.y; py < rect.y + rect.h; py++){
-                    plannedCells[px + py * job.worldW] = true;
-                }
-            }
-        }
-        for(i = 0; i < job.tiles.length; i++){
-            var pfact = job.cellFacts[api.tx(job.tiles[i]) + api.ty(job.tiles[i]) * job.worldW];
-            if(pfact === undefined || pfact.mineable !== true) continue;
-            if(plannedCells[api.tx(job.tiles[i]) + api.ty(job.tiles[i]) * job.worldW] === true) alreadyPlanned++;
-        }
+    for(i in job.plannedBlocked){
+        var plannedTile = api.tile(i % job.worldW, Math.floor(i / job.worldW));
+        if(plannedTile != null && api.itemId(api.drop(plannedTile)) === job.sourceDropId) alreadyPlanned++;
     }
 
     var team = job.team;
@@ -1009,10 +1043,6 @@ function finish(job){
     if(job.cancelled){
         api.toast("[AutoDrill] planning cancelled");
     }else{
-        if(job.truncated){
-            api.toast("[AutoDrill] patch is larger than Max Tiles (" + job.maxTiles
-                + ") - raise it in settings to cover the rest");
-        }
         if(job.exhausted){
             api.toast("[AutoDrill] quality limit reached (" + job.placements + " layouts explored) - raise Optimization Quality for better results");
         }else if(job.aborted){
@@ -1029,20 +1059,27 @@ function finish(job){
             api.toast("[AutoDrill] planned " + summary);
         }
 
-        if(allPlans.length === 0 && job.entries.length > 0){
+        if(allPlans.length === 0 && alreadyPlanned > 0){
+            api.toast("[AutoDrill] the patch is already planned from your last fill ("
+                + alreadyPlanned + " ore tiles) - nothing to add");
+        }else if(allPlans.length === 0 && job.entries.length > 0){
             api.toast("[AutoDrill] nothing could be placed here - is this inside your build range?");
         }else if(drillCount > 0){
             // Always say what the fill did. A patch that looks half filled is usually a patch
             // that already has buildings on it (a second tap fills the gaps), or a mixed patch
             // where only the tapped ore is covered - both are worth stating outright.
-            var taken = alreadyBuilt + alreadyPlanned;
-            if(covered < job.targetCells && taken > 0){
+            if(covered < job.targetCells && alreadyBuilt > 0){
                 api.toast("[AutoDrill] mined " + covered + " of " + job.targetCells + " free "
-                    + oreWord + " tiles - " + taken + " tiles already have drills or buildings on them");
+                    + oreWord + " tiles - " + alreadyBuilt + " tiles already have buildings on them");
             }else if(covered < job.targetCells){
                 var why = null;
-                if(job.reservedNodes.length > 0){
+                if(job.truncated){
+                    why = "the patch is larger than Max Tiles (" + job.maxTiles
+                        + ") - the fill covers the part nearest your tap, raise Max Tiles for the rest";
+                }else if(job.reservedNodes.length > 0){
                     why = "the rest is kept free for the power blocks (turn off Water & Power Support to fill every tile)";
+                }else if(alreadyPlanned > 0){
+                    why = alreadyPlanned + " tiles are already planned from your last fill";
                 }else if(unreachable > 0){
                     why = unreachable + " out of reach (lower Min Ores)";
                 }else{
@@ -1053,6 +1090,10 @@ function finish(job){
                     + " tiles - " + why);
             }else{
                 api.toast("[AutoDrill] mined all " + covered + " " + oreWord + " tiles here"
+                    + (job.truncated
+                        ? " - but the patch is larger than Max Tiles (" + job.maxTiles
+                            + "), so only the part nearest your tap was filled"
+                        : "")
                     + (routed > 0 ? " (+" + routed + " routing tiles)" : ""));
             }
 
@@ -1064,9 +1105,10 @@ function finish(job){
                     otherName = api.itemName(otherId | 0);
                 }
             }
-            if(otherName != null && otherCount > 0){
-                api.toast("[AutoDrill] this patch also has " + otherName + " (" + otherCount
-                    + " tiles) - tap a " + otherName + " tile to fill those too");
+            if(otherName != null && otherCount >= 5){
+                api.toast("[AutoDrill] note: this patch also has " + otherName + " (" + otherCount
+                    + " tiles) - a fill only covers the ore you tap, so tap a " + otherName
+                    + " tile for those");
             }
         }
     }

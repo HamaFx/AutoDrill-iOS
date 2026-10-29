@@ -112,7 +112,7 @@ function makeApi(){
     };
     api.log = function(text){ fakeLog.push(text); };
     api.now = function(){ return Date.now(); };
-    api.toast = function(){};
+    api.toast = function(text){ fakeLog.push("toast: " + text); };
     api.tilesize = function(){ return TILESIZE; };
 
     api.tile = function(x, y){ return inWorld(x, y) ? {x: x, y: y} : null; };
