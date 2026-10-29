@@ -67,6 +67,20 @@ function buildReal(){
         return V.mods.locateMod(name) != null;
     };
 
+    /**
+     * The version string of this mod as the game loaded it. Stamped on every fill's result line:
+     * "it did not change" is impossible to tell apart from "the update never arrived" without it.
+     */
+    api.modVersion = function(){
+        try{
+            var mod = V.mods.locateMod("auto-drill-ios");
+            if(mod != null && mod.meta != null && mod.meta.version != null) return String(mod.meta.version);
+        }catch(e){
+            // never break a fill over a version string
+        }
+        return "?";
+    };
+
     api.warn = function(msg){
         Log.warn("[auto-drill-ios] " + msg);
     };

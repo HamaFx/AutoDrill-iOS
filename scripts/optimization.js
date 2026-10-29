@@ -1041,12 +1041,12 @@ function finish(job){
 
     // ---- feedback ----
     if(job.cancelled){
-        api.toast("[AutoDrill] planning cancelled");
+        api.toast("[AutoDrill v" + api.modVersion() + "] planning cancelled");
     }else{
         if(job.exhausted){
-            api.toast("[AutoDrill] quality limit reached (" + job.placements + " layouts explored) - raise Optimization Quality for better results");
+            api.toast("[AutoDrill v" + api.modVersion() + "] quality limit reached (" + job.placements + " layouts explored) - raise Optimization Quality for better results");
         }else if(job.aborted){
-            api.toast("[AutoDrill] search stopped after " + SEARCH_BUDGET_MS + " ms - lower Optimization Quality for faster results");
+            api.toast("[AutoDrill v" + api.modVersion() + "] search stopped after " + SEARCH_BUDGET_MS + " ms - lower Optimization Quality for faster results");
         }
 
         if(selection.length > 0){
@@ -1056,20 +1056,20 @@ function finish(job){
             if(extractorCount > 0) summary += " + " + extractorCount + " water extractors";
             if(nodeCount > 0) summary += " + " + nodeCount + " " + job.stats.powerName;
             if(linked > 0) summary += " (" + linked + " more wiring them to your grid)";
-            api.toast("[AutoDrill] planned " + summary);
+            api.toast("[AutoDrill v" + api.modVersion() + "] planned " + summary);
         }
 
         if(allPlans.length === 0 && alreadyPlanned > 0){
-            api.toast("[AutoDrill] the patch is already planned from your last fill ("
+            api.toast("[AutoDrill v" + api.modVersion() + "] the patch is already planned from your last fill ("
                 + alreadyPlanned + " ore tiles) - nothing to add");
         }else if(allPlans.length === 0 && job.entries.length > 0){
-            api.toast("[AutoDrill] nothing could be placed here - is this inside your build range?");
+            api.toast("[AutoDrill v" + api.modVersion() + "] nothing could be placed here - is this inside your build range?");
         }else if(drillCount > 0){
             // Always say what the fill did. A patch that looks half filled is usually a patch
             // that already has buildings on it (a second tap fills the gaps), or a mixed patch
             // where only the tapped ore is covered - both are worth stating outright.
             if(covered < job.targetCells && alreadyBuilt > 0){
-                api.toast("[AutoDrill] mined " + covered + " of " + job.targetCells + " free "
+                api.toast("[AutoDrill v" + api.modVersion() + "] mined " + covered + " of " + job.targetCells + " free "
                     + oreWord + " tiles - " + alreadyBuilt + " tiles already have buildings on them");
             }else if(covered < job.targetCells){
                 var why = null;
@@ -1086,10 +1086,10 @@ function finish(job){
                     why = blocked + " blocked (raise Optimization Quality)";
                 }
 
-                api.toast("[AutoDrill] mined " + covered + " of " + job.targetCells + " " + oreWord
+                api.toast("[AutoDrill v" + api.modVersion() + "] mined " + covered + " of " + job.targetCells + " " + oreWord
                     + " tiles - " + why);
             }else{
-                api.toast("[AutoDrill] mined all " + covered + " " + oreWord + " tiles here"
+                api.toast("[AutoDrill v" + api.modVersion() + "] mined all " + covered + " " + oreWord + " tiles here"
                     + (job.truncated
                         ? " - but the patch is larger than Max Tiles (" + job.maxTiles
                             + "), so only the part nearest your tap was filled"
@@ -1106,7 +1106,7 @@ function finish(job){
                 }
             }
             if(otherName != null && otherCount >= 5){
-                api.toast("[AutoDrill] note: this patch also has " + otherName + " (" + otherCount
+                api.toast("[AutoDrill v" + api.modVersion() + "] note: this patch also has " + otherName + " (" + otherCount
                     + " tiles) - a fill only covers the ore you tap, so tap a " + otherName
                     + " tile for those");
             }

@@ -277,12 +277,12 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
     if(word == null) word = "ore";
 
     if(drills === 0){
-        api.toast("[AutoDrill] nothing could be placed here - is this inside your build range?");
+        api.toast("[AutoDrill v" + api.modVersion() + "] nothing could be placed here - is this inside your build range?");
         return;
     }
 
     if(n >= targetCells){
-        api.toast("[AutoDrill] mined all " + n + " " + word + " tiles here"
+        api.toast("[AutoDrill v" + api.modVersion() + "] mined all " + n + " " + word + " tiles here"
             + (truncated ? " - but the patch is larger than Max Tiles (" + maxTiles
                 + "), so only the part nearest your tap was filled" : ""));
     }else{
@@ -298,7 +298,7 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
             why = "the belt layout keeps tiles for its bridges - use the laser or airblast drill"
                 + " to cover every tile";
         }
-        api.toast("[AutoDrill] mined " + n + " of " + targetCells + " " + word + " tiles - " + why);
+        api.toast("[AutoDrill v" + api.modVersion() + "] mined " + n + " of " + targetCells + " " + word + " tiles - " + why);
     }
 
     var otherName = null, otherCount = 0;
@@ -309,7 +309,7 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
         }
     }
     if(otherName != null && otherCount >= 5){
-        api.toast("[AutoDrill] note: this patch also has " + otherName + " (" + otherCount
+        api.toast("[AutoDrill v" + api.modVersion() + "] note: this patch also has " + otherName + " (" + otherCount
             + " tiles) - a fill only covers the ore you tap, so tap a " + otherName
             + " tile for those");
     }

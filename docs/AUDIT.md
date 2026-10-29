@@ -493,6 +493,14 @@ transport needs. The optimiser drills cover every tile because they plan no tran
 their ore then has nowhere to go until the player makes room, which is the trade the user picks
 by choosing the tool. The fill's own message says so, and names the tool to use instead.
 
+### 1.7.6 — the fill stamps its version
+
+"It did not change" and "the update never arrived" cannot be told apart from a screenshot of the
+map. Every fill's result line now starts with the version of the mod the game actually loaded
+(*"[AutoDrill v1.7.6] mined 373 of 376 Copper tiles - the patch is larger than Max Tiles (300)…"*),
+read back from the game's mod list rather than from a constant. The in-game mod list refresh
+takes up to two hours, so a device can lag several releases behind while the map looks identical.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |

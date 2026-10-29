@@ -132,6 +132,7 @@ function makeApi(){
         if(lr != null && tile.x >= lr.x0 && tile.x <= lr.x1 && tile.y >= lr.y0 && tile.y <= lr.y1) return lead;
         return ore[pos(tile.x, tile.y)] === true ? copper : null;
     };
+    api.modVersion = function(){ return "test"; };
     api.itemName = function(id){ return id === lead.id ? "Lead" : (id === copper.id ? "Copper" : null); };
     api.hasBuilding = function(tile){
         return tile != null && BUILT[pos(tile.x, tile.y)] === true;
