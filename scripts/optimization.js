@@ -230,6 +230,7 @@ function scanCandidates(job, work){
     var worldW = job.worldW;
     var size = job.size;
     var half = job.half;
+    var drill = job.drill;
     var cellFacts = job.cellFacts;
     var lowPriority = job.lowPriority;
     var candidates = job.candidates;
@@ -254,6 +255,21 @@ function scanCandidates(job, work){
                 cellKeys.push(ckey);
 
                 var fact = cellFacts[ckey];
+                if(fact === undefined){
+                    // A cell outside the scanned patch: the flood fill walks the tapped ore, so
+                    // the outer ring of an overhanging drill has no facts yet. Foreign ore
+                    // there still decides the dominant item (Drill.countOre sorts by count and
+                    // item id), so complete the fact on demand. `mineable` stays false: the
+                    // coverage target is the patch the fill was asked for.
+                    var ft = api.tile(cx0 + ci, cy0 + cj);
+                    if(ft != null){
+                        var ftItem = api.getDrop(drill, ft);
+                        var ftId = api.itemId(ftItem);
+                        if(lowPriority[ftId] === undefined) lowPriority[ftId] = api.itemLowPriority(ftItem);
+                        fact = {canMine: api.canMine(drill, ft), dropId: ftId, mineable: false, outside: true};
+                        cellFacts[ckey] = fact;
+                    }
+                }
                 if(fact === undefined || !fact.canMine) continue;
 
                 minedCells++;
@@ -557,6 +573,10 @@ function spotCost(job, candidateAt, x, y){
  *   the water   - extractors fit in the lanes and the gaps the lanes open up.
  *
  * Lanes run along the patch's longer side so the belts leave by the shorter one.
+ *
+ * A lane tile has to be a tile the scan saw: the cells the candidate pass completed on demand
+ * (the outer ring of overhanging footprints, see scanCandidates) sit outside the patch and are
+ * skipped, so the lane grid is the one the patch shape asks for.
  */
 function reserveLaneTiles(job){
     var lanes = [];
@@ -588,14 +608,16 @@ function reserveLaneTiles(job){
     if(alongX){
         for(var y = minY; y <= maxY; y += lanePitch){
             for(var x = minX; x <= maxX; x += LANE_HOP){
-                if(job.cellFacts[x + y * job.worldW] === undefined) continue;
+                var laneFactX = job.cellFacts[x + y * job.worldW];
+                if(laneFactX === undefined || laneFactX.outside === true) continue;
                 lanes.push({x: x, y: y});
             }
         }
     }else{
         for(var x2 = minX; x2 <= maxX; x2 += lanePitch){
             for(var y2 = minY; y2 <= maxY; y2 += LANE_HOP){
-                if(job.cellFacts[x2 + y2 * job.worldW] === undefined) continue;
+                var laneFactY = job.cellFacts[x2 + y2 * job.worldW];
+                if(laneFactY === undefined || laneFactY.outside === true) continue;
                 lanes.push({x: x2, y: y2});
             }
         }

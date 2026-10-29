@@ -139,6 +139,18 @@ function fillAt(shape, drill, overrides, withSupport, keepPlans){
     return result;
 }
 
+/**
+ * Rebuilds the fake world (so ore added by an earlier fixture, or buildings stood up on it,
+ * are gone) at the current scenario, and re-installs the settings wrapper the copy replaces.
+ */
+function resetWorld(){
+    var freshApi = makeApi();
+    for(var k in freshApi) api[k] = freshApi[k];
+    api.settingInt = function(key, def){
+        return SETTING_OVERRIDE[key] != null ? SETTING_OVERRIDE[key] : realSettingInt(key, def);
+    };
+}
+
 // ---------------------------------------------------------------- the patch set
 
 var laser = api.block("laserDrill");
@@ -699,6 +711,36 @@ check("a patch with no power nearby is not wired to anything",
     var leadTiles = 0;
     for(var id in mixed.stats.otherOres) leadTiles += mixed.stats.otherOres[id];
     check("other ore under the patch is counted", leadTiles > 0, "other ore tiles=" + leadTiles);
+})();
+
+// Foreign ore just outside the tapped patch: an overhanging 4x4 drill reaches into it, and
+// when the foreign ore wins Drill.countOre the placement mines the wrong resource in-game.
+// The flood fill only walks the tapped ore, so the outer ring of an overhanging footprint has
+// no facts when the candidate pass runs - the scan has to complete them on demand instead of
+// ignoring every cell the patch expansion does not cover (which hid the lead column below).
+(function(){
+    // the lead band starts three tiles right of the small patch: the cells three and four tiles
+    // out are beyond the two-tile expansion, and a drill covering the patch's last column sees
+    // the same amount of lead as copper there - the tie goes to the higher item id, i.e. lead.
+    S.leadRect = {x0: 82, y0: 70, x1: 89, y1: 79};
+    resetWorld();
+
+    util.undoLastCommitted();
+    var job = optimization.prepare(centreOf(small), blast, false, "sharded", null, 0);
+
+    var copperId = api.itemId(AUTODRILL_API_FAKE.__info().copper);
+    var wrong = 0;
+    for(var i = 0; i < job.entries.length; i++){
+        var t = job.entries[i].tile;
+        var realOre = util.countOre(api.tile(api.tx(t), api.ty(t)), blast);
+        if(realOre == null || api.itemId(realOre.item) !== copperId) wrong++;
+    }
+
+    check("mixed border: every candidate drill mines the tapped ore (foreign ore is seen)",
+        wrong === 0, "foreign-dominant candidates=" + wrong + "/" + job.entries.length);
+
+    S.leadRect = null;
+    resetWorld();
 })();
 
 // ---------------------------------------------------------------- 6f. what the fill says
