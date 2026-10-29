@@ -98,6 +98,7 @@ bunx eslint scripts tests/ingame
 
 # 2. Fast fake-world engine & coverage gates (takes ~5s each)
 ./tools/engine-tests.sh
+./tools/corpus-probe.sh --quick   # the committed real-map corpus (first 12 patches)
 ./tools/shape-sweep.sh
 ./tools/vein-probe.sh
 AUTODRILL_VEIN_WALKS=200 ./tools/vein-probe.sh
