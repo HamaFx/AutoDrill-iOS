@@ -30,17 +30,31 @@ Everything below exists and was verified on 2026-10-29; the plan builds on it, i
 | Real-map probe | `tests/js/realmap-probe.js`, `tools/realmap-probe.sh` | per patch: belt coverage/wiring (directed bridge flow), optimizer coverage (support ON/OFF), routing tiles, "meets existing transport" |
 | Audit | `docs/AUDIT-BELTING.md` | the measurements + the model the scoreboard should keep reporting (coverage, wired drills, dumps/stuck, meetsExisting) |
 
-**Raw data in this environment (not in the repo — treat as read-only input)**
+**Raw data (the committed archive is the source of record; everything under /tmp is a convenience copy)**
 
 | Thing | Path | Notes |
 |---|---|---|
-| Player save export | `/tmp/opencode/userdata/` | 40 saves, 10 maps, settings, mods (extracted from the maintainer's zip) |
+| Player save export (**committed**) | `tests/game-data/2026-10-29-save-export.zip` | the data this phase runs on: settings.bin, 40 saves, 10 maps, 29 schematics (2.0 MB). The mods of the original export are deliberately not in the repo — see `tests/game-data/README.md` |
+| Player save export (working copy) | `/tmp/opencode/userdata/` (or `/tmp/game-data/` after extracting the committed zip) | convenience extraction; may disappear with /tmp |
 | In-game dump mod | `/tmp/opencode/mapdump/` (`mod.hjson`, `scripts/main.js`) | loads every save via `SaveIO.load`, dumps lead components |
 | Dump runner | `/tmp/opencode/mapdump-run.sh` | boots the real game under Xvfb with the dump mod + the user's content mods |
 | Region dumps | `/tmp/opencode/dump/` (100 files, ~13 MB) | lead only, top-5 components per save, ±32 tiles |
 | Fixture generator | `/tmp/opencode/make_fixture.py` | dump file → combined scenario+REALMAP fixture |
 
-**IF /tmp IS GONE:** the committed corpus (Task 1) survives; regeneration needs the maintainer's save-export zip and a re-run of the dumper. Do not block on it — the committed fixtures are the corpus of record.
+**The data is in the repo.** Everything this phase needs starts from the committed archive:
+
+```bash
+mkdir -p /tmp/game-data && unzip tests/game-data/2026-10-29-save-export.zip -d /tmp/game-data
+SOURCE=/tmp/game-data ./tools/mapdump.sh      # after Task 1 Step 1
+```
+
+If /tmp is gone, just re-extract the committed zip — nothing needs to be asked for. Some saves
+reference content from third-party mods that are not in the archive (the Asthosus sectors); the
+dumper catches per-save load errors, logs `LOAD FAILED`, and continues. That is expected.
+
+**IF the corpus needs extending** beyond what the archive holds (Task 1 Steps 2–3 already cover
+every ore and component in it), ask the maintainer for a fresh save export; the committed
+fixtures are the corpus of record and survive without /tmp.
 
 **What the audit measured (the baseline this phase must beat)**
 
@@ -106,7 +120,7 @@ Everything below exists and was verified on 2026-10-29; the plan builds on it, i
 - Create (generated): `tests/js/fixtures/corpus/world.js`, `tests/js/fixtures/corpus/manifest.json`
 
 **Interfaces:**
-- Consumes: `/tmp/opencode/userdata` (save export), `/tmp/opencode/mapdump`, `/tmp/opencode/mapdump-run.sh`, `/tmp/opencode/make_fixture.py`, `/tmp/opencode/dump`
+- Consumes: `tests/game-data/2026-10-29-save-export.zip` (committed), `/tmp/opencode/mapdump`, `/tmp/opencode/mapdump-run.sh`, `/tmp/opencode/make_fixture.py`, `/tmp/opencode/dump`
 - Produces: a committed corpus loadable as `tests/js/scenario.js` (globals `AUTODRILL_FAKE_SCENARIO`, `CORPUS`); `tools/mapdata/build_corpus.py <dumpdir> <outdir>`
 
 - [ ] **Step 1: Commit the dumper and the runner**
@@ -114,7 +128,7 @@ Everything below exists and was verified on 2026-10-29; the plan builds on it, i
   Copy `/tmp/opencode/mapdump/*` into `tests/ingame/autodrill-mapdump/` and `/tmp/opencode/mapdump-run.sh` into `tools/mapdump.sh`; parameterise the runner:
 
   ```bash
-  SOURCE="${SOURCE:-/tmp/opencode/userdata}"     # save export (read-only)
+  SOURCE="${SOURCE:-/tmp/game-data}"             # game-data export (extract the committed zip)
   OUT="${OUT:-/tmp/opencode/dump2}"              # where the text dumps go
   CONTENT_MODS="${CONTENT_MODS:-$SOURCE/mods}"   # skipped when missing
   ```
@@ -130,8 +144,16 @@ Everything below exists and was verified on 2026-10-29; the plan builds on it, i
   - cap per save at 40 dumps; file name `<save>_<oreShort>_<index>.txt` (`oreShort` = the overlay name without `ore-`);
   - keep the existing header lines and the per-tile `#<block>` markers (they become the corpus `built` list).
 
-  Run: `SOURCE=/tmp/opencode/userdata OUT=/tmp/opencode/dump2 ./tools/mapdump.sh`
-  Expected: `MAP DUMP COMPLETE`, and `ls /tmp/opencode/dump2 | wc -l` ≥ 150 dumps covering ≥ 5 ore types.
+  Run:
+
+  ```bash
+  mkdir -p /tmp/game-data && unzip -o tests/game-data/2026-10-29-save-export.zip -d /tmp/game-data
+  SOURCE=/tmp/game-data OUT=/tmp/opencode/dump2 ./tools/mapdump.sh
+  ```
+
+  Expected: `MAP DUMP COMPLETE`; `ls /tmp/opencode/dump2 | wc -l` ≥ 150 dumps covering ≥ 5 ore
+  types; a handful of `LOAD FAILED` lines for the saves whose mods are not in the archive
+  (Asthosus sectors) — fine, they are skipped.
 
 - [ ] **Step 3: Build the single-world corpus**
 
@@ -433,5 +455,5 @@ AUTODRILL_VEIN_WALKS=200 ./tools/vein-probe.sh
 - The corpus is data: never hand-edit `world.js`/`manifest.json`/`baseline.txt`; regenerate with the tools and commit the diff.
 - The fake world's world size is fixed by the scenario; patches must never share ore-adjacent gutters (10 tiles), or one patch's scan will eat a neighbour's tiles and every number becomes noise.
 - `SaveIO.load` in the dumper mutates the running game per save; the dump mod is a dev tool and must never ship (`tools/pack.sh` excludes `tests/`).
-- If `/tmp/opencode/userdata` is missing, do not regenerate blindly — the committed corpus is enough for Tasks 2–5; ask the maintainer only if Task 1's extension is required.
+- The source of truth for the game data is `tests/game-data/2026-10-29-save-export.zip` (committed, 2.0 MB). Extract it to `/tmp/game-data` and point `SOURCE` there; never edit the archive. The committed corpus (`tests/js/fixtures/corpus/`) is the durable record and is enough for Tasks 2–5.
 - Keep every threshold you distil in a comment with the corpus run that justified it; if someone re-runs the corpus later and a rule looks wrong, the comment is the breadcrumb.

@@ -1,7 +1,8 @@
 # Belting & Routing Audit
 
-Date: 2026-10-29 · Baseline: `AutoDrill (iOS)` v1.11.0 · Data: player save export
-(`/tmp/BCD3675A-…zip`: 40 saves, 10 maps, settings, both AutoDrill mods)
+Date: 2026-10-29 · Baseline: `AutoDrill (iOS)` v1.11.0 · Data: player save export, committed
+at `tests/game-data/2026-10-29-save-export.zip` (settings.bin, 40 saves, 10 maps, schematics;
+the original export's third-party mods are not redistributed — see `tests/game-data/README.md`)
 
 **Why.** Player feedback on v1.11.0: the belt tool leaves ore on real veins, and — more
 importantly — *"all the drills need belts to transport rss to core"*: a fill that only stops at
