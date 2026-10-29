@@ -519,6 +519,43 @@ What the fill does now, in order:
    *"mined 38 of 42 Copper tiles - 6 more drills fit here but have no belt room next to them -
    free the ground beside the patch (or use the laser or airblast drill, which needs none)"*.
 
+## Engine assessment 1.7.8 — measured, not guessed
+
+`tools/shape-sweep.sh` runs the fills over nine patch shapes and compares them with a reference
+packer (best of a lattice pass and 60 randomised greedy passes on the same rules). Coverage from
+the committed plans; "holes" are uncovered ore tiles with mined tiles on all four sides, i.e.
+gaps *inside* the layout.
+
+| case | engine | reference | headroom | holes |
+|---|---|---|---|---|
+| square 24x24 | 100 % | 100 % | 0 | 0 |
+| round 45x45 | 100 % | 100 % | 0 | 0 |
+| round, squashed | 100 % | 100 % | 0 | 0 |
+| small 10x10 | 100 % | 100 % | 0 | 0 |
+| one-tile vein | 100 % | 100 % | 0 | 0 |
+| diagonal band | 100 % | 100 % | 0 | 0 |
+| patch with a hole in it | 100 % | 100 % | 0 | 0 |
+| square + power support | 83.7 % | 100 % | **16.3 %** | 0 |
+| round + power support | 84.6 % | 100 % | **15.4 %** | 0 |
+| vein + power support | 95.0 % | 100 % | 5.0 % | 0 |
+| band + power support | 84.0 % | 100 % | **16.0 %** | 0 |
+| belt tool, 2-wide vein | 100 % | 100 % | 0 | 0 |
+| belt tool, small square | 88.9 % | 100 % | 11.1 % | 9 |
+
+Two conclusions, and they redirect the work:
+
+1. **Drill placement is already exact.** Every shape is covered whole, with no gaps inside the
+   layout, and the reference packer (which is free to spend an arbitrary amount of time) finds
+   nothing more. Nothing to gain by "more precise placement" of drills.
+2. **The support pass is the one real coverage cost: 15-16 %.** The power blocks are placed on a
+   rigid lattice of reserved tiles, chosen by a local cheapest-spot search. Every reserved tile
+   costs a 3x3 drill, and the lattice is not chosen for the layout it is about to sit in. On the
+   belt tools the same is true but cheaper - the belt lanes are already dead tiles, and the power
+   blocks are not using them.
+
+The plan that follows from that is in the reply: lanes that carry belts *and* power, a global
+cheapest-tile choice for the reserved tiles, and styles for how the layout is organised.
+
 ## Recommended order
 
 | # | Change | Effort | Payoff |
