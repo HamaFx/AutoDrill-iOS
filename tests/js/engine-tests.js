@@ -838,6 +838,43 @@ check("a patch with no power nearby is not wired to anything",
         cov.covered >= 36, "covered=" + cov.covered + "/" + cov.total + " drills=" + cov.drills);
 })();
 
+// A patch in a walled pocket makes the belt tool plan belts and conveyors around the walls.
+// The grid used to keep wall tiles in its list - the chain planned them, the dry run refused
+// them ("7 buildings could not be placed") - and neither the conveyors it laid nor the drills
+// that needed them were marked as taken, so a later candidate could overlap them. Nothing may
+// be refused in the dry run and nothing may overlap.
+(function(){
+    var pocketWalls = [];
+    for(var py = 60; py <= 80; py++) pocketWalls.push([69, py]);
+    for(var px = 69; px <= 80; px++) pocketWalls.push([px, 80]);
+    S.wallCells = pocketWalls;
+    resetWorld();
+
+    var fakeMessages = AUTODRILL_API_FAKE.__info().log;
+    var logBefore = fakeMessages.length;
+    util.undoLastCommitted();
+    var plans = bridge.fill({x: 74, y: 74}, api.block("mechanicalDrill"), direction.RIGHT, "sharded");
+    var cov = coverageOf(small, plans, api.block("mechanicalDrill"));
+
+    var refused = "";
+    for(var mi = logBefore; mi < fakeMessages.length; mi++){
+        if(String(fakeMessages[mi]).indexOf("could not be placed") >= 0) refused = String(fakeMessages[mi]);
+    }
+
+    S.wallCells = null;
+    resetWorld();
+
+    // How far the belt grid lets the pocket be mined: the grid keeps a tile every three rows
+    // and columns and those tiles are not mined - measured, the 6x6 pattern reaches 84 of the
+    // 100 ore tiles here, and no phase or layout family does better (the shape sweep measures
+    // the same ~11% loss on the unwalled square). What this check pins is that the fill now
+    // refuses nothing: no conveyor, bridge or drill plan collides with another.
+    check("belt tool: walled pocket plans without refused or overlapping belts",
+        refused === "" && overlapCells(plans) === 0 && cov.covered >= 84,
+        "covered=" + cov.covered + "/" + cov.total + " overlaps=" + overlapCells(plans)
+            + (refused === "" ? "" : " refused=[" + refused + "]"));
+})();
+
 // ---------------------------------------------------------------- 6i. belt lanes
 
 // The lane mode is a different support path: belts, power and water share the lane rows, and the
