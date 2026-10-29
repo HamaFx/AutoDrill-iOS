@@ -810,6 +810,7 @@ function tenths(n, d){
 
 function summary(){
     var beltPct = [], laserOnPct = [], laserOffPct = [], routes = [], wiredBad = 0, beltWorst = -1;
+    var beltCovered = 0, laserOnCovered = 0, laserOffCovered = 0, tilesTotal = 0, wiredMissing = 0, routeTiles = 0;
     var hash = FNV_OFFSET;
     for(var i = 0; i < results.length; i++){
         var r = results[i];
@@ -819,18 +820,30 @@ function summary(){
         routes.push(r.route);
         if(r.wired < r.beltDrills) wiredBad++;
         if(beltWorst < 0 || tenths(r.belt, r.total) < beltWorst) beltWorst = tenths(r.belt, r.total);
+        beltCovered += r.belt;
+        laserOnCovered += r.laserOn;
+        laserOffCovered += r.laserOff;
+        tilesTotal += r.total;
+        wiredMissing += r.beltDrills - r.wired;
+        routeTiles += r.route;
         hash = fnv1a(r.core, hash);
     }
     var beltMedian = medianOf(beltPct) / 10;
     var laserOnMedian = medianOf(laserOnPct) / 10;
     var laserOffMedian = medianOf(laserOffPct) / 10;
     java.lang.System.out.println("CORPUS-SUMMARY patches=" + results.length
+        + " tiles=" + tilesTotal
         + " beltMedian=" + beltMedian + "%"
         + " beltWorst=" + (beltWorst / 10) + "%"
+        + " beltCovered=" + beltCovered
         + " wiredBad=" + wiredBad
+        + " wiredMissing=" + wiredMissing
         + " laserOnMedian=" + laserOnMedian + "%"
+        + " laserOnCovered=" + laserOnCovered
         + " laserOffMedian=" + laserOffMedian + "%"
+        + " laserOffCovered=" + laserOffCovered
         + " routeMedian=" + medianOf(routes)
+        + " routeTiles=" + routeTiles
         + " hash=0x" + ("00000000" + hash.toString(16)).slice(-8));
 }
 

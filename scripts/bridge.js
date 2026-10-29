@@ -58,9 +58,11 @@ exports.isDrillTile = isDrillTile;
  *
  * Returns 1 when the line was laid (its plans are queued in `beltPlans`).
  */
-function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occupied){
+function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occupied, budget, maxLen){
     var conveyor = api.block("conveyor");
     if(conveyor == null || bridgeTiles.length === 0) return 0;
+    if(budget == null) budget = 80;
+    if(maxLen == null) maxLen = 12;
 
     var worldW = api.worldW();
 
@@ -93,8 +95,8 @@ function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occu
         if(occupied[sx + sy * worldW] === true) continue;                 // a drill sits there
         if(!util.canPlaceBlock(conveyor, team, sx, sy, 0)) continue;      // wall or building
 
-        var path = util.findDuctPath(start, goalTiles, conveyor, team, 80, occupied);
-        if(path == null || path.length === 0 || path.length > 12) continue;
+        var path = util.findDuctPath(start, goalTiles, conveyor, team, budget, occupied);
+        if(path == null || path.length === 0 || path.length > maxLen) continue;
 
         // where the line ends: the belt tile beside the last conveyor
         var last = path[path.length - 1];
@@ -954,7 +956,11 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
 
             var beforeLine = beltPlans.length;
             var repairNeighbours = util.nearbyTilesOfBlock(rtx, rty, drill);
-            if(connectByConveyor(repairNeighbours, drill, team, plannedBridgeTiles, beltPlans, occupied) !== 1){
+            // The last pass may search farther than the packing pass: the layout is final, so a
+            // longer line cannot steal ground from a drill that still has to be placed. The
+            // caps are the ones the audit found too tight for the last few drills (80 nodes /
+            // 12 tiles); the corpus run of 2026-10-29 measures the effect.
+            if(connectByConveyor(repairNeighbours, drill, team, plannedBridgeTiles, beltPlans, occupied, 240, 24) !== 1){
                 continue;
             }
 

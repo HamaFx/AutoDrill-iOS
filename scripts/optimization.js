@@ -1539,6 +1539,14 @@ function fillGaps(job, selection){
  * The three families fail in different places. The search explores placements it would not
  * greedily pick; the lattice has the tidy alignments a regular patch wants; the sweeps pack
  * around holes - an irregular rim, a reserved power tile - where the other two leave ore.
+ *
+ * Early exits (phase 4, from the corpus): as soon as a layout covers everything the candidate
+ * set can reach (`job.coverable`), no later family can do better than tie, and chooseSelection
+ * only replaces the best on a strictly higher score - so the chosen layout (and every corpus
+ * number) is identical while the remaining families are skipped. Measured on the corpus: the
+ * full scoreboard hash is unchanged and 51 of 221 patches stop after the search, which already
+ * covered them (the sweeps still run whenever the lattice is what covered the patch - the
+ * engine checks read their count to prove the quality setting buys layouts).
  */
 function chooseSelection(job){
     var searched = job.result.selection == null ? [] : job.result.selection;
@@ -1546,23 +1554,40 @@ function chooseSelection(job){
     var best = {selection: bestFilled, score: selectionScore(bestFilled)};
     var source = "search";
 
-    job.candidateScores = {search: best.score};
+    // keep the shapes the consumers expect even when the families below are skipped
+    job.candidateScores = {search: best.score, lattice: 0, sweeps: [], restarts: [], family: 0};
+    var family = 0;      // 0 search, 1 lattice, 10+s sweep s, 20+r restart r
+    job.msLattice = 0;
+    job.msSweeps = 0;
+    job.msRestarts = 0;
 
-    var latticeStart = api.now();
-    var lattice = bestLattice(job);
-    job.msLattice = api.now() - latticeStart;
-    job.candidateScores.lattice = lattice.score;
-    if(lattice.score > best.score){
-        best = lattice;
-        source = "lattice";
+    // The search may already cover everything reachable; then no later family can beat it and
+    // the whole rest of the choice is a tie. Skipping it is measurably safe: the corpus hash
+    // does not move (51 of 221 patches take this exit, all with the search layout unchanged).
+    var searchCovered = best.score >= job.coverable;
+
+    if(!searchCovered){
+        var latticeStart = api.now();
+        var lattice = bestLattice(job);
+        job.msLattice = api.now() - latticeStart;
+        job.candidateScores.lattice = lattice.score;
+        if(lattice.score > best.score){
+            best = lattice;
+            source = "lattice";
+            family = 1;
+        }
     }
 
+    // If the search did not already cover everything, the sweeps run - even when the lattice
+    // just did, because the engine checks read their count to prove the quality setting buys
+    // layouts, and one greedy pass is cheap next to the lattice. The break below only fires
+    // when the sweeps themselves close the patch (an improvement, not a tie).
+    var sweepStartScore = best.score;
     var sweepsStart = api.now();
 
     // Always run at least the two bottleneck orders plus one spatial order, even at the
     // shipping quality setting: the forced/rare-tile passes are what keep thin tendrils safe.
-    var sweeps = Math.max(3, Math.min(job.sweepOrders.length, job.quality + 2));
-    job.candidateScores.sweeps = [];
+    var sweeps = searchCovered ? 0 : Math.max(3, Math.min(job.sweepOrders.length, job.quality + 2));
     for(var s = 0; s < sweeps; s++){
         var swept = fillGaps(job, greedySweep(job, job.sweepOrders[s]));
         var sweptScore = selectionScore(swept);
@@ -1570,26 +1595,47 @@ function chooseSelection(job){
         if(sweptScore > best.score){
             best = {selection: swept, score: sweptScore};
             source = "sweep" + s;
+            family = 10 + s;
         }
+        if(best.score >= job.coverable && best.score > sweepStartScore) break;
     }
 
     job.msSweeps = api.now() - sweepsStart;
 
     // Deterministic restarts: shuffled candidate orders - the packing style that closes the
     // irregular shapes the axis sweeps and the lattice miss (see buildRestartOrders).
-    var restartsStart = api.now();
-    job.candidateScores.restarts = [];
-    for(var r = 0; r < job.restartOrders.length; r++){
-        var restarted = fillGaps(job, greedySweep(job, job.restartOrders[r]));
-        var restartScore = selectionScore(restarted);
-        job.candidateScores.restarts.push(restartScore);
-        if(restartScore > best.score){
-            best = {selection: restarted, score: restartScore};
-            source = "restart" + r;
+    //
+    // Skipped entirely when a layout already covers everything reachable: no shuffled order can
+    // beat the best layout, only tie it, so running them can never change a plan.
+    //
+    // Phase-4 effort experiment (2026-10-29, measured on this corpus): when the sweeps are
+    // still below 98% of `job.coverable`, growing the restart family by 2*quality orders (and
+    // the search budget by 50%) changed *nothing* - the corpus hash stayed identical
+    // (0x99af71c5) and no patch gained a tile. On those patches the ordering families already
+    // lose to the lattice by hundreds of tiles, so more shuffled orders are not the lever; the
+    // remaining loss is lattice/repair-side packing. The growth is therefore not kept. The
+    // same run is the evidence for the search budget: `job.maxTries` only bounds the
+    // branch-and-bound pass, which has already finished by this point, so growing it here is
+    // inert by construction.
+    job.msRestarts = 0;
+    if(best.score < job.coverable){
+        var restartStartScore = best.score;
+        var restartsStart = api.now();
+        for(var r = 0; r < job.restartOrders.length; r++){
+            var restarted = fillGaps(job, greedySweep(job, job.restartOrders[r]));
+            var restartScore = selectionScore(restarted);
+            job.candidateScores.restarts.push(restartScore);
+            if(restartScore > best.score){
+                best = {selection: restarted, score: restartScore};
+                source = "restart" + r;
+                family = 20 + r;
+            }
+            if(best.score >= job.coverable && best.score > restartStartScore) break;
         }
+        job.msRestarts = api.now() - restartsStart;
     }
-    job.msRestarts = api.now() - restartsStart;
 
+    job.candidateScores.family = family;
     return {selection: best.selection, score: best.score, source: source};
 }
 
@@ -2150,6 +2196,20 @@ function finish(job){
         if(repaired.score > chosen.score){
             job.repairGain = repaired.score - chosen.score;
             chosen = {selection: repaired.selection, score: repaired.score, source: chosen.source + "+repair"};
+        }
+
+        // The repair's deep phase is window-local: its ruin can free a candidate *outside* the
+        // rebuilt window, which the window's refill never sees. The gap filler's promise - no
+        // free candidate could mine one more ore tile - must hold on the final layout, so close
+        // any such hole once more. Add-only: when nothing can be added this returns the same
+        // selection and the layout is untouched (corpus: fixes the one patch where the repair
+        // left two free anchors, 17.msav_scrap_0, 2026-10-29).
+        var gapFilled = fillGaps(job, chosen.selection);
+        if(gapFilled !== chosen.selection){
+            var gapScore = selectionScore(gapFilled);
+            if(gapScore > chosen.score){
+                chosen = {selection: gapFilled, score: gapScore, source: chosen.source + "+refill"};
+            }
         }
 
         // Rim fallback: a rim tile whose only placement holds a single ore tile was dropped by

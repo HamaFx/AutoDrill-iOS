@@ -1,6 +1,6 @@
-# corpus baseline, engine 304135f, corpus f0cd208, 2026-10-29
+# corpus baseline, engine 304135f + phase 4 task 5 fixes, corpus f0cd208, 2026-10-29
 # every CORPUS line (ms stripped - wall-clock times vary per run) + the summary.
-# regenerate with tools/corpus-probe.sh; compare with ./tools/corpus-probe.sh --quick
+# regenerate with tools/corpus-probe.sh; the gate compares ./tools/corpus-probe.sh --quick
 CORPUS 0.msav_copper_18 ore=copper tiles=12 belt=11/12/3 wired=3/3 dumps=6/6 beltMin=11 laserOn=12/12 laserOnBlocked=0 laserOnUnreach=0 laserOff=12/12 laserOffBlocked=0 laserOffUnreach=0 route=0 meets=0
 CORPUS 0.msav_copper_2 ore=copper tiles=73 belt=67/73/23 wired=23/23 dumps=22/22 beltMin=67 laserOn=73/73 laserOnBlocked=0 laserOnUnreach=0 laserOff=73/73 laserOffBlocked=0 laserOffUnreach=0 route=44 meets=0
 CORPUS 0.msav_copper_3 ore=copper tiles=58 belt=52/58/18 wired=18/18 dumps=17/17 beltMin=52 laserOn=58/58 laserOnBlocked=0 laserOnUnreach=0 laserOff=58/58 laserOffBlocked=0 laserOffUnreach=0 route=24 meets=0
@@ -34,7 +34,7 @@ CORPUS 12.msav_copper_8 ore=copper tiles=31 belt=26/31/7 wired=7/7 dumps=6/6 bel
 CORPUS 12.msav_lead_2 ore=lead tiles=47 belt=40/47/15 wired=15/15 dumps=15/15 beltMin=40 laserOn=45/47 laserOnBlocked=2 laserOnUnreach=0 laserOff=45/47 laserOffBlocked=2 laserOffUnreach=0 route=22 meets=0
 CORPUS 12.msav_lead_36 ore=lead tiles=15 belt=12/15/4 wired=4/4 dumps=6/6 beltMin=12 laserOn=13/15 laserOnBlocked=2 laserOnUnreach=0 laserOff=13/15 laserOffBlocked=2 laserOffUnreach=0 route=5 meets=0
 CORPUS 12.msav_lead_37 ore=lead tiles=12 belt=11/12/4 wired=4/4 dumps=2/2 beltMin=11 laserOn=9/12 laserOnBlocked=3 laserOnUnreach=0 laserOff=9/12 laserOffBlocked=3 laserOffUnreach=0 route=6 meets=0
-CORPUS 12.msav_titanium_23 ore=titanium tiles=14 belt=12/14/5 wired=3/5 dumps=1/1 beltMin=12 laserOn=14/14 laserOnBlocked=0 laserOnUnreach=0 laserOff=14/14 laserOffBlocked=0 laserOffUnreach=0 route=0 meets=0
+CORPUS 12.msav_titanium_23 ore=titanium tiles=14 belt=12/14/5 wired=4/5 dumps=1/1 beltMin=12 laserOn=14/14 laserOnBlocked=0 laserOnUnreach=0 laserOff=14/14 laserOffBlocked=0 laserOffUnreach=0 route=0 meets=0
 CORPUS 13.msav_coal_2 ore=coal tiles=69 belt=62/69/20 wired=20/20 dumps=19/19 beltMin=62 laserOn=69/69 laserOnBlocked=0 laserOnUnreach=0 laserOff=69/69 laserOffBlocked=0 laserOffUnreach=0 route=20 meets=0
 CORPUS 13.msav_copper_0 ore=copper tiles=69 belt=62/69/20 wired=20/20 dumps=19/19 beltMin=62 laserOn=69/69 laserOnBlocked=0 laserOnUnreach=0 laserOff=69/69 laserOffBlocked=0 laserOffUnreach=0 route=20 meets=0
 CORPUS 13.msav_lead_1 ore=lead tiles=69 belt=62/69/20 wired=20/20 dumps=19/19 beltMin=62 laserOn=69/69 laserOnBlocked=0 laserOnUnreach=0 laserOff=69/69 laserOffBlocked=0 laserOffUnreach=0 route=20 meets=0
@@ -54,7 +54,7 @@ CORPUS 17.msav_lead_17 ore=lead tiles=48 belt=42/48/16 wired=16/16 dumps=17/17 b
 CORPUS 17.msav_lead_18 ore=lead tiles=37 belt=24/37/9 wired=8/9 dumps=8/8 beltMin=24 laserOn=22/37 laserOnBlocked=4 laserOnUnreach=11 laserOff=22/37 laserOffBlocked=4 laserOffUnreach=11 route=25 meets=0
 CORPUS 17.msav_lead_2 ore=lead tiles=98 belt=88/98/30 wired=30/30 dumps=29/29 beltMin=88 laserOn=96/98 laserOnBlocked=1 laserOnUnreach=1 laserOff=96/98 laserOffBlocked=1 laserOffUnreach=1 route=28 meets=0
 CORPUS 17.msav_lead_9 ore=lead tiles=20 belt=17/20/7 wired=6/7 dumps=6/6 beltMin=17 laserOn=19/20 laserOnBlocked=0 laserOnUnreach=1 laserOff=19/20 laserOffBlocked=0 laserOffUnreach=1 route=0 meets=0
-CORPUS 17.msav_scrap_0 ore=scrap tiles=129 belt=111/129/32 wired=31/32 dumps=22/22 beltMin=111 laserOn=123/129 laserOnBlocked=6 laserOnUnreach=0 laserOff=123/129 laserOffBlocked=6 laserOffUnreach=0 route=30 meets=0
+CORPUS 17.msav_scrap_0 ore=scrap tiles=129 belt=111/129/32 wired=31/32 dumps=22/22 beltMin=111 laserOn=125/129 laserOnBlocked=4 laserOnUnreach=0 laserOff=125/129 laserOffBlocked=4 laserOffUnreach=0 route=34 meets=0
 CORPUS 17.msav_scrap_1 ore=scrap tiles=106 belt=96/106/31 wired=30/31 dumps=23/23 beltMin=96 laserOn=106/106 laserOnBlocked=0 laserOnUnreach=0 laserOff=106/106 laserOffBlocked=0 laserOffUnreach=0 route=15 meets=0
 CORPUS 18.msav_coal_14 ore=coal tiles=12 belt=12/12/6 wired=6/6 dumps=9/9 beltMin=12 laserOn=12/12 laserOnBlocked=0 laserOnUnreach=0 laserOff=12/12 laserOffBlocked=0 laserOffUnreach=0 route=17 meets=0
 CORPUS 18.msav_copper_27 ore=copper tiles=25 belt=19/25/6 wired=6/6 dumps=10/10 beltMin=19 laserOn=23/25 laserOnBlocked=0 laserOnUnreach=2 laserOff=23/25 laserOffBlocked=0 laserOffUnreach=2 route=14 meets=0
@@ -217,9 +217,9 @@ CORPUS sector-serpulo-271.msav_titanium_2 ore=titanium tiles=46 belt=32/46/12 wi
 CORPUS sector-serpulo-271.msav_titanium_5 ore=titanium tiles=42 belt=29/42/8 wired=8/8 dumps=9/9 beltMin=29 laserOn=30/42 laserOnBlocked=9 laserOnUnreach=3 laserOff=30/42 laserOffBlocked=9 laserOffUnreach=3 route=3 meets=0
 CORPUS sporeMountains.msav.msav_copper_13 ore=copper tiles=69 belt=62/69/22 wired=22/22 dumps=20/20 beltMin=62 laserOn=69/69 laserOnBlocked=0 laserOnUnreach=0 laserOff=69/69 laserOffBlocked=0 laserOffUnreach=0 route=20 meets=0
 CORPUS sporeMountains.msav.msav_copper_9 ore=copper tiles=83 belt=76/83/24 wired=24/24 dumps=23/23 beltMin=76 laserOn=83/83 laserOnBlocked=0 laserOnUnreach=0 laserOff=83/83 laserOffBlocked=0 laserOffUnreach=0 route=36 meets=0
-CORPUS sporeMountains.msav.msav_lead_0 ore=lead tiles=79 belt=60/79/19 wired=17/19 dumps=12/12 beltMin=60 laserOn=66/79 laserOnBlocked=10 laserOnUnreach=3 laserOff=66/79 laserOffBlocked=10 laserOffUnreach=3 route=15 meets=0
+CORPUS sporeMountains.msav.msav_lead_0 ore=lead tiles=79 belt=60/79/19 wired=18/19 dumps=12/12 beltMin=60 laserOn=66/79 laserOnBlocked=10 laserOnUnreach=3 laserOff=66/79 laserOffBlocked=10 laserOffUnreach=3 route=15 meets=0
 CORPUS sporeMountains.msav.msav_lead_2 ore=lead tiles=86 belt=69/86/21 wired=21/21 dumps=11/11 beltMin=69 laserOn=72/86 laserOnBlocked=11 laserOnUnreach=3 laserOff=72/86 laserOffBlocked=11 laserOffUnreach=3 route=18 meets=0
 CORPUS sporeMountains.msav.msav_lead_26 ore=lead tiles=16 belt=14/16/5 wired=5/5 dumps=5/5 beltMin=14 laserOn=15/16 laserOnBlocked=2 laserOnUnreach=0 laserOff=15/16 laserOffBlocked=2 laserOffUnreach=0 route=1 meets=0
 CORPUS sporeMountains.msav.msav_titanium_17 ore=titanium tiles=16 belt=13/16/5 wired=5/5 dumps=9/9 beltMin=13 laserOn=16/16 laserOnBlocked=1 laserOnUnreach=0 laserOff=16/16 laserOffBlocked=1 laserOffUnreach=0 route=20 meets=0
 CORPUS sporeMountains.msav.msav_titanium_35 ore=titanium tiles=14 belt=12/14/5 wired=4/5 dumps=2/2 beltMin=12 laserOn=12/14 laserOnBlocked=2 laserOnUnreach=0 laserOff=12/14 laserOffBlocked=2 laserOffUnreach=0 route=0 meets=0
-CORPUS-SUMMARY patches=221 beltMedian=89.9% beltWorst=42.9% wiredBad=27 laserOnMedian=100% laserOffMedian=100% routeMedian=20 hash=0x849e0629
+CORPUS-SUMMARY patches=221 tiles=21128 beltMedian=89.9% beltWorst=42.9% beltCovered=18728 wiredBad=27 wiredMissing=38 laserOnMedian=100% laserOnCovered=20035 laserOffMedian=100% laserOffCovered=20602 routeMedian=20 routeTiles=4675 hash=0x99af71c5

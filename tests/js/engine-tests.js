@@ -116,6 +116,76 @@ function signature(plans){
     return parts.join(";");
 }
 
+/**
+ * Directed flow model of a belt layout: a drill is wired when an adjacent conveyor or bridge
+ * reaches a dumping bridge (config 0,0) - the same model tests/js/corpus-probe.js reports.
+ * Trimmed copy on purpose: the engine checks must not depend on the probe rig.
+ */
+function beltWiring(plans){
+    var wW = api.worldW();
+    var bridgeAt = {}, belts = {}, drills = [];
+    for(var i = 0; i < plans.length; i++){
+        var name = api.blockName(plans[i].block);
+        if(name === "mechanicalDrill" || name === "pneumaticDrill"){ drills.push(plans[i]); continue; }
+        if(name === "conveyor"){ belts[plans[i].x + plans[i].y * wW] = plans[i]; continue; }
+        if(name === "itemBridge") bridgeAt[plans[i].x + plans[i].y * wW] = plans[i];
+    }
+
+    function flowStart(x, y){
+        var seen = {};
+        var cur = {x: x, y: y};
+        var hops = 0;
+        for(;;){
+            var b = bridgeAt[cur.x + cur.y * wW];
+            if(b == null) return 1;
+            var cx = b.configX == null ? 0 : b.configX;
+            var cy = b.configY == null ? 0 : b.configY;
+            if(cx === 0 && cy === 0) return 0;
+            var key = cur.x + "," + cur.y;
+            if(seen[key] === true) return 2;
+            seen[key] = true;
+            cur = {x: b.x + cx, y: b.y + cy};
+            if(++hops > 64) return 2;
+        }
+    }
+
+    var convUsable = {};
+    var changed = true;
+    while(changed){
+        changed = false;
+        for(var ck in belts){
+            if(convUsable[ck] === true) continue;
+            var c = belts[ck];
+            var usable = false;
+            for(var ddx = -1; ddx <= 1 && !usable; ddx++){
+                for(var ddy = -1; ddy <= 1; ddy++){
+                    if(Math.abs(ddx) + Math.abs(ddy) !== 1) continue;
+                    var nk = (c.x + ddx) + (c.y + ddy) * wW;
+                    if(bridgeAt[nk] != null && flowStart(bridgeAt[nk].x, bridgeAt[nk].y) === 0){ usable = true; break; }
+                    if(convUsable[nk] === true){ usable = true; break; }
+                }
+            }
+            if(usable){ convUsable[ck] = true; changed = true; }
+        }
+    }
+
+    var wired = 0;
+    for(i = 0; i < drills.length; i++){
+        var d = drills[i];
+        var ok = false;
+        for(var dx = -1; dx <= 2 && !ok; dx++){
+            for(var dy = -1; dy <= 2; dy++){
+                if(dx >= 0 && dx <= 1 && dy >= 0 && dy <= 1) continue;
+                var k3 = (d.x + dx) + (d.y + dy) * wW;
+                if(bridgeAt[k3] != null && flowStart(d.x + dx, d.y + dy) === 0){ ok = true; break; }
+                if(convUsable[k3] === true){ ok = true; break; }
+            }
+        }
+        if(ok) wired++;
+    }
+    return {drills: drills.length, wired: wired, bridges: bridgeAt, conveyors: belts};
+}
+
 /** Runs a fill with the given per-key settings, leaving everything else at its default. */
 var SETTING_OVERRIDE = {};
 function withSettings(overrides){
@@ -1160,6 +1230,94 @@ check("a patch with no power nearby is not wired to anything",
         convCount >= 8 && overlapCells(routedRes.plans) === 0,
         "conveyors=" + convCount + " drills=" + routedRes.stats.drills
             + " extractors=" + routedRes.stats.extractors + " nodes=" + routedRes.stats.nodes);
+})();
+
+// ---------------------------------------------------------------- 6e. the corpus regression
+
+// The real-map corpus found one patch (17.msav_scrap_0) where the final layout still had two
+// free candidates that mined uncovered tiles: the deep repair rebuilds a window-local
+// neighbourhood, and its ruin can free a candidate *outside* that window, which the window-local
+// refill never sees. finish() now runs the gap filler once more over the final layout. Fixture
+// extracted from the corpus patch with tools/mapdata/extract_regression.py (run of 2026-10-29,
+// baseline hash 0x849e0629; the patch covered 123/129 before the fix).
+(function(){
+    withSettings(null);
+    util.undoLastCommitted();
+    var tap = api.tile(S.terrainTap1[0], S.terrainTap1[1]);
+    if(api.drop(tap) == null){
+        check("corpus regression fixture loads (17.msav_scrap_0)", false, "tap has no ore");
+        return;
+    }
+    var job = optimization.prepare(tap, laser, false, "sharded", null, 0);
+    while(!optimization.searchStep(job, Infinity)){
+        // run to completion
+    }
+    var plans = optimization.finish(job);
+
+    var occ = {}, covered = {};
+    var i = 0, k = 0;
+    for(i = 0; i < plans.length; i++){
+        if(api.blockId(plans[i].block) !== api.blockId(laser)) continue;
+        var size = api.size(laser), offset = Math.floor((size - 1) / 2);
+        for(var dx = 0; dx < size; dx++){
+            for(var dy = 0; dy < size; dy++){
+                var key = (plans[i].x - offset + dx) + (plans[i].y - offset + dy) * W;
+                occ[key] = true;
+                covered[key] = true;
+            }
+        }
+    }
+
+    var freeWithGain = 0;
+    for(i = 0; i < job.entries.length; i++){
+        var entry = job.entries[i];
+        var blocked = false;
+        var cells = entry.cellKeys;
+        for(k = 0; k < cells.length; k++){
+            if(occ[cells[k]] === true){ blocked = true; break; }
+        }
+        if(blocked) continue;
+        var mine = entry.mineableKeys;
+        for(k = 0; k < mine.length; k++){
+            if(covered[mine[k]] !== true){ freeWithGain++; break; }
+        }
+    }
+
+    // the patch's own ore tiles under the drills
+    var reached = util.getConnectedTiles(tap, 5001, "sharded");
+    var sourceId = api.itemId(api.drop(tap));
+    var ore = {};
+    var total = 0;
+    for(i = 0; i < reached.length; i++){
+        if(api.itemId(api.drop(reached[i])) === sourceId){
+            ore[api.pos(reached[i])] = true;
+            total++;
+        }
+    }
+    var patchCovered = 0;
+    for(var ok in ore){
+        if(covered[ok] === true) patchCovered++;
+    }
+
+    check("corpus patch 17.msav_scrap_0: the final gap fill closes the repair's free anchors",
+        total === 129 && freeWithGain === 0 && patchCovered >= 125,
+        "covered=" + patchCovered + "/" + total + " freeWithGain=" + freeWithGain
+            + " repairGain=" + job.stats.repairGain + " source=" + job.stats.source);
+})();
+
+// The second corpus regression: a drill whose conveyor line to the belt grid was longer than the
+// packing pass's path cap stayed unwired on 12.msav_titanium_23. The final repair pass now
+// searches farther (240 nodes / 24 tiles); this patch went from 3 to 4 wired drills of 5, so the
+// check pins the improvement, not perfection (the fifth drill has no reachable belt ground).
+(function(){
+    withSettings(null);
+    util.undoLastCommitted();
+    var tap = api.tile(S.terrainTap2[0], S.terrainTap2[1]);
+    var plans = bridge.fill(tap, api.block("mechanicalDrill"), direction.RIGHT, "sharded");
+    var wiring = beltWiring(plans);
+    check("corpus patch 12.msav_titanium_23: the final belt repair wires the long-path drill",
+        wiring.drills >= 5 && wiring.wired >= 4,
+        "wired=" + wiring.wired + "/" + wiring.drills + " plans=" + plans.length);
 })();
 
 // ---------------------------------------------------------------- 7. same patch, same layout
