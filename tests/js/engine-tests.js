@@ -1320,6 +1320,49 @@ check("a patch with no power nearby is not wired to anything",
         "wired=" + wiring.wired + "/" + wiring.drills + " plans=" + plans.length);
 })();
 
+// The third corpus regression: the worst patch of the 2026-10-29 belt scoreboard. Its alignment
+// needed a drill-pattern phase outside the old 3x3 search, and one-tile sandwiches between
+// pattern drills kept the add-only passes from closing the rest. The 6x6 phase candidates plus
+// the layout competition lifted it from 6/14 to 11/14 (baseline hash 0x849e0629 -> 0x405311df).
+(function(){
+    withSettings(null);
+    var tap = api.tile(S.terrainTap3[0], S.terrainTap3[1]);
+    var reached = util.getConnectedTiles(tap, 5001, "sharded");
+    var sourceId = api.itemId(api.drop(tap));
+    var ore = {};
+    var total = 0;
+    for(var i = 0; i < reached.length; i++){
+        if(api.itemId(api.drop(reached[i])) === sourceId){
+            ore[api.pos(reached[i])] = true;
+            total++;
+        }
+    }
+    var mechanical = api.block("mechanicalDrill");
+    var dirs = [direction.RIGHT, direction.DOWN, direction.UP, direction.LEFT];
+    var best = 0;
+    for(var d = 0; d < dirs.length; d++){
+        util.undoLastCommitted();
+        var plans = bridge.fill(tap, mechanical, dirs[d], "sharded");
+        var size = api.size(mechanical), offset = Math.floor((size - 1) / 2);
+        var covered = {};
+        for(i = 0; i < plans.length; i++){
+            if(api.blockId(plans[i].block) !== api.blockId(mechanical)) continue;
+            for(var dx = 0; dx < size; dx++){
+                for(var dy = 0; dy < size; dy++){
+                    var key = (plans[i].x - offset + dx) + (plans[i].y - offset + dy) * W;
+                    if(ore[key] === true) covered[key] = true;
+                }
+            }
+        }
+        var n = 0;
+        for(var ck in covered) n++;
+        if(n > best) best = n;
+    }
+    check("corpus patch sector-serpulo-165.msav_coal_38: the worst belt patch stays above its fixed floor",
+        total === 14 && best >= 11,
+        "covered=" + best + "/" + total + " (was 6/14 before the phase competition)");
+})();
+
 // ---------------------------------------------------------------- 7. same patch, same layout
 
 var first = fillAt(round, laser, null);

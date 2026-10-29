@@ -449,6 +449,15 @@ function markRefused(){
     refusedPlans++;
 }
 
+/** The refusal count so far, and a reset for layout trials that must not share the count. */
+exports.refusedCount = function(){
+    return refusedPlans;
+};
+
+exports.resetRefused = function(){
+    refusedPlans = 0;
+};
+
 /**
  * Reports how many wanted plans were refused, once per fill. The game silently refuses
  * anything outside the core build radius (or on blocked terrain), which is the usual reason

@@ -136,6 +136,21 @@ function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occu
     return 0;
 }
 
+/** Ore cells of `oreSet` under a drill anchored at `tile` (for drills left without transport). */
+function oreUnderTile(tile, drill, oreSet){
+    var size = api.size(drill);
+    var offset = Math.floor((size - 1) / 2);
+    var worldW = api.worldW();
+    var n = 0;
+    var x = api.tx(tile) - offset, y = api.ty(tile) - offset;
+    for(var dx = 0; dx < size; dx++){
+        for(var dy = 0; dy < size; dy++){
+            if(oreSet[(x + dx) + (y + dy) * worldW] === true) n++;
+        }
+    }
+    return n;
+}
+
 /**
  * Adds a conveyor at `tile` when a belt tile sits right next to it, so the drill beside it can
  * hand its ore over. Returns 1 when the conveyor was taken (its plan is queued in `beltPlans`).
@@ -325,33 +340,100 @@ function isBridgeTile(tile, phaseX, phaseY){
  * the phases that anchor the drills on the vein row (wall in the footprint, refused) used to
  * score highest and produce the worst layouts - 27 of 40 vein tiles where the phases that
  * anchor on the free side reach 40 of 40.
+ *
+ * The drill pattern repeats every 6 tiles in both axes, so the search tries all 36 offsets.
+ * It used to try 3x3: half of the alignments were unreachable, and patches whose vein sat in
+ * the other half lost tiles purely because of where they sat on the map (measured 2026-10-29
+ * on the committed corpus: +54 covered tiles and the worst patch 43% -> 68% once all 36 were
+ * tried). The pattern score is only a proxy for the final coverage, though, so the phases
+ * ranked here are *candidates* - `fill` builds the layout for the best few and keeps the one
+ * that actually covers the most (see rankPhases/competingLayouts).
  */
-function pickPhase(tiles, drill, targetSet, team){
+function phaseScore(tiles, drill, targetSet, team, px, py){
     var size = api.size(drill);
     var offset = Math.floor((size - 1) / 2);
     var worldW = api.worldW();
-    var best = {x: 0, y: 0, score: -1};
+    var score = 0;
     var i = 0, dx = 0, dy = 0;
 
+    for(i = 0; i < tiles.length; i++){
+        if(!isDrillTile(tiles[i], px, py)) continue;
+        if(!util.canPlaceBlock(drill, team, api.tx(tiles[i]), api.ty(tiles[i]), 0)) continue;
+
+        var x = api.tx(tiles[i]) - offset, y = api.ty(tiles[i]) - offset;
+        for(dx = 0; dx < size; dx++){
+            for(dy = 0; dy < size; dy++){
+                if(targetSet[(x + dx) + (y + dy) * worldW] === true) score++;
+            }
+        }
+    }
+    return score;
+}
+
+/** The historical 3x3 winner - always among the candidates, so coverage can only improve. */
+function legacyPhase(tiles, drill, targetSet, team){
+    var best = {x: 0, y: 0, score: -1};
     for(var px = 0; px < 3; px++){
         for(var py = 0; py < 3; py++){
-            var score = 0;
-
-            for(i = 0; i < tiles.length; i++){
-                if(!isDrillTile(tiles[i], px, py)) continue;
-                if(!util.canPlaceBlock(drill, team, api.tx(tiles[i]), api.ty(tiles[i]), 0)) continue;
-
-                var x = api.tx(tiles[i]) - offset, y = api.ty(tiles[i]) - offset;
-                for(dx = 0; dx < size; dx++){
-                    for(dy = 0; dy < size; dy++){
-                        if(targetSet[(x + dx) + (y + dy) * worldW] === true) score++;
-                    }
-                }
-            }
+            var score = phaseScore(tiles, drill, targetSet, team, px, py);
             if(score > best.score) best = {x: px, y: py, score: score};
         }
     }
     return best;
+}
+
+/** The 36 pattern offsets ranked by pattern score (stable: lower px, py first on ties). */
+function rankPhases(tiles, drill, targetSet, team){
+    var phases = [];
+    for(var px = 0; px < 6; px++){
+        for(var py = 0; py < 6; py++){
+            phases.push({x: px, y: py, score: phaseScore(tiles, drill, targetSet, team, px, py)});
+        }
+    }
+    util.sortStable(phases, function(p){
+        return -p.score;
+    });
+    return phases;
+}
+
+/**
+ * The phases whose layouts compete in `fill`: the historical 3x3 winner first (so ties keep the
+ * old behaviour), then the best-ranked 6x6 offsets. Bounded: 4 layouts at most, and the loop in
+ * `fill` stops early on a full useful cover. On big patches the extra layouts are the price of
+ * not losing tiles to a bad alignment (the corpus run of 2026-10-29 keeps every gain and the
+ * patches that a single higher-scoring phase used to regress).
+ */
+function candidatePhases(tiles, drill, targetSet, team){
+    var ranked = rankPhases(tiles, drill, targetSet, team);
+    var legacy = legacyPhase(tiles, drill, targetSet, team);
+    var out = [legacy];
+    for(var i = 0; i < ranked.length && out.length < 4; i++){
+        if(ranked[i].x === legacy.x && ranked[i].y === legacy.y) continue;
+        out.push(ranked[i]);
+    }
+    return out;
+}
+
+/** Ore tiles of the patch under the fill's drills (the number reportCoverage talks about). */
+function oreUnderDrills(plans, drill, targetSet){
+    var size = api.size(drill);
+    var offset = Math.floor((size - 1) / 2);
+    var worldW = api.worldW();
+    var covered = {};
+    var n = 0;
+    for(var i = 0; i < plans.length; i++){
+        if(api.blockId(plans[i].block) !== api.blockId(drill)) continue;
+        for(var dx = 0; dx < size; dx++){
+            for(var dy = 0; dy < size; dy++){
+                var key = (plans[i].x - offset + dx) + (plans[i].y - offset + dy) * worldW;
+                if(targetSet[key] === true && covered[key] !== true){
+                    covered[key] = true;
+                    n++;
+                }
+            }
+        }
+    }
+    return n;
 }
 
 exports.isBridgeTile = isBridgeTile;
@@ -386,14 +468,44 @@ function fill(tile, drill, direction, teamOverride){
     util.expandArea(tiles, Math.floor(api.size(drill) / 2));
 
     var phaseTeam = teamOverride != null ? teamOverride : api.team();
-    var phase = pickPhase(tiles, drill, targetSet, phaseTeam);
-    dbg("phase=" + phase.x + "," + phase.y + " patternOre=" + phase.score + " of " + targetCells);
 
-    var outcome = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride, phase.x, phase.y);
+    // The phases compete on the layout they produce, not on the pattern score: a higher-scoring
+    // alignment can leave one-tile holes between pattern drills that the add-only passes cannot
+    // take (measured on the corpus, sector-serpulo-170.msav_copper_1: the single best-scoring
+    // 6x6 phase covered 12 of 15 where the old 3x3 phase covered all 15). The trial score is
+    // the ore under drills *that have transport* - a drill the repair pass could not connect
+    // carries nothing, so its tiles do not count (16 corpus patches lost wiring to a
+    // higher-cover phase that stranded ore this way). The trial stops early on a full cover,
+    // and the legacy phase runs first, so ties keep the old layout.
+    var candidates = candidatePhases(tiles, drill, targetSet, phaseTeam);
+    var best = null;
+    for(var ph = 0; ph < candidates.length; ph++){
+        util.resetRefused();
+        var trial = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride,
+            candidates[ph].x, candidates[ph].y);
+        trial.covered = oreUnderDrills(trial.plans, drill, targetSet);
+        trial.useful = trial.covered - trial.lonelyOre;
+        trial.phase = candidates[ph];
+        if(best == null || trial.useful > best.useful
+            || (trial.useful === best.useful && trial.skipped < best.skipped)){
+            best = trial;
+        }
+        if(best.useful >= targetCells) break;
+    }
 
-    reportCoverage(outcome.plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles,
-        outcome.skipped);
-    return outcome.plans;
+    dbg("phase=" + best.phase.x + "," + best.phase.y + " patternOre=" + best.phase.score
+        + " covered=" + best.covered + "/" + targetCells + " lonely=" + best.lonelyOre
+        + " candidates=" + candidates.length);
+
+    // the winner's refusals are the ones the report should mention, not every trial's
+    util.resetRefused();
+    for(var r = 0; r < best.refused; r++) util.markRefused();
+    util.commitPlans(best.plans);
+    util.reportRefused("buildings");
+
+    reportCoverage(best.plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles,
+        best.skipped);
+    return best.plans;
 }
 
 /**
@@ -492,10 +604,13 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
 exports.fill = fill;
 
 function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, phaseX, phaseY){
-    // returns {plans, skipped} - skipped counts ore tiles a drill fits on but a belt cannot reach
+    // returns {plans, skipped, refused} - skipped counts ore tiles a drill fits on but a belt
+    // cannot reach; refused is this trial's share of the placement-refusal counter. The caller
+    // runs several of these as trials and commits only the winner, so no plans are committed here.
     var team = teamOverride != null ? teamOverride : api.team();
     var configX = direction.x * 3;
     var configY = direction.y * 3;
+    var refusedStart = util.refusedCount();
 
     var drillTiles = [];
     var bridgeTiles = [];
@@ -932,6 +1047,7 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
     // so nothing ever carries its ore. Give every belt-less drill a conveyor line to the
     // bridges that did get planned - the same machinery the filter uses, now that it works.
     var repairedDrills = 0;
+    var lonelyOre = 0;
     var plannedBridgeTiles = [];
     for(i = 0; i < bridgePlans.length; i++){
         var pbt = api.tile(bridgePlans[i].x, bridgePlans[i].y);
@@ -961,6 +1077,7 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
             // caps are the ones the audit found too tight for the last few drills (80 nodes /
             // 12 tiles); the corpus run of 2026-10-29 measures the effect.
             if(connectByConveyor(repairNeighbours, drill, team, plannedBridgeTiles, beltPlans, occupied, 240, 24) !== 1){
+                lonelyOre += oreUnderTile(repairTile, drill, oreSet);
                 continue;
             }
 
@@ -982,6 +1099,7 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
                     delete occupied[beltPlans[q5].x + beltPlans[q5].y * api.worldW()];
                 }
                 beltPlans.length = beforeLine;
+                lonelyOre += oreUnderTile(repairTile, drill, oreSet);
                 util.markRefused();
             }
         }
@@ -994,10 +1112,10 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
         allPlans.push(bridgePlans[i]);
     }
 
-    dbg("committing: drills+bridge plans=" + allPlans.length + " (bridges kept=" + bridgePlans.length + ")");
-    util.commitPlans(allPlans);
-    util.reportRefused("buildings");
-    return {plans: allPlans, skipped: skipped};
+    dbg("trial: drills+bridge plans=" + allPlans.length + " (bridges kept=" + bridgePlans.length
+        + " lonelyOre=" + lonelyOre + ")");
+    return {plans: allPlans, skipped: skipped, refused: util.refusedCount() - refusedStart,
+        lonelyOre: lonelyOre};
 }
 
 /** Java: BridgeDrill.findExistingBridgePartner */
