@@ -1,7 +1,7 @@
-displayName: "AutoDrill (iOS)"
+displayName: "AutoDrill (iOS) Classic"
 name: "auto-drill-ios"
 author: "Pointifix (original mod), HamaFx (iOS port)"
-description: "Adds tools for automatically filling resource patches with drills. iOS-compatible script edition of AutoDrill."
+description: "Classic build: ships the original mod's drill defaults. Adds tools for automatically filling resource patches with drills. iOS-compatible script edition of AutoDrill."
 version: "1.15.0"
 minGameVersion: 160
 iosCompatible: true

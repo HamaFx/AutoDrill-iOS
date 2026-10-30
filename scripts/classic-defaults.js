@@ -12,4 +12,4 @@
 // so one build switch changes the shipped defaults, the fallbacks and the settings sliders.
 "use strict";
 
-exports.on = false;
+exports.on = true;
