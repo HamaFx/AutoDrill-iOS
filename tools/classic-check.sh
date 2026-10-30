@@ -61,3 +61,12 @@ else
     echo "CLASSIC CHECK FAILED - see the CHECK FAIL lines above"
     exit 1
 fi
+
+# 3. the packed scripts must also load in the iOS script mode (real global.js, ui.js included)
+echo "== classic: iOS-mode load =="
+java -cp "$MINDUSTRY_JAR:$RHINO_JAR:tests/build" \
+    ScriptHarness "$STAGE" - tests/harness/global.js 2>&1 | grep -E "\[harness\] (done|FAILED)" || {
+    echo "CLASSIC CHECK FAILED: the packed scripts do not load in iOS mode"
+    exit 1
+}
+echo "classic iOS-mode load passed"
