@@ -7,3 +7,4 @@ minGameVersion: 160
 iosCompatible: true
 hidden: true
 repo: "HamaFx/AutoDrill-iOS"
+hideBrowser: true
