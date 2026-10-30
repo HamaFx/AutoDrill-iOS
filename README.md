@@ -40,8 +40,10 @@ the starting point: **`auto-drill-ios_v*-classic.zip`** (GitHub releases, pre-re
 Be aware of what the original limits mean: a scan limit of a few hundred tiles stops big patches
 short of full coverage (on the release corpus the original values cover ~53% of the ore against
 ~89% for the standard defaults — that is why the standard build raises them). The classic build
-is a separate, manual-import package: download the zip from the releases page and import it
-(Mods → Import → File); it replaces the standard build of the same mod.
+is a separate package: install it from the game (Mods → Browser → AutoDrill (iOS) →
+*View Releases* → the classic release → Add) or by importing the zip
+(`Mods → Import → File`) from the releases page. Either way it replaces the standard build of
+the same mod, and importing a standard zip brings it back.
 
 ## Use
 
@@ -183,8 +185,10 @@ extractors and power nodes on Serpulo, beam towers or beam nodes on Erekir, wire
 - `tools/run-tests.sh <normal|ios>` — the in-engine suite in both script modes;
   `tools/guard-check.sh` — the "another AutoDrill is installed" check.
 - `tools/pack.sh [--classic]` — builds the release zip; `--classic` builds the original-defaults
-  package (verified by `tools/classic-check.sh`, which stages the packed zip and checks the
-  defaults and that the port's extra settings are ignored).
+  package, verified by `tools/classic-check.sh` (staged zip: defaults, ignored settings, iOS-mode
+  load). `tools/classic-tag.sh` points the classic release tag at a tree that carries the switch:
+  the in-game browser installs script mods from the repo tree at the release tag, not from the
+  zip asset, so the tag itself must be classic (`tools/publish.sh --classic` runs it first).
 - `tests/ingame/` — a test mod and a screenshot driver that run inside the real game.
 - `tests/harness/` — Rhino harness used by the iOS-mode check.
 - `tools/make-ios-sim-jar.sh` — rebuilds the iOS-simulation game jar used by the iOS test mode.

@@ -28,6 +28,9 @@ if $CLASSIC; then
     ZIP="dist/auto-drill-ios_v${VERSION}-classic.zip"
     TITLE="AutoDrill iOS $VERSION classic [$BUILD_TAG]"
     NOTES="The classic build of the iOS port: drill defaults and settings match the original Java mod (mechanical 200, pneumatic 150, laser 100, airblast 100 max tiles; min ores 1/2/5/9; the port's extra settings are not shown or used). Import \`$ZIP\` manually (Mods -> Import -> File); it replaces the standard build of the same mod. Requires Mindustry 8.160 or newer."
+    # the in-game browser installs script mods from the repo tree at the release tag, so the
+    # tag itself must carry the classic switch (not only the zip asset)
+    ./tools/classic-tag.sh "$TAG" --push
     ./tools/pack.sh --classic >/dev/null
 else
     TAG="v$VERSION"

@@ -33,27 +33,8 @@ if $CLASSIC; then
     trap 'rm -rf "$STAGE"' EXIT
     cp -r "${FILES[@]}" "$STAGE/"
 
-    python3 - "$STAGE" <<'PY'
-import pathlib, sys
-stage = pathlib.Path(sys.argv[1])
-
-def sub_once(path, old, new):
-    text = path.read_text()
-    if old not in text:
-        sys.exit("classic pack: pattern not found in %s: %r" % (path, old))
-    path.write_text(text.replace(old, new, 1))
-
-# the build switch: the classic package ships the original mod's drill defaults
-sub_once(stage / "scripts/classic-defaults.js", "exports.on = false;", "exports.on = true;")
-
-# the mod list should say which of the two builds is installed
-sub_once(stage / "mod.hjson",
-         'displayName: "AutoDrill (iOS)"',
-         'displayName: "AutoDrill (iOS) Classic"')
-sub_once(stage / "mod.hjson",
-         'description: "Adds tools',
-         "description: \"Classic build: ships the original mod's drill defaults. Adds tools")
-PY
+    # the same patch tools/classic-tag.sh applies to the release tag tree
+    python3 tools/classic-patch.py "$STAGE"
 
     (cd "$STAGE" && zip -q -r "$OUT_ABS" "${FILES[@]}")
 else
