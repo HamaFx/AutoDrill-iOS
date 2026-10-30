@@ -70,7 +70,16 @@ exports.init = function(){
 };
 
 var KEY_SETTINGS_VERSION = "auto-drill-ios-settings-version";
-var SETTINGS_VERSION = 3;
+
+// The classic package (tools/pack.sh --classic) ships the Java AutoDrill defaults: the switch
+// also drives the slider ranges and hides the settings this port added (lanes, routing,
+// variation), so the settings page matches the real mod's.
+var classicDefaults = optimization.classicDefaults === true;
+
+// 4 is the classic build's first limits set: installing it over any older install (the normal
+// builds are all on 3) rewrites the stored limits to the original mod's values once. The normal
+// line stays on 3 and never touches limits a user already has.
+var SETTINGS_VERSION = classicDefaults ? 4 : 3;
 
 /**
  * The fill limits shipped by older versions made the fill look broken: a laser fill saw 100 ore
@@ -96,7 +105,9 @@ function migrateFillLimits(){
     }
 
     api.putSettingInt(KEY_SETTINGS_VERSION, SETTINGS_VERSION);
-    if(upgrading) api.toast("[AutoDrill] fill limits upgraded - the whole ore patch gets covered now");
+    if(upgrading) api.toast(classicDefaults
+        ? "[AutoDrill] fill limits set to the original mod's defaults"
+        : "[AutoDrill] fill limits upgraded - the whole ore patch gets covered now");
 }
 
 // ---------------------------------------------------------------- toolbar handling
@@ -336,7 +347,8 @@ function updateSelectTable(){
  * routing is enabled they ask for a direction first, like the bridge fillers do.
  */
 function startOptimization(drill, withSupport){
-    var routeLength = api.settingInt(KEY_ROUTE, 0);
+    // the classic build has no output-routing option: a leftover value must not route
+    var routeLength = classicDefaults ? 0 : api.settingInt(KEY_ROUTE, 0);
 
     if(routeLength > 0){
         requireDirection(function(d){
@@ -451,28 +463,39 @@ function buildSettings(){
         // defaults come from the engine table, so the two can never drift apart
         var d = optimization.settingDefaults;
 
-        st.slider("mechanical-drill-max-tiles", d.mechanical.tiles, 100, 10000, 100, tiles);
+        // classic build: the Java mod's 25..500 range, step 25
+        var maxTilesMin = classicDefaults ? 25 : 100;
+        var maxTilesMax = classicDefaults ? 500 : 10000;
+        var maxTilesStep = classicDefaults ? 25 : 100;
+
+        st.slider("mechanical-drill-max-tiles", d.mechanical.tiles, maxTilesMin, maxTilesMax, maxTilesStep, tiles);
         st.slider("mechanical-drill-min-ores", d.mechanical.ores, 1, 4, 1, ores);
 
-        st.slider("pneumatic-drill-max-tiles", d.pneumatic.tiles, 100, 10000, 100, tiles);
+        st.slider("pneumatic-drill-max-tiles", d.pneumatic.tiles, maxTilesMin, maxTilesMax, maxTilesStep, tiles);
         st.slider("pneumatic-drill-min-ores", d.pneumatic.ores, 1, 4, 1, ores);
 
-        st.slider("laser-drill-max-tiles", d.laser.tiles, 100, 10000, 100, tiles);
+        st.slider("laser-drill-max-tiles", d.laser.tiles, maxTilesMin, maxTilesMax, maxTilesStep, tiles);
         st.slider("laser-drill-min-ores", d.laser.ores, 1, 9, 1, ores);
 
-        st.slider("airblast-drill-max-tiles", d.airblast.tiles, 100, 10000, 100, tiles);
+        st.slider("airblast-drill-max-tiles", d.airblast.tiles, maxTilesMin, maxTilesMax, maxTilesStep, tiles);
         st.slider("airblast-drill-min-ores", d.airblast.ores, 1, 16, 1, ores);
 
         st.slider(KEY_QUALITY, 2, 1, 10, 1, function(v){ return "level " + v; });
-        st.slider(KEY_VARIATION, 0, 0, 9, 1, function(v){
-            return v === 0 ? api.bundle("auto-drill-ios-unit-off") : api.bundle("auto-drill-ios-unit-reroll") + " " + v;
-        });
+        if(!classicDefaults){
+            st.slider(KEY_VARIATION, 0, 0, 9, 1, function(v){
+                return v === 0 ? api.bundle("auto-drill-ios-unit-off") : api.bundle("auto-drill-ios-unit-reroll") + " " + v;
+            });
+        }
         st.check(KEY_SUPPORT, true);
-        st.check(KEY_LANES, false);
+        if(!classicDefaults){
+            st.check(KEY_LANES, false);
+        }
 
-        st.slider(KEY_ROUTE, 0, 0, 12, 1, function(v){
-            return v === 0 ? api.bundle("auto-drill-ios-unit-off") : v + " " + api.bundle("auto-drill-ios-unit-tiles");
-        });
+        if(!classicDefaults){
+            st.slider(KEY_ROUTE, 0, 0, 12, 1, function(v){
+                return v === 0 ? api.bundle("auto-drill-ios-unit-off") : v + " " + api.bundle("auto-drill-ios-unit-tiles");
+            });
+        }
 
         // Extra rows are allowed here (the table cannot be subclassed on iOS, but it is a
         // Table, so plain rows work as long as they come after the preferences).

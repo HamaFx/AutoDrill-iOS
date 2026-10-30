@@ -49,12 +49,33 @@ function debugLog(msg){
 // Patch-size defaults are safety limits, not "how much ore to bother with": ore patches are
 // routinely several hundred tiles, and a limit below that silently fills only the part nearest
 // the tap. The search itself is bounded by the quality budget and the wall clock instead.
-var SETTING_DEFAULTS = {
-    mechanical: {tiles: 5000, ores: 1},
-    pneumatic: {tiles: 5000, ores: 1},
-    laser: {tiles: 5000, ores: 2},
-    airblast: {tiles: 5000, ores: 2}
-};
+//
+// The classic build (tools/pack.sh --classic, scripts/classic-defaults.js) ships the Java
+// AutoDrill v1.6 defaults instead: mechanical 200/1, pneumatic 150/2, laser 100/5,
+// airblast 100/9. Those truncate real patches to about half coverage (measured on the corpus:
+// belt 52.5%, optimizer 54.2%), so they are only the fallback for that package.
+var CLASSIC_DEFAULTS = require("classic-defaults").on === true;
+
+var SETTING_DEFAULTS = CLASSIC_DEFAULTS
+    ? {
+        mechanical: {tiles: 200, ores: 1},
+        pneumatic: {tiles: 150, ores: 2},
+        laser: {tiles: 100, ores: 5},
+        airblast: {tiles: 100, ores: 9}
+    }
+    : {
+        mechanical: {tiles: 5000, ores: 1},
+        pneumatic: {tiles: 5000, ores: 1},
+        laser: {tiles: 5000, ores: 2},
+        airblast: {tiles: 5000, ores: 2}
+    };
+
+exports.classicDefaults = CLASSIC_DEFAULTS;
+
+// The port's extra settings (layout variation, belt lanes, output routing) are ignored entirely
+// in the classic build: the original mod has no such options, so a value left behind by a normal
+// install must not change a classic fill. The reads below are the only places that see them
+// (bridge.js reads the variation too, through the same switch).
 
 /** Shared with the bridge/wall fillers so the four defaults exist in exactly one place. */
 exports.settingDefaults = SETTING_DEFAULTS;
@@ -118,7 +139,7 @@ function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
         maxTiles: api.settingInt(prefix + "-drill-max-tiles", SETTING_DEFAULTS[prefix].tiles),
         minOres: api.settingInt(prefix + "-drill-min-ores", SETTING_DEFAULTS[prefix].ores),
         quality: api.settingInt(KEY_QUALITY, 2),
-        variation: api.settingInt(KEY_VARIATION, 0),
+        variation: CLASSIC_DEFAULTS ? 0 : api.settingInt(KEY_VARIATION, 0),
 
         // ---- patch scan (resumable) ----
         phase: PHASE_TILES,
@@ -351,7 +372,7 @@ function setupSearch(job){
     // it; the reserved tiles cost a drill each, which is why this only happens when the
     // water-extractor/power-node support is on.
     if(job.withSupport && api.settingBool(KEY_SUPPORT, true)){
-        if(api.settingBool(KEY_LANES, false)) reserveLaneTiles(job);
+        if(!CLASSIC_DEFAULTS && api.settingBool(KEY_LANES, false)) reserveLaneTiles(job);
         else reservePowerTiles(job);
     }
 
@@ -3341,10 +3362,16 @@ function routeOutputs(job, allPlans, occupied){
 
 // ---------------------------------------------------------------------------- entry points
 
+/** The output-routing length: the port's setting, or 0 in the classic build (the original mod
+ *  never routes outputs, so a leftover value from a normal install must not either). */
+function routeSetting(){
+    return CLASSIC_DEFAULTS ? 0 : api.settingInt(KEY_ROUTE, 0);
+}
+
 /** Synchronous fill (tests, tools, and anything that wants the result immediately). */
 function fill(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction, routeLength){
     var job = prepare(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction,
-        routeLength == null ? api.settingInt(KEY_ROUTE, 0) : routeLength);
+        routeLength == null ? routeSetting() : routeLength);
     while(!searchStep(job, Infinity)){
         // run to completion
     }
@@ -3356,7 +3383,7 @@ exports.fill = fill;
 /** Same as fill, plus the layout statistics (used by the engine checks). */
 exports.fillDetailed = function(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction, routeLength){
     var job = prepare(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction,
-        routeLength == null ? api.settingInt(KEY_ROUTE, 0) : routeLength);
+        routeLength == null ? routeSetting() : routeLength);
     while(!searchStep(job, Infinity)){
         // run to completion
     }
@@ -3382,7 +3409,7 @@ function prepareProgress(job){
  */
 exports.fillAsync = function(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction, routeLength, onDone){
     var job = newJob(tile, drill, waterExtractorsAndPowerNodes, teamOverride, direction,
-        routeLength == null ? api.settingInt(KEY_ROUTE, 0) : routeLength);
+        routeLength == null ? routeSetting() : routeLength);
 
     api.showProgress("[accent]AutoDrill[] planning...");
     api.setProgressCancel(function(){

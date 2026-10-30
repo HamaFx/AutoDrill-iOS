@@ -501,7 +501,9 @@ function fill(tile, drill, direction, teamOverride){
     }
 
     // shared with optimization.js/ui.js: re-rolls the arrangement among equally-good layouts
-    var variation = api.settingInt("auto-drill-ios-layout-variation", 0);
+    // (the classic build has no such setting - it always uses the standard layout)
+    var variation = optimization.classicDefaults === true
+        ? 0 : api.settingInt("auto-drill-ios-layout-variation", 0);
 
     var mechanical = api.blockId(drill) === api.blockId(api.block("mechanicalDrill"));
     var prefix = mechanical ? "mechanical" : "pneumatic";

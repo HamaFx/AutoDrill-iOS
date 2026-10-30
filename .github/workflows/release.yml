@@ -9,6 +9,9 @@ on:
   push:
     tags:
       - "v*"
+      # the classic package is published manually via tools/publish.sh --classic; this workflow
+      # only builds the standard zip, so classic tags must not trigger it
+      - "!v*-classic"
   workflow_dispatch:
 
 permissions:

@@ -23,6 +23,26 @@ Nothing about the tool itself changed: same buttons, same layouts, same settings
    Mods → Import → File in game and pick the zip.
 3. Enable the mod and restart.
 
+## Classic build (original defaults)
+
+A second package ships the settings the original Java mod ships, for anyone who wants that as
+the starting point: **`auto-drill-ios_v*-classic.zip`** (GitHub releases, pre-release tag
+`v*-classic`).
+
+- **Max Tiles** defaults to the original 200 (mechanical), 150 (pneumatic), 100 (laser and
+  airblast), with the original 25–500 slider range, step 25.
+- **Min Ores** defaults to 1/2/5/9.
+- This port's extra settings (belt lanes, output routing, layout variation) are hidden from the
+  settings page and ignored by the fill.
+- The fill engine is the same as the standard build — the classic package changes the
+  configuration, not the planner.
+
+Be aware of what the original limits mean: a scan limit of a few hundred tiles stops big patches
+short of full coverage (on the release corpus the original values cover ~53% of the ore against
+~89% for the standard defaults — that is why the standard build raises them). The classic build
+is a separate, manual-import package: download the zip from the releases page and import it
+(Mods → Import → File); it replaces the standard build of the same mod.
+
 ## Use
 
 - Tap the **AutoDrill icon** next to the minimap (or press `H` on a hardware keyboard) to
@@ -162,7 +182,9 @@ extractors and power nodes on Serpulo, beam towers or beam nodes on Erekir, wire
   number lives.
 - `tools/run-tests.sh <normal|ios>` — the in-engine suite in both script modes;
   `tools/guard-check.sh` — the "another AutoDrill is installed" check.
-- `tools/pack.sh` — builds the release zip.
+- `tools/pack.sh [--classic]` — builds the release zip; `--classic` builds the original-defaults
+  package (verified by `tools/classic-check.sh`, which stages the packed zip and checks the
+  defaults and that the port's extra settings are ignored).
 - `tests/ingame/` — a test mod and a screenshot driver that run inside the real game.
 - `tests/harness/` — Rhino harness used by the iOS-mode check.
 - `tools/make-ios-sim-jar.sh` — rebuilds the iOS-simulation game jar used by the iOS test mode.
