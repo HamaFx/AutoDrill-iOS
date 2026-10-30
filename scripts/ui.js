@@ -16,6 +16,7 @@ var KEY_ACTIVATION = "auto-drill-ios-activation-key";
 var KEY_SHOW_BUTTON = "auto-drill-ios-display-toggle-button";
 var KEY_WELCOME = "auto-drill-ios-welcome";
 var KEY_QUALITY = "auto-drill-ios-optimization-quality";
+var KEY_VARIATION = "auto-drill-ios-layout-variation";
 var KEY_SUPPORT = "auto-drill-ios-place-water-extractor-and-power-nodes";
 var KEY_LANES = "auto-drill-ios-build-belt-lanes";
 var KEY_ROUTE = "auto-drill-ios-output-routing-length";
@@ -463,6 +464,9 @@ function buildSettings(){
         st.slider("airblast-drill-min-ores", d.airblast.ores, 1, 16, 1, ores);
 
         st.slider(KEY_QUALITY, 2, 1, 10, 1, function(v){ return "level " + v; });
+        st.slider(KEY_VARIATION, 0, 0, 9, 1, function(v){
+            return v === 0 ? api.bundle("auto-drill-ios-unit-off") : api.bundle("auto-drill-ios-unit-reroll") + " " + v;
+        });
         st.check(KEY_SUPPORT, true);
         st.check(KEY_LANES, false);
 

@@ -59,6 +59,10 @@ whether water extractors/power nodes are added to optimised drills. What the ext
   costs about a quarter of the patch's tiles, because the belt bridges need room between drills.
 - **Optimization Quality** — how many layout attempts the fill makes (plus the search budget).
   Higher = fewer ore tiles left behind, slower fill.
+- **Layout Variation** — a re-roll among the near-best arrangements: raise the number to move a
+  belt or a hole somewhere else (it may trade one ore tile for that), the same number always
+  gives the same layout on every device, and 0 keeps the best one. It does not add coverage —
+  the fill already picks its best layouts.
 - **Max Tiles** — how many ore tiles the fill looks at, nearest the tap first. It is a safety
   limit, not a target: 5,000 ships by default, which covers any normal patch whole. If a patch
   is bigger the fill says so and fills the part it saw.

@@ -17,6 +17,7 @@ JAR="${MINDUSTRY_JAR:-/tmp/opencode/libs/Mindustry.jar}"
 LOG=/tmp/opencode/mr/compile-check.log
 WAIT="${WAIT:-40}"
 
+mkdir -p "$(dirname "$LOG")"
 rm -f "$DATA/settings.bin" "$DATA/settings_backup.bin" "$DATA/launchid.dat"
 mkdir -p "$MODS"
 rm -rf "$MODS"/*

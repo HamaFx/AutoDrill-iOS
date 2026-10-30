@@ -58,9 +58,10 @@ exports.isDrillTile = isDrillTile;
  *
  * Returns 1 when the line was laid (its plans are queued in `beltPlans`).
  */
-function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occupied, budget, maxLen){
+function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occupied, budget, maxLen, existingBelts){
     var conveyor = api.block("conveyor");
-    if(conveyor == null || bridgeTiles.length === 0) return 0;
+    if(conveyor == null) return 0;
+    if(bridgeTiles.length === 0 && (existingBelts == null || existingBelts.length === 0)) return 0;
     if(budget == null) budget = 80;
     if(maxLen == null) maxLen = 12;
 
@@ -87,6 +88,22 @@ function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occu
             goalTiles.push(gt);
         }
     }
+    // an existing built belt is a goal too: a free tile beside it ends the line
+    if(existingBelts != null){
+        for(g = 0; g < existingBelts.length; g++){
+            var ebt = existingBelts[g];
+            for(o = 0; o < 4; o++){
+                var egt = api.tile(api.tx(ebt) + offs[o][0], api.ty(ebt) + offs[o][1]);
+                if(egt == null) continue;
+                var ekey = api.pos(egt);
+                if(goalSeen[ekey] === true) continue;
+                if(occupied[ekey] === true) continue;
+                if(!util.canPlaceBlock(conveyor, team, api.tx(egt), api.ty(egt), 0)) continue;
+                goalSeen[ekey] = true;
+                goalTiles.push(egt);
+            }
+        }
+    }
     if(goalTiles.length === 0) return 0;
 
     for(var i = 0; i < neighbours.length; i++){
@@ -98,13 +115,20 @@ function connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occu
         var path = util.findDuctPath(start, goalTiles, conveyor, team, budget, occupied);
         if(path == null || path.length === 0 || path.length > maxLen) continue;
 
-        // where the line ends: the belt tile beside the last conveyor
+        // where the line ends: the belt tile beside the last conveyor (planned or existing)
         var last = path[path.length - 1];
         var goal = null;
         for(var b = 0; b < bridgeTiles.length && goal == null; b++){
             var bdx = api.tx(bridgeTiles[b]) - api.tx(last);
             var bdy = api.ty(bridgeTiles[b]) - api.ty(last);
             if(Math.abs(bdx) + Math.abs(bdy) === 1) goal = bridgeTiles[b];
+        }
+        if(goal == null && existingBelts != null){
+            for(b = 0; b < existingBelts.length && goal == null; b++){
+                var edx = api.tx(existingBelts[b]) - api.tx(last);
+                var edy = api.ty(existingBelts[b]) - api.ty(last);
+                if(Math.abs(edx) + Math.abs(edy) === 1) goal = existingBelts[b];
+            }
         }
         if(goal == null) continue;
 
@@ -159,7 +183,7 @@ function oreUnderTile(tile, drill, oreSet){
  * next to it: this is what lets drills at a patch edge - where the belt grid does not reach -
  * work at all.
  */
-function addConveyorToGrid(tile, team, bridgeTiles, beltPlans, occupied){
+function addConveyorToGrid(tile, team, bridgeTiles, beltPlans, occupied, existingBelts){
     var conveyor = api.block("conveyor");
     if(conveyor == null) return 0;
     if(util.containsTile(bridgeTiles, tile)) return 0;
@@ -173,7 +197,9 @@ function addConveyorToGrid(tile, team, bridgeTiles, beltPlans, occupied){
     var directions = [{x: 1, y: 0, r: 0}, {x: 0, y: 1, r: 1}, {x: -1, y: 0, r: 2}, {x: 0, y: -1, r: 3}];
     for(var i = 0; i < directions.length; i++){
         var beside = api.tile(x + directions[i].x, y + directions[i].y);
-        if(beside == null || !util.containsTile(bridgeTiles, beside)) continue;
+        var besideIsGrid = beside != null && util.containsTile(bridgeTiles, beside);
+        var besideIsBelt = beside != null && isExistingBelt(beside);
+        if(!besideIsGrid && !besideIsBelt) continue;
         if(!util.canPlaceBlock(conveyor, team, x, y, directions[i].r)) continue;
 
         beltPlans.push(util.newPlan(x, y, directions[i].r, conveyor));
@@ -231,7 +257,7 @@ function markCovered(tile, drill, oreSet, covered){
  * NOTE: a number, not an object - helpers that build an object and are called inside a hot loop
  * are the Rhino trap documented in docs/AUDIT.md.
  */
-function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridgeTiles, beltPlans, occupied, phaseX, phaseY){
+function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridgeTiles, beltPlans, occupied, phaseX, phaseY, existingBelts){
     var size = api.size(drill);
     var offset = Math.floor((size - 1) / 2);
     var worldW = api.worldW();
@@ -265,6 +291,17 @@ function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridg
         }
     }
 
+    // an already-built belt beside the drill is transport too: this is what lets a re-tap over
+    // a built base (or a base the player wired themselves) keep placing drills
+    if(!connected){
+        for(j = 0; j < neighbours.length; j++){
+            if(isExistingBelt(neighbours[j])){
+                connected = true;
+                break;
+            }
+        }
+    }
+
     if(!connected){
         var placeable = [];
 
@@ -280,7 +317,7 @@ function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridg
             // it. A conveyor takes and passes on any face, so this is all it takes for a drill
             // the grid misses - and a patched patch has plenty of those at its edges.
             for(j = 0; j < neighbours.length; j++){
-                if(!addConveyorToGrid(neighbours[j], team, bridgeTiles, beltPlans, occupied)) continue;
+                if(!addConveyorToGrid(neighbours[j], team, bridgeTiles, beltPlans, occupied, existingBelts)) continue;
                 placeable.push(neighbours[j]);
                 break;
             }
@@ -291,7 +328,7 @@ function takeDrillCandidate(t, drill, sourceDropId, minOresPerDrill, team, bridg
             // laid around the obstruction, from the drill to the nearest belt tile. It counts as
             // transport, so the drill is taken - and its footprint is still marked below, or the
             // next candidate would sit right on top of it.
-            if(connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occupied)){
+            if(connectByConveyor(neighbours, drill, team, bridgeTiles, beltPlans, occupied, null, null, existingBelts)){
                 connected = true;
             }
         }
@@ -438,6 +475,24 @@ function oreUnderDrills(plans, drill, targetSet){
 
 exports.isBridgeTile = isBridgeTile;
 
+/**
+ * True when a tile holds a *built* belt: an item conveyor, bridge or duct the player's base -
+ * or an earlier fill - already has. The fill counts these as transport targets, so a drill
+ * beside one can hand its ore over. Before this, only the fill's own plans counted and a patch
+ * whose belts were already built got almost no new drills (the re-tap over a built base
+ * reported "mined 20 of 51" while belts ran right past the free ore).
+ */
+function isExistingBelt(tile){
+    if(tile == null) return false;
+    if(api.buildOf(tile) == null) return false;
+    var name = api.blockName(api.blockOf(tile));
+    return name === "conveyor" || name === "itemBridge" || name === "armoredConveyor"
+        || name === "duct" || name === "armoredDuct" || name === "ductBridge"
+        || name === "plastaniumConveyor";
+}
+
+exports.isExistingBelt = isExistingBelt;
+
 /** Java: BridgeDrill.fill */
 function fill(tile, drill, direction, teamOverride){
     if(api.size(drill) !== 2){
@@ -445,12 +500,20 @@ function fill(tile, drill, direction, teamOverride){
         return;
     }
 
+    // shared with optimization.js/ui.js: re-rolls the arrangement among equally-good layouts
+    var variation = api.settingInt("auto-drill-ios-layout-variation", 0);
+
     var mechanical = api.blockId(drill) === api.blockId(api.block("mechanicalDrill"));
     var prefix = mechanical ? "mechanical" : "pneumatic";
     var maxTiles = api.settingInt(prefix + "-drill-max-tiles", SETTING_DEFAULTS[prefix].tiles);
 
     // one tile past the limit tells a patch that is exactly the limit apart from one that was cut
-    var reached = util.getConnectedTiles(tile, maxTiles + 1, teamOverride);
+    var builtOre = {};      // ore tiles that already have a building on them (for the report)
+    var reached = util.getConnectedTiles(tile, maxTiles + 1, teamOverride, null, builtOre);
+    var builtCount = 0;
+    for(var bo in builtOre){
+        if(builtOre[bo] === true) builtCount++;
+    }
     var truncated = reached.length > maxTiles;
     if(truncated) reached.length = maxTiles;
 
@@ -467,6 +530,13 @@ function fill(tile, drill, direction, teamOverride){
     var tiles = reached;
     util.expandArea(tiles, Math.floor(api.size(drill) / 2));
 
+    // the player's existing belts (base or an earlier fill): valid hand-off targets for new
+    // drills, and what makes a second fill over a built base place drills again
+    var existingBelts = [];
+    for(var eb = 0; eb < tiles.length; eb++){
+        if(isExistingBelt(tiles[eb])) existingBelts.push(tiles[eb]);
+    }
+
     var phaseTeam = teamOverride != null ? teamOverride : api.team();
 
     // The phases compete on the layout they produce, not on the pattern score: a higher-scoring
@@ -479,18 +549,31 @@ function fill(tile, drill, direction, teamOverride){
     // and the legacy phase runs first, so ties keep the old layout.
     var candidates = candidatePhases(tiles, drill, targetSet, phaseTeam);
     var best = null;
+    var allTrials = [];
     for(var ph = 0; ph < candidates.length; ph++){
         util.resetRefused();
         var trial = placeDrillsAndBridges(tile, tiles, drill, direction, teamOverride,
-            candidates[ph].x, candidates[ph].y);
+            candidates[ph].x, candidates[ph].y, existingBelts);
         trial.covered = oreUnderDrills(trial.plans, drill, targetSet);
         trial.useful = trial.covered - trial.lonelyOre;
         trial.phase = candidates[ph];
+        allTrials.push(trial);
         if(best == null || trial.useful > best.useful
             || (trial.useful === best.useful && trial.skipped < best.skipped)){
             best = trial;
         }
         if(best.useful >= targetCells) break;
+    }
+
+    // "Layout Variation": a re-roll among the near-best arrangements. Coverage may trade up to
+    // one ore tile for a different fitting (say, to move a belt or a hole); 0 keeps the best
+    // layout. Deterministic per value, so it is the same everywhere.
+    if(variation > 0 && allTrials.length > 1){
+        var near = [];
+        for(var nt = 0; nt < allTrials.length; nt++){
+            if(allTrials[nt].useful >= best.useful - 1) near.push(allTrials[nt]);
+        }
+        if(near.length > 1) best = near[variation % near.length];
     }
 
     dbg("phase=" + best.phase.x + "," + best.phase.y + " patternOre=" + best.phase.score
@@ -504,7 +587,7 @@ function fill(tile, drill, direction, teamOverride){
     util.reportRefused("buildings");
 
     reportCoverage(best.plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles,
-        best.skipped);
+        best.skipped, builtCount);
     return best.plans;
 }
 
@@ -513,12 +596,12 @@ function fill(tile, drill, direction, teamOverride){
  * where a second ore is the only thing left - looked like the fill had stopped working. Same
  * plain result line the optimiser fills print.
  */
-function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles, skipped){
+function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, truncated, maxTiles, skipped, builtCount){
     var size = api.size(drill);
     var offset = Math.floor((size - 1) / 2);
     var covered = {};
     var others = {};
-    var built = 0;
+    var built = builtCount == null ? 0 : builtCount;
     var drills = 0;
     var i = 0, dx = 0, dy = 0;
 
@@ -545,12 +628,6 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
                 }
             }
         }
-    }
-
-    // ore that already has something on it (a second tap on the same patch)
-    for(i in targetSet){
-        var target = api.tile(i % api.worldW(), Math.floor(i / api.worldW()));
-        if(target != null && api.hasBuilding(target)) built++;
     }
 
     var n = 0;
@@ -603,7 +680,7 @@ function reportCoverage(plans, drill, sourceDropId, targetCells, targetSet, trun
 
 exports.fill = fill;
 
-function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, phaseX, phaseY){
+function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, phaseX, phaseY, existingBelts){
     // returns {plans, skipped, refused} - skipped counts ore tiles a drill fits on but a belt
     // cannot reach; refused is this trial's share of the placement-refusal counter. The caller
     // runs several of these as trials and commits only the winner, so no plans are committed here.
@@ -703,7 +780,7 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
 
     for(i = 0; i < drillTiles.length; i++){
         var takenOne = takeDrillCandidate(drillTiles[i], drill, sourceDropId, minOresPerDrill, team,
-            bridgeTiles, beltPlans, occupied, phaseX, phaseY);
+            bridgeTiles, beltPlans, occupied, phaseX, phaseY, existingBelts);
         if(takenOne === 1){
             filtered.push(drillTiles[i]);
             markCovered(drillTiles[i], drill, oreSet, coveredOre);
@@ -725,7 +802,7 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
         if(uncoveredGain(leftover, drill, oreSet, coveredOre) === 0) continue;
 
         var takenTwo = takeDrillCandidate(leftover, drill, sourceDropId, minOresPerDrill, team,
-            bridgeTiles, beltPlans, occupied, phaseX, phaseY);
+            bridgeTiles, beltPlans, occupied, phaseX, phaseY, existingBelts);
         if(takenTwo === 1){
             filtered.push(leftover);
             markCovered(leftover, drill, oreSet, coveredOre);
@@ -766,7 +843,7 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
                 leftoverAttempts++;
 
                 var takenThree = takeDrillCandidate(anchorTile, drill, sourceDropId, minOresPerDrill,
-                    team, bridgeTiles, beltPlans, occupied, phaseX, phaseY);
+                    team, bridgeTiles, beltPlans, occupied, phaseX, phaseY, existingBelts);
                 if(takenThree === 1){
                     filtered.push(anchorTile);
                     markCovered(anchorTile, drill, oreSet, coveredOre);
@@ -790,21 +867,28 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
     // bridge matrix anyway when a non-ore tile was tapped, filling the map with useless plans.
     if(drillTiles.length === 0) return {plans: [], skipped: skipped};
 
-    if(bridgeTiles.length === 0) return {plans: [], skipped: skipped};
+    // No *placeable* mesh tile is fine when the player's own belts are around: the drills hand
+    // their ore to those instead (a heavily built pocket has no free grid tiles at all).
+    var hasExistingBelts = existingBelts != null && existingBelts.length > 0;
+    if(bridgeTiles.length === 0 && !hasExistingBelts) return {plans: [], skipped: skipped};
 
     // --- Outlet: the bridge tile furthest in the chosen direction, plus one tile further out.
-    var outerMost = util.argMax(bridgeTiles, function(t2){
-        return direction.x === 0 ? api.ty(t2) * direction.y : api.tx(t2) * direction.x;
-    });
-    if(outerMost == null) return {plans: [], skipped: skipped};
+    // Only when there is a planned mesh; with existing belts only, the drills feed the base's
+    // network and the fill plans no bridges at all.
+    if(bridgeTiles.length > 0){
+        var outerMost = util.argMax(bridgeTiles, function(t2){
+            return direction.x === 0 ? api.ty(t2) * direction.y : api.tx(t2) * direction.x;
+        });
+        if(outerMost == null) return {plans: [], skipped: skipped};
 
-    var outlet = api.nearby(outerMost, configX, configY);
-    if(outlet == null) return {plans: [], skipped: skipped};
+        var outlet = api.nearby(outerMost, configX, configY);
+        if(outlet == null) return {plans: [], skipped: skipped};
 
-    bridgeTiles.push(outlet);
-    util.sortStable(bridgeTiles, function(t2){
-        return api.dst2ToPoint(t2, api.tileWorldX(outlet), api.tileWorldY(outlet));
-    });
+        bridgeTiles.push(outlet);
+        util.sortStable(bridgeTiles, function(t2){
+            return api.dst2ToPoint(t2, api.tileWorldX(outlet), api.tileWorldY(outlet));
+        });
+    }
 
     // --- Dry run: collect all plans, validate, then commit.
     var allPlans = [];
@@ -1062,7 +1146,8 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
             for(var bx = -1; bx <= 2 && !hasBelt; bx++){
                 for(var by = -1; by <= 2; by++){
                     if(bx >= 0 && bx <= 1 && by >= 0 && by <= 1) continue;
-                    if(bridgePlanAt(rtx + bx, rty + by) || conveyorPlanAt(rtx + bx, rty + by)){
+                    if(bridgePlanAt(rtx + bx, rty + by) || conveyorPlanAt(rtx + bx, rty + by)
+                        || isExistingBelt(api.tile(rtx + bx, rty + by))){
                         hasBelt = true;
                         break;
                     }
@@ -1076,7 +1161,8 @@ function placeDrillsAndBridges(source, tiles, drill, direction, teamOverride, ph
             // longer line cannot steal ground from a drill that still has to be placed. The
             // caps are the ones the audit found too tight for the last few drills (80 nodes /
             // 12 tiles); the corpus run of 2026-10-29 measures the effect.
-            if(connectByConveyor(repairNeighbours, drill, team, plannedBridgeTiles, beltPlans, occupied, 240, 24) !== 1){
+            if(connectByConveyor(repairNeighbours, drill, team, plannedBridgeTiles, beltPlans,
+                occupied, 240, 24, existingBelts) !== 1){
                 lonelyOre += oreUnderTile(repairTile, drill, oreSet);
                 continue;
             }

@@ -93,6 +93,7 @@ function makeApi(){
     var TERRAIN_ORE = {};     // pos -> item
     var TERRAIN_SOLID = {};   // pos -> true
     var TERRAIN_BUILT = {};   // pos -> true
+    var TERRAIN_BLOCK = {};   // pos -> block name of a built block with identity (conveyor, ...)
     var T = OPTS.terrain;
     if(T != null){
         var tchars = T.chars == null ? {} : T.chars;
@@ -107,6 +108,13 @@ function makeApi(){
                     var iname = tchars[ch] == null ? "copper" : tchars[ch];
                     if(ORE_ITEMS[iname] != null) TERRAIN_ORE[tkey] = ORE_ITEMS[iname];
                 }
+            }
+        }
+        // optional built-block identities: {"x,y": "conveyor", ...} - what stands on a 'B' tile
+        if(T.built != null){
+            for(var bkey in T.built){
+                var bparts = String(bkey).split(",");
+                TERRAIN_BLOCK[pos(parseInt(bparts[0], 10), parseInt(bparts[1], 10))] = T.built[bkey];
             }
         }
     }
@@ -225,6 +233,8 @@ function makeApi(){
     };
     /** Test hook: mark a tile as already built, so a second fill sees it as taken. */
     api.__build = function(x, y){ BUILT[pos(x, y)] = true; };
+    /** Test hook: a built block with an identity (e.g. a conveyor the player already has). */
+    api.__buildBlock = function(x, y, name){ BUILT[pos(x, y)] = true; TERRAIN_BLOCK[pos(x, y)] = name; };
     /** Test hook: add an ore tile (vein fixtures are built at runtime by the checks). */
     api.__ore = function(x, y){ ore[pos(x, y)] = true; };
     api.wallDrop = function(tile){
@@ -238,8 +248,16 @@ function makeApi(){
         if(TERRAIN_SOLID[p] === true) return true;
         return walls[p] === true;
     };
-    api.blockOf = function(){ return air; };
-    api.buildOf = function(){ return null; };
+    api.blockOf = function(tile){
+        if(tile == null) return air;
+        var builtName = TERRAIN_BLOCK[pos(tile.x, tile.y)];
+        return (builtName != null && blocks[builtName] != null) ? blocks[builtName] : air;
+    };
+    api.buildOf = function(tile){
+        if(tile == null) return null;
+        var builtName = TERRAIN_BLOCK[pos(tile.x, tile.y)];
+        return (builtName != null && blocks[builtName] != null) ? {block: blocks[builtName]} : null;
+    };
     // Tile.relativeTo: the rotation from `other` to `tile` (0=east, 1=north, 2=west, 3=south),
     // or -1 for the same tile - the wall duct phases need the real thing, not a stub
     api.relativeTo = function(tile, other){

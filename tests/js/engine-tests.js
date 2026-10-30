@@ -765,6 +765,51 @@ check("a patch with no power nearby is not wired to anything",
         highTried > lowTried, "sweeps=" + lowTried + " vs " + highTried);
 })();
 
+// "Layout Variation": a deterministic re-roll among equally-good arrangements. Same number must
+// give the same layout on every device, and it must not cost coverage where everything is
+// coverable. (0, the default, keeps the standard layout - the corpus hash is the guard for that.)
+(function(){
+    var v1 = fillAt(round, laser, {"auto-drill-ios-layout-variation": 1}, false);
+    var v1again = fillAt(round, laser, {"auto-drill-ios-layout-variation": 1}, false);
+    check("layout variation is deterministic per value",
+        signature(v1.plans) === signature(v1again.plans) && v1.plans.length > 0,
+        "plans=" + v1.plans.length);
+
+    util.undoLastCommitted();
+    withSettings({"auto-drill-ios-layout-variation": 2});
+    var b1 = bridge.fill(centreOf(round), mechanical, direction.RIGHT, "sharded");
+    util.undoLastCommitted();
+    withSettings({"auto-drill-ios-layout-variation": 2});
+    var b2 = bridge.fill(centreOf(round), mechanical, direction.RIGHT, "sharded");
+    withSettings(null);
+    check("belt tool: the same variation fills the same way twice",
+        signature(b1) === signature(b2) && b1.length > 0, "plans=" + b1.length);
+})();
+
+// A drill beside an already-built belt can hand its ore over: the fill plans it instead of
+// refusing the placement for lack of transport. Before this, a re-tap over a built base placed
+// almost nothing - a built conveyor or bridge beside a free ore pocket was invisible to the
+// fill's transport checks (which only knew its own plans).
+(function(){
+    withSettings(null);
+    for(var ox = 120; ox <= 121; ox++){
+        for(var oy = 60; oy <= 61; oy++) api.__ore(ox, oy);
+    }
+    // a ring of built conveyors around the pocket: the only transport a drill can use there
+    for(var x = 118; x <= 123; x++){
+        for(var y = 58; y <= 63; y++){
+            if(x >= 120 && x <= 121 && y >= 60 && y <= 61) continue;
+            api.__buildBlock(x, y, "conveyor");
+        }
+    }
+    util.undoLastCommitted();
+    var plans = bridge.fill(api.tile(120, 60), mechanical, direction.RIGHT, "sharded");
+    var cov = coverageOf({oreX0: 120, oreY0: 60, x1: 121, y1: 61}, plans, mechanical);
+    check("a drill beside an already-built belt is planned (built-base re-tap)",
+        cov.drills >= 1 && cov.covered === cov.total,
+        "drills=" + cov.drills + " covered=" + cov.covered + "/" + cov.total);
+})();
+
 // ---------------------------------------------------------------- 6c. Erekir support
 
 // On Erekir the drills need beam blocks (power nodes do not exist there), and the fill must

@@ -60,6 +60,9 @@ var SETTING_DEFAULTS = {
 exports.settingDefaults = SETTING_DEFAULTS;
 
 var KEY_QUALITY = "auto-drill-ios-optimization-quality";
+// Re-rolls the arrangement among layouts that cover the same ore. Key shared with ui.js and
+// bridge.js (stable setting key). 0 = the standard layout everywhere.
+var KEY_VARIATION = "auto-drill-ios-layout-variation";
 var KEY_SUPPORT = "auto-drill-ios-place-water-extractor-and-power-nodes";
 var KEY_ROUTE = "auto-drill-ios-output-routing-length";
 var KEY_LANES = "auto-drill-ios-build-belt-lanes";
@@ -115,6 +118,7 @@ function newJob(tile, drill, withSupport, teamOverride, direction, routeLength){
         maxTiles: api.settingInt(prefix + "-drill-max-tiles", SETTING_DEFAULTS[prefix].tiles),
         minOres: api.settingInt(prefix + "-drill-min-ores", SETTING_DEFAULTS[prefix].ores),
         quality: api.settingInt(KEY_QUALITY, 2),
+        variation: api.settingInt(KEY_VARIATION, 0),
 
         // ---- patch scan (resumable) ----
         phase: PHASE_TILES,
@@ -424,7 +428,7 @@ function setupSearch(job){
     // Restart orders: shuffled candidate orders, a few every fill regardless of the quality
     // setting (they are the cheapest family that closes irregular shapes; see
     // buildRestartOrders). More of them at higher quality.
-    job.restartOrders = buildRestartOrders(entries, Math.max(4, Math.min(8, job.quality)));
+    job.restartOrders = buildRestartOrders(entries, Math.max(4, Math.min(8, job.quality)), job.variation);
 
     // Order set for the deep repair (ruin-and-recreate): the entry order plus the spatial
     // sweeps plus the first restart orders - the different insertion styles the repair tries.
@@ -1278,10 +1282,14 @@ var RESTART_SEED = 20261029;
  * Measured on the 13 shapes where the families still ended one tile short: one seeded restart
  * closed every one of them, and the extra cost is one greedy pass each (a few ms on a big
  * patch). Bounded and deterministic, so it behaves like an extra family, not like a random mod.
+ *
+ * `variation` shifts the seed: the player's "Layout Variation" setting re-rolls these orders
+ * (and, in the belt tool, the tie between equally-good phases). The same number always gives
+ * the same layout on every device; only the number changes what the shuffle looks like.
  */
-function buildRestartOrders(entries, count){
+function buildRestartOrders(entries, count, variation){
     var orders = [];
-    var seed = RESTART_SEED;
+    var seed = RESTART_SEED + (variation == null ? 0 : variation | 0) * 7919;
 
     for(var r = 0; r < count; r++){
         var order = [];
